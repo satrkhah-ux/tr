@@ -104,7 +104,7 @@ export function DuplicatesPanel({ data }: { data: Duplicates }) {
               <div key={g.key} className="rounded-[12px] border border-[#e2ebe7] p-2.5">
                 <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-[12.5px] font-extrabold text-[#185045]">
-                    {g.title} <span className="text-[11px] font-bold text-[#93aaa3]">· {TABLE[g.table]}{g.country ? ` · ${g.country}` : ""}</span>
+                    {g.title} <span className="text-[11px] font-bold text-tv-text-faint">· {TABLE[g.table]}{g.country ? ` · ${g.country}` : ""}</span>
                   </p>
                   <button type="button" disabled={!data.canChange || busy !== null} onClick={() => run(g.key, () => notDuplicate(g.key), "أُخفيت من القائمة")} className={`${BTN} border-[#e2ebe7] text-[#557d78]`}>
                     ليست مكررة
@@ -115,8 +115,8 @@ export function DuplicatesPanel({ data }: { data: Duplicates }) {
                     <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[9px] bg-[#f8fbfa] px-2.5 py-1.5 text-[12px] font-semibold text-[#185045]">
                       <span className="min-w-0 flex-1 break-words">
                         {r.label}
-                        {r.detail ? <span className="text-[#93aaa3]"> · {r.detail}</span> : null}
-                        {r.uses ? <span className="text-[#93aaa3]"> · {r.uses} أسعار سيارات</span> : null}
+                        {r.detail ? <span className="text-tv-text-faint"> · {r.detail}</span> : null}
+                        {r.uses ? <span className="text-tv-text-faint"> · {r.uses} أسعار سيارات</span> : null}
                       </span>
                       {r.price ? <DirText className="tv-tnum font-extrabold">{r.price}</DirText> : null}
                       <button

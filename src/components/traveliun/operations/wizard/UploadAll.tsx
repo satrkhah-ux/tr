@@ -489,7 +489,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <h2 className="text-[14px] font-extrabold text-[#185045]">{t("wz.up.title")}</h2>
-          <p className="mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.up.hint")}</p>
+          <p className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{t("wz.up.hint")}</p>
         </div>
         <button type="button" onClick={onClose} aria-label={t("wz.up.close")} className="inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#557d78] hover:bg-[#f0f5f3]">
           <X className="size-4" />
@@ -513,7 +513,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
         <span className="text-[13.5px] font-extrabold text-[#185045]">
           {reading ? t("wz.up.reading", { done: items.length - reading, of: items.length }) : t("wz.up.drop")}
         </span>
-        <span className="text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.up.types")}</span>
+        <span className="text-[11.5px] font-semibold text-tv-text-faint">{t("wz.up.types")}</span>
         <input
           type="file"
           multiple

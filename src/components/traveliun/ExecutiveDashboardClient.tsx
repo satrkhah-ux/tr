@@ -284,7 +284,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
     <>
       {/* header + filters */}
       <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-        <p className="mb-3 text-[12.5px] font-semibold text-[#8aa29b]">{t("exec.subtitle")}</p>
+        <p className="mb-3 text-[12.5px] font-semibold text-tv-text-faint">{t("exec.subtitle")}</p>
         <div className="flex flex-wrap items-end gap-3">
           <Field label={t("exec.filter.destination")}>
             <select value={dest} onChange={(e) => setDest(e.target.value)} className={selectClass}>
@@ -356,12 +356,12 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
       <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] lg:p-5">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("exec.table.title")}</h2>
-          <span className="text-[12px] font-semibold text-[#93aaa3]">
+          <span className="text-[12px] font-semibold text-tv-text-faint">
             {t("exec.table.count", { shown: fmtInt(view.length), total: fmtInt(rows.length) })}
           </span>
         </div>
         {view.length === 0 ? (
-          <p className="py-8 text-center text-sm text-[#93aaa3]">{t("exec.table.empty")}</p>
+          <p className="py-8 text-center text-sm text-tv-text-faint">{t("exec.table.empty")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[13px]">
@@ -376,7 +376,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
                   <Th onClick={() => setSortCol("sell")} active={sort.col === "sell"} dir={sort.dir} numeric>{t("exec.table.sell")}</Th>
                   <Th onClick={() => setSortCol("buy")} active={sort.col === "buy"} dir={sort.dir} numeric>{t("exec.table.buy")}</Th>
                   <Th onClick={() => setSortCol("profit")} active={sort.col === "profit"} dir={sort.dir} numeric>{t("exec.table.profit")}</Th>
-                  <th className="whitespace-nowrap px-3 py-2.5 text-start text-[11.5px] font-bold text-[#93aaa3]">{t("exec.table.status")}</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-start text-[11.5px] font-bold text-tv-text-faint">{t("exec.table.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -389,8 +389,8 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
                     <td className="whitespace-nowrap px-3 py-2.5 text-[#557d78]"><DirText dir="ltr">{r.date || t("exec.na")}</DirText></td>
                     <td className="tv-tnum whitespace-nowrap px-3 py-2.5 text-end text-[#0f3d38]"><DirText dir="ltr">{fmtInt(r.pax)}</DirText></td>
                     <td className="tv-tnum whitespace-nowrap px-3 py-2.5 text-end font-bold text-[#0f3d38]"><DirText dir="ltr">{fmtInt(r.sell)}</DirText></td>
-                    <td className="tv-tnum whitespace-nowrap px-3 py-2.5 text-end text-[#557d78]">{r.buy != null ? <DirText dir="ltr">{fmtInt(r.buy)}</DirText> : <span className="text-[#93aaa3]">{t("exec.na")}</span>}</td>
-                    <td className="tv-tnum whitespace-nowrap px-3 py-2.5 text-end font-bold">{r.profit != null ? <span className={r.profit >= 0 ? "text-[#0f7a52]" : "text-[#c22850]"}><DirText dir="ltr">{fmtInt(r.profit)}</DirText></span> : <span className="text-[#93aaa3]">{t("exec.na")}</span>}</td>
+                    <td className="tv-tnum whitespace-nowrap px-3 py-2.5 text-end text-[#557d78]">{r.buy != null ? <DirText dir="ltr">{fmtInt(r.buy)}</DirText> : <span className="text-tv-text-faint">{t("exec.na")}</span>}</td>
+                    <td className="tv-tnum whitespace-nowrap px-3 py-2.5 text-end font-bold">{r.profit != null ? <span className={r.profit >= 0 ? "text-[#0f7a52]" : "text-[#c22850]"}><DirText dir="ltr">{fmtInt(r.profit)}</DirText></span> : <span className="text-tv-text-faint">{t("exec.na")}</span>}</td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <StatusChip status={r.status} label={STATUS_LABEL_KEY.has(r.status) ? t(STATUS_LABEL_KEY.get(r.status)!) : r.status} />
                     </td>
@@ -403,7 +403,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
       </section>
 
       {/* footer */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2 text-[11.5px] font-semibold text-[#93aaa3]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2 text-[11.5px] font-semibold text-tv-text-faint">
         <span>
           {t("exec.footer.ref", {
             offers: fmtInt(rows.length),
@@ -424,7 +424,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-bold text-[#8aa29b]">{label}</span>
+      <span className="text-[11px] font-bold text-tv-text-faint">{label}</span>
       {children}
     </label>
   );
@@ -434,16 +434,16 @@ export function KpiCard({ label, value, unit, hint, icon: Icon, color }: { label
   return (
     <article className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
       <div className="flex items-start justify-between">
-        <p className="text-[12.5px] font-bold text-[#6f8f88]">{label}</p>
+        <p className="text-[12.5px] font-bold text-tv-text-faint">{label}</p>
         <span className="flex size-[38px] items-center justify-center rounded-[11px]" style={{ color, background: `${color}1a` }}>
           <Icon className="size-5" />
         </span>
       </div>
       <p className="tv-tnum mt-2.5 text-[26px] font-extrabold text-[#003c3a]">
         <DirText dir="ltr">{value}</DirText>
-        {unit ? <span className="ms-1 text-[14px] font-bold text-[#93aaa3]">{unit}</span> : null}
+        {unit ? <span className="ms-1 text-[14px] font-bold text-tv-text-faint">{unit}</span> : null}
       </p>
-      <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">{hint}</p>
+      <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">{hint}</p>
     </article>
   );
 }
@@ -452,7 +452,7 @@ export function ChartCard({ title, caption, children }: { title: string; caption
   return (
     <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] lg:p-5">
       <h3 className="text-sm font-extrabold text-[#003c3a]">{title}</h3>
-      <p className="mb-3 mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">{caption}</p>
+      <p className="mb-3 mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{caption}</p>
       {children}
     </div>
   );
@@ -460,7 +460,7 @@ export function ChartCard({ title, caption, children }: { title: string; caption
 
 function Th({ children, onClick, active, dir, numeric }: { children: React.ReactNode; onClick: () => void; active: boolean; dir: "asc" | "desc"; numeric?: boolean }) {
   return (
-    <th className={`whitespace-nowrap px-3 py-2.5 text-[11.5px] font-bold ${numeric ? "text-end" : "text-start"} ${active ? "text-[#185045]" : "text-[#93aaa3]"}`}>
+    <th className={`whitespace-nowrap px-3 py-2.5 text-[11.5px] font-bold ${numeric ? "text-end" : "text-start"} ${active ? "text-[#185045]" : "text-tv-text-faint"}`}>
       <button type="button" onClick={onClick} className={`inline-flex items-center gap-1 hover:text-[#185045] ${numeric ? "flex-row-reverse" : ""}`}>
         {children}
         <ArrowDownUp className={`size-3 ${active ? "opacity-100" : "opacity-30"}`} />

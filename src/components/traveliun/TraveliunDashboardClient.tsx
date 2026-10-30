@@ -131,7 +131,7 @@ function ReadySections() {
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-extrabold text-[#003c3a]">{t("dash.readySections")}</h2>
-        <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.readyHint")}</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("dash.readyHint")}</p>
       </div>
 
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
@@ -146,7 +146,7 @@ function ReadySections() {
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[13.5px] font-extrabold text-[#0f3d38]">{t(a.labelKey)}</span>
-              <span className="block truncate text-[11.5px] font-semibold text-[#93aaa3]">{t(a.descKey)}</span>
+              <span className="block truncate text-[11.5px] font-semibold text-tv-text-faint">{t(a.descKey)}</span>
             </span>
           </Link>
         ))}
@@ -200,7 +200,7 @@ function PreviousSections() {
         <span className="tv-tnum rounded-full bg-[#eef4f1] px-2 py-0.5 text-[11px] font-bold text-[#557d78]">
           <DirText dir="ltr">{String(count)}</DirText>
         </span>
-        <span className="ms-auto text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.previousHint")}</span>
+        <span className="ms-auto text-[11.5px] font-semibold text-tv-text-faint">{t("dash.previousHint")}</span>
       </summary>
       <div className="grid gap-4 border-t border-[#eef2f0] p-5 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
         {groups.map((group) => (
@@ -307,13 +307,13 @@ function KpiCard({ label, value, detail, icon: Icon, color }: { label: string; v
   return (
     <article className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
       <div className="flex items-start justify-between">
-        <p className="text-[12.5px] font-bold text-[#6f8f88]">{label}</p>
+        <p className="text-[12.5px] font-bold text-tv-text-faint">{label}</p>
         <span className="flex size-[38px] items-center justify-center rounded-[11px]" style={{ color, background: `${color}1a` }}>
           <Icon className="size-5" />
         </span>
       </div>
       <p className="tv-tnum mt-2.5 text-[28px] font-extrabold text-[#003c3a]"><DirText>{value}</DirText></p>
-      {detail ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">{detail}</p> : null}
+      {detail ? <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">{detail}</p> : null}
     </article>
   );
 }
@@ -430,7 +430,7 @@ function TeamOperations() {
       {/* toolbar: employee search + customize */}
       <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
         <div className="relative h-11 w-full max-w-[320px]">
-          <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" />
           <input
             value={selected ? selected.name : query}
             onChange={(e) => { setSelected(null); setQuery(e.target.value); }}
@@ -477,7 +477,7 @@ function TeamOperations() {
                 const isHidden = layout.hidden.includes(key);
                 return (
                   <div key={key} className="flex items-center justify-between rounded-[10px] border border-[#eef2f0] px-3 py-2 dark:border-[#294039]">
-                    <span className={`text-sm font-semibold ${isHidden ? "text-[#b6c4bf] line-through" : "text-[#185045] dark:text-[#d6e5df]"}`}>{t(def.label)}</span>
+                    <span className={`text-sm font-semibold ${isHidden ? "text-tv-text-faint line-through" : "text-[#185045] dark:text-[#d6e5df]"}`}>{t(def.label)}</span>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => move(key, -1)} disabled={index === 0} className="flex size-8 items-center justify-center rounded-md border border-[#e2ebe7] text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-40"><ChevronUp className="size-4" /></button>
                       <button type="button" onClick={() => move(key, 1)} disabled={index === layout.order.length - 1} className="flex size-8 items-center justify-center rounded-md border border-[#e2ebe7] text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-40"><ChevronDown className="size-4" /></button>

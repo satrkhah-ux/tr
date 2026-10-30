@@ -113,7 +113,7 @@ type Tab = "tours" | "program";
  * bare fields aligned under them — rather than a label over every field, which
  * spread a city over half a screen. Below xl the rows wrap two to a line.
  */
-const head = "hidden px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid";
+const head = "hidden px-0.5 text-[10.5px] font-bold text-tv-text-faint xl:grid";
 const rowGap = "grid grid-cols-2 items-start gap-2";
 // the hotel, its room type, the board, the price (the owner, 2026-10-22) — the rest under «المزيد»
 const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_5rem_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_minmax(7rem,0.8fr)_2rem]";
@@ -432,7 +432,7 @@ export function BasicCityCard({
               window.setTimeout(() => onDragFrom(index), 0);
             }}
             onDragEnd={() => onDragFrom(null)}
-            className="cursor-grab text-[#7a948f] hover:text-[#185045] active:cursor-grabbing"
+            className="cursor-grab text-tv-text-faint hover:text-[#185045] active:cursor-grabbing"
           >
             <GripVertical className="size-4" />
           </span>
@@ -584,7 +584,7 @@ export function BasicCityCard({
           <button type="button" onClick={() => setEditing(false)} className="inline-flex h-9 items-center px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045]">
             {tx("cancelEdit")}
           </button>
-          <p className="basis-full text-[11px] font-semibold text-[#7a948f]">{tx("editCityHint")}</p>
+          <p className="basis-full text-[11px] font-semibold text-tv-text-faint">{tx("editCityHint")}</p>
         </div>
       ) : null}
 
@@ -811,7 +811,7 @@ export function HotelPanel({
                   {/* the city's nights: on its first row; the other stays say their own on their dates line */}
                   {i === 0 && j === 0 && onNights ? (
                     <label className="grid gap-0.5">
-                      <span className="text-[10.5px] font-bold text-[#7a948f] xl:hidden">{tx("nights")}</span>
+                      <span className="text-[10.5px] font-bold text-tv-text-faint xl:hidden">{tx("nights")}</span>
                       <select
                         value={city.nights}
                         onChange={(e) => onNights(Number(e.target.value))}
@@ -986,7 +986,7 @@ export function HotelPanel({
           </span>
         ) : null}
         {more ? (
-          <span className="tv-tnum text-[11px] font-bold text-[#7a948f]">
+          <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
             {tx("dayRange", { from: dayFrom, to: dayFrom + city.nights })}
             {lines.length === 1 ? stays.map((s) => (s.check_in ? ` · ${tx("stayDates", { in: s.check_in, out: s.check_out ?? "" })}` : "")) : null}
           </span>
@@ -1202,7 +1202,7 @@ function ClientHotelPanel({
           {tx("clientHint")}
         </p>
       )}
-      <p className="text-[11px] font-semibold text-[#7a948f]">{tx("clientNote")}</p>
+      <p className="text-[11px] font-semibold text-tv-text-faint">{tx("clientNote")}</p>
     </div>
   );
 }
@@ -1318,7 +1318,7 @@ function TboStayPrice({
 /** A small labelled field for the short lines. */
 function Field({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <label className={`grid gap-1 text-[10.5px] font-bold text-[#7a948f] ${className ?? ""}`}>
+    <label className={`grid gap-1 text-[10.5px] font-bold text-tv-text-faint ${className ?? ""}`}>
       {label}
       {children}
     </label>
@@ -1603,7 +1603,7 @@ function ServicesPanel({
         return (
           <div key={date} className="flex min-h-9 flex-wrap items-center gap-2 rounded-[8px] border border-dashed border-[#DCE9E5] px-2 py-1 text-[11.5px]">
             <span className="tv-tnum font-bold text-[#185045]">{dayLabel(date)}</span>
-            {title ? <span className="min-w-0 truncate font-semibold text-[#7a948f]">{title}</span> : null}
+            {title ? <span className="min-w-0 truncate font-semibold text-tv-text-faint">{title}</span> : null}
             {toursOn ? <span className="ms-auto">{extra ?? tourButton(date, t("pg.tour.add"))}</span> : null}
           </div>
         );

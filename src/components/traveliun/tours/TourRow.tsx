@@ -36,7 +36,7 @@ export type TourCatalog = {
 
 /** The compact field both screens' tour rows use. */
 export const tourField = basicField;
-const caption = "text-[10.5px] font-bold text-[#7a948f]";
+const caption = "text-[10.5px] font-bold text-tv-text-faint";
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 /** A car in a tour's name — the old list filed a tour once per car: «جولة البسفور (فيتو)»، «… (باص كبير)». */
@@ -288,7 +288,7 @@ export function TourRow({
             // a tour from the price list arrives priced for the tours car (or the car its price is for); a typed one keeps what was there
             onChange(chosenTour(catalog, value, pick));
           }}
-          className={`${field} ${pick.free ? "text-[#7a948f]" : ""}`}
+          className={`${field} ${pick.free ? "text-tv-text-faint" : ""}`}
         />,
       )}
       {compact && !carOpen && !pick.free ? (

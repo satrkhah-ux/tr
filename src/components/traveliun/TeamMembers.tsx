@@ -156,11 +156,11 @@ export function TeamMembers({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-extrabold text-[#003c3a]">{t("nav.employees")}</h1>
-              <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("team.subtitle")}</p>
+              <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("team.subtitle")}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
-                <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+                <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -190,7 +190,7 @@ export function TeamMembers({
             </div>
           </div>
           {canManage ? (
-            <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+            <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
               <KeyRound className="size-3.5" />
               {t("team.auditNote")}
             </p>
@@ -276,7 +276,7 @@ export function TeamMembers({
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-extrabold text-[#003c3a]">{m.arabic_name}</span>
-                    <span className="block truncate text-[11px] font-semibold text-[#93aaa3]">
+                    <span className="block truncate text-[11px] font-semibold text-tv-text-faint">
                       <DirText dir="ltr">{m.email ?? m.mobile ?? "—"}</DirText>
                     </span>
                   </span>
@@ -302,14 +302,14 @@ export function TeamMembers({
                       onClick={() => setTgFor(tgFor === m.id ? null : m.id)}
                       aria-expanded={tgFor === m.id}
                       className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
-                        m.telegram_linked ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#93aaa3]"
+                        m.telegram_linked ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-tv-text-faint"
                       }`}
                     >
                       <Bell className="size-3.5" />
                       {m.telegram_linked ? t("team.tg.linked") : t("team.tg.notLinkedShort")}
                     </button>
                   ) : (
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${m.telegram_linked ? "bg-[#e7f6ef] text-[#0f7a52]" : "bg-[#eef4f1] text-[#93aaa3]"}`}>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${m.telegram_linked ? "bg-[#e7f6ef] text-[#0f7a52]" : "bg-[#eef4f1] text-tv-text-faint"}`}>
                       {m.telegram_linked ? t("team.tg.linked") : t("team.tg.notLinkedShort")}
                     </span>
                   )}
@@ -430,7 +430,7 @@ function RoleSummary({ role }: { role?: TeamRole }) {
     <div className="mt-3 rounded-[10px] border border-[#e8efeb] bg-[#f8fbfa] px-3.5 py-2.5">
       <p className="text-[12px] font-extrabold text-[#185045]">{role.arabic_name}</p>
       {role.description ? <p className="mt-0.5 text-[11.5px] font-semibold text-[#557d78]">{role.description}</p> : null}
-      <p className="mt-1 text-[11px] font-bold text-[#93aaa3]">
+      <p className="mt-1 text-[11px] font-bold text-tv-text-faint">
         {role.permission_keys.length === 0
           ? t("team.grantsNone")
           : t("team.grants", { n: String(role.permission_keys.length), total: String(ALL_PERMISSIONS.length) })}
@@ -496,7 +496,7 @@ function ExtraSections({ member, roleKeys, onDone }: { member: TeamMember; roleK
                   {fromRole && !on ? (
                     <span className="text-[10.5px] font-bold text-[#c22850]">({t("team.removedFromRole")})</span>
                   ) : fromRole ? (
-                    <span className="text-[10.5px] font-semibold text-[#93aaa3]">({t("team.fromRole")})</span>
+                    <span className="text-[10.5px] font-semibold text-tv-text-faint">({t("team.fromRole")})</span>
                   ) : on ? (
                     <span className="text-[10.5px] font-bold text-[#0f7a52]">({t("team.addedForMember")})</span>
                   ) : null}

@@ -47,7 +47,7 @@ export function ComparePanel({ query, current, sarPer, action }: {
     <div className="flex flex-wrap items-baseline gap-2 text-sm">
       <strong>{query.cityAr}</strong>
       {query.hotelName && <span className="text-[#557d78]">{query.hotelName}</span>}
-      <span className="text-xs text-[#8ba09b] tabular-nums">{query.checkIn ?? "؟"} ← {query.checkOut ?? "؟"} · {query.rooms} غرفة · {query.adults} بالغ</span>
+      <span className="text-xs text-tv-text-faint tabular-nums">{query.checkIn ?? "؟"} ← {query.checkOut ?? "؟"} · {query.rooms} غرفة · {query.adults} بالغ</span>
       {current && <button type="button" onClick={() => void copyCurrent()} className="inline-flex items-center gap-1 rounded border border-[#dbe6e1] px-2 py-0.5 text-xs font-bold text-[#185045]">
         <Copy size={11} /> {copied ? "نُسخ ✓" : `سعرنا للإقامة: ${current.amount.toLocaleString("en-US")} ${current.currency}`}
       </button>}

@@ -96,7 +96,7 @@ export function TeamRoles({ roles, members }: { roles: TeamRole[]; members: Team
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-extrabold text-[#003c3a]">{t("team.title")}</h1>
-              <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("team.subtitle")}</p>
+              <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("team.subtitle")}</p>
             </div>
             <button
               type="button"
@@ -107,7 +107,7 @@ export function TeamRoles({ roles, members }: { roles: TeamRole[]; members: Team
               {t("team.addRole")}
             </button>
           </div>
-          <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+          <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
             <KeyRound className="size-3.5" />
             {t("team.auditNote")}
           </p>
@@ -168,7 +168,7 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
           {role.description ? (
             <p className="mt-1 text-[12px] font-semibold text-[#557d78]">{role.description}</p>
           ) : null}
-          <p className="mt-1.5 text-[11.5px] font-bold text-[#93aaa3]">
+          <p className="mt-1.5 text-[11.5px] font-bold text-tv-text-faint">
             {held.size === 0
               ? t("team.grantsNone")
               : t("team.grants", { n: String(held.size), total: String(TOTAL_PERMISSIONS) })}
@@ -228,7 +228,7 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
           {t("team.membersCount", { n: String(members.length) })}
         </p>
         {members.length === 0 ? (
-          <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("team.noMembers")}</p>
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("team.noMembers")}</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {members.map((m) => (
@@ -265,7 +265,7 @@ function PermList({
         {title}
       </p>
       {items.length === 0 ? (
-        <p className="text-[11.5px] font-semibold text-[#b6c4bf]">—</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">—</p>
       ) : (
         <ul className="space-y-1">
           {items.map((item) => (
@@ -381,7 +381,7 @@ function RoleForm({
                           </span>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 block text-[11px] font-semibold text-[#93aaa3]">{t(PERM_HINT(item.key))}</span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-tv-text-faint">{t(PERM_HINT(item.key))}</span>
                     </span>
                   </label>
                 );
@@ -452,7 +452,7 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
         <UserCog className="size-4" />
         {t("team.members")}
       </h2>
-      <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("team.noLoginHint")}</p>
+      <p className="mb-3 text-[11.5px] font-semibold text-tv-text-faint">{t("team.noLoginHint")}</p>
 
       <ul className="space-y-2">
         {members.map((m) => (
@@ -464,7 +464,7 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-extrabold text-[#003c3a]">{m.arabic_name}</span>
-              <span className="block truncate text-[11px] font-semibold text-[#93aaa3]">
+              <span className="block truncate text-[11px] font-semibold text-tv-text-faint">
                 <DirText dir="ltr">{m.email ?? m.mobile ?? "—"}</DirText>
               </span>
             </span>

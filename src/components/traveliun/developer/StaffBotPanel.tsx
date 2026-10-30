@@ -56,19 +56,19 @@ export function StaffBotPanel({ data }: { data: StaffBotPanelData }) {
   return (
     <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.sb.title")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.sb.hint")}</p>
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.sb.hint")}</p>
 
       <dl className="mt-3 grid gap-1 text-[12px] font-bold text-[#41615b]">
         <div className="flex flex-wrap gap-2">
-          <dt className="text-[#93aaa3]">{t("dev.sb.username")}</dt>
+          <dt className="text-tv-text-faint">{t("dev.sb.username")}</dt>
           <dd dir="ltr">{data.username ? `@${data.username}` : "—"}</dd>
         </div>
         <div className="flex flex-wrap gap-2">
-          <dt className="text-[#93aaa3]">{t("dev.sb.token")}</dt>
+          <dt className="text-tv-text-faint">{t("dev.sb.token")}</dt>
           <dd className={data.source ? "" : "text-[#c22850]"}>{data.source ? t(source) : t("dev.sb.noToken")}</dd>
         </div>
         <div className="flex flex-wrap gap-2">
-          <dt className="text-[#93aaa3]">{t("dev.sb.webhookUrl")}</dt>
+          <dt className="text-tv-text-faint">{t("dev.sb.webhookUrl")}</dt>
           <dd dir="ltr">{data.webhookUrl}</dd>
         </div>
       </dl>
@@ -116,7 +116,7 @@ export function StaffBotPanel({ data }: { data: StaffBotPanelData }) {
       ) : null}
 
       {data.updatedAt ? (
-        <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
+        <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">
           {t("dev.sb.updated", { at: new Date(data.updatedAt).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh" }), who: data.updatedBy ?? "—" })}
         </p>
       ) : null}

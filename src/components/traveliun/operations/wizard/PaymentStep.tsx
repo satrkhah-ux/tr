@@ -59,7 +59,7 @@ export function PaymentStep({ data, canManage }: StepProps) {
                 }`}
               >
                 <span className="block text-[13px] font-extrabold text-[#0f3d38]">{t(`wz.pay.choice.${c}` as TranslationKey)}</span>
-                <span className="tv-tnum mt-0.5 block text-[11.5px] font-semibold text-[#6d8a84]">
+                <span className="tv-tnum mt-0.5 block text-[11.5px] font-semibold text-tv-text-faint">
                   {c === "plan"
                     ? t("wz.pay.choice.planHint")
                     : `${(c === "full" ? choices.full : choices.installment).amount.toLocaleString("en-US")} ${op.currency ?? "SAR"}`}
@@ -67,7 +67,7 @@ export function PaymentStep({ data, canManage }: StepProps) {
               </button>
             ))}
           </div>
-          {choice === "plan" && !canManage ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.pay.choice.planManager")}</p> : null}
+          {choice === "plan" && !canManage ? <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">{t("wz.pay.choice.planManager")}</p> : null}
         </div>
       ) : null}
 
@@ -162,7 +162,7 @@ function AgreedPrice({ data, canManage }: Pick<StepProps, "data" | "canManage">)
           <DirText dir="ltr">{op.total == null ? "—" : `${fmt(op.total)} ${currency}`}</DirText>
         </p>
       )}
-      <p className="tv-tnum mt-1.5 text-[11px] font-semibold text-[#93aaa3]">
+      <p className="tv-tnum mt-1.5 text-[11px] font-semibold text-tv-text-faint">
         {agreed != null && offerTotal != null
           ? t("wz.pay.agreed.fromOffer", { offer: fmt(offerTotal), currency })
           : t("wz.pay.agreed.hint")}

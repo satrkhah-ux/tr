@@ -83,13 +83,13 @@ export function SendAllRequests({ operationId }: { operationId: string }) {
           <X className="size-4" />
         </button>
       </div>
-      {drafts.length === 0 ? <p className="text-[12.5px] font-semibold text-[#93aaa3]">{t("wz.sendAll.none")}</p> : null}
+      {drafts.length === 0 ? <p className="text-[12.5px] font-semibold text-tv-text-faint">{t("wz.sendAll.none")}</p> : null}
       <div className="space-y-3">
         {drafts.map((d) => (
           <article key={d.supplierId} className={`rounded-[10px] border bg-white p-3 ${done.has(d.supplierId) ? "border-[#bfe5d4]" : "border-[#e2ebe7]"}`}>
             <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[12px] font-extrabold text-[#0f3d38]">
               {d.draft.to_label}
-              {d.draft.to_phone ? <DirText dir="ltr" className="font-semibold text-[#93aaa3]">{d.draft.to_phone}</DirText> : null}
+              {d.draft.to_phone ? <DirText dir="ltr" className="font-semibold text-tv-text-faint">{d.draft.to_phone}</DirText> : null}
               <span className="tv-tnum rounded-full bg-[#eef5f2] px-2 py-0.5 text-[10.5px] font-bold text-[#2a7d66]">{t("wz.sendAll.count", { n: String(d.bookingIds.length) })}</span>
               {done.has(d.supplierId) ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0f7a52]">

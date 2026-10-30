@@ -43,7 +43,7 @@ export function TripLinkSend({ operationId }: { operationId: string }) {
     if (!list) return null;
     const went = list.delivered.includes("trip_link");
     const why = went ? tx("tripLinkSent") : !list.to_phone ? t("ops.err.clientNoPhone") : tx("tripLinkPending");
-    return <p className={`text-[12px] font-bold ${went ? "text-[#0f7a52]" : "text-[#7a948f]"}`}>{why}</p>;
+    return <p className={`text-[12px] font-bold ${went ? "text-[#0f7a52]" : "text-tv-text-faint"}`}>{why}</p>;
   }
 
   async function send() {

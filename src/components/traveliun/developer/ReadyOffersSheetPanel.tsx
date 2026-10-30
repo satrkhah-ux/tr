@@ -59,11 +59,11 @@ export function ReadyOffersSheetPanel({ data }: { data: ReadyOffersPanelData }) 
   return (
     <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.ro.title")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.ro.hint")}</p>
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.ro.hint")}</p>
 
       <label className="mt-3 grid gap-1">
         <span className="text-[11.5px] font-extrabold text-[#557d78]">
-          {t("dev.ro.link")} <span className="font-semibold text-[#93aaa3]">— {t(source)}</span>
+          {t("dev.ro.link")} <span className="font-semibold text-tv-text-faint">— {t(source)}</span>
         </span>
         <input
           value={link}

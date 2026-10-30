@@ -121,7 +121,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-extrabold text-[#003c3a]">{t("partner.title")}</h1>
-              <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("partner.subtitle")}</p>
+              <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("partner.subtitle")}</p>
             </div>
             <button
               type="button"
@@ -248,13 +248,13 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
                       >
                         {option.labelAr} · أهلاً وسهلاً
                       </span>
-                      <span className="mt-0.5 block text-[11px] font-semibold text-[#93aaa3]">{option.noteAr}</span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-tv-text-faint">{option.noteAr}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
-            <p className="mt-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("partner.colorsHint")}</p>
+            <p className="mt-1.5 text-[11px] font-semibold text-tv-text-faint">{t("partner.colorsHint")}</p>
             {isHouseColor(draft.brand_color) ? (
               <p className="mt-1.5 flex items-center gap-1.5 rounded-[9px] bg-[#fff8e8] px-3 py-2 text-[11.5px] font-bold text-[#a86a10]">
                 <AlertTriangle className="size-3.5 shrink-0" />
@@ -354,7 +354,7 @@ function Toggle({
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-4 accent-[#185045]" />
       <span>
         <span className="block text-[12.5px] font-bold text-[#185045]">{text}</span>
-        {hint ? <span className="block text-[11px] font-semibold text-[#93aaa3]">{hint}</span> : null}
+        {hint ? <span className="block text-[11px] font-semibold text-tv-text-faint">{hint}</span> : null}
       </span>
     </label>
   );
@@ -381,7 +381,7 @@ function LogoUpload({ partnerId }: { partnerId: string }) {
   return (
     <div className="mt-4 rounded-[10px] border border-dashed border-[#cfe0d9] p-3">
       <p className="text-[12px] font-bold text-[#185045]">{t("partner.logo")}</p>
-      <p className="mt-0.5 text-[11px] font-semibold text-[#93aaa3]">{t("partner.logoHint")}</p>
+      <p className="mt-0.5 text-[11px] font-semibold text-tv-text-faint">{t("partner.logoHint")}</p>
       <input
         ref={input}
         type="file"
@@ -432,7 +432,7 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
           <Link href={`/partner-companies/${company.id}`} className="block truncate text-[14px] font-extrabold text-[#003c3a] hover:underline">
             {company.name}
           </Link>
-          <p className="truncate text-[11.5px] font-semibold text-[#93aaa3]">
+          <p className="truncate text-[11.5px] font-semibold text-tv-text-faint">
             {[company.name_latin, company.phone, company.website].filter(Boolean).join(" · ") || "—"}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">

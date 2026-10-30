@@ -56,11 +56,11 @@ function ConnectionCard({ result, busy, onRecheck }: { result: CheckResult; busy
       </div>
       <p className="break-words text-[12px] font-semibold text-[#557d78]">{t(result.detail.key, result.detail.params)}</p>
       {result.extra?.map((line, i) => (
-        <p key={i} className="break-words text-[11.5px] font-semibold text-[#93aaa3]">
+        <p key={i} className="break-words text-[11.5px] font-semibold text-tv-text-faint">
           {t(line.key, line.params)}
         </p>
       ))}
-      <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-[#dce7e2] pt-2 text-[11px] font-bold text-[#93aaa3]">
+      <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-[#dce7e2] pt-2 text-[11px] font-bold text-tv-text-faint">
         <span dir="ltr">{result.latencyMs === null ? "— ms" : `${result.latencyMs} ms`}</span>
         <span>
           {result.lastRunAt
@@ -101,7 +101,7 @@ function ServerCard({ info }: { info: ServerInfo }) {
       <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-            <dt className="text-[11.5px] font-bold text-[#93aaa3]">{t(label)}</dt>
+            <dt className="text-[11.5px] font-bold text-tv-text-faint">{t(label)}</dt>
             <dd dir="ltr" className="min-w-0 break-all text-[12px] font-bold text-[#0f3d38]">
               {value}
             </dd>
@@ -118,7 +118,7 @@ function SectionHeader({ action }: { action?: React.ReactNode }) {
     <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
       <div>
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.connections")}</h2>
-        <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.connections.hint")}</p>
+        <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.connections.hint")}</p>
       </div>
       {action}
     </header>

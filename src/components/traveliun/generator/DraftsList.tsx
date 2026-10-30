@@ -125,7 +125,7 @@ export function DraftsList({
       <div className="tv-fade-up space-y-4">
         <section className={`${card} px-5 py-4`}>
           <h1 className="text-lg font-extrabold text-[#003c3a]">{issuedOnly ? t("nav.issuedOffers") : t("pg.hubTitle")}</h1>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">
+          <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">
             {issuedOnly ? t("pg.issuedSubtitle") : t("pg.hubSubtitle")}
           </p>
         </section>
@@ -159,12 +159,12 @@ export function DraftsList({
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.draftsTitle")}</h2>
-              <p className="mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">
+              <p className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">
                 {t("pg.draftsCount", { n: String(rows.length) })} · {t("pg.draftsSubtitle")}
               </p>
             </div>
             <div className="relative">
-              <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+              <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -211,7 +211,7 @@ export function DraftsList({
                             <span className="tv-tnum font-extrabold text-[#185045]">{draft.produced_serial}</span>
                           </DirText>
                         ) : (
-                          <span className="text-[11.5px] font-semibold text-[#b6c4bf]">{t("pg.noSerial")}</span>
+                          <span className="text-[11.5px] font-semibold text-tv-text-faint">{t("pg.noSerial")}</span>
                         )}
                       </Td>
                       <Td>
@@ -263,7 +263,7 @@ export function DraftsList({
                             </span>
                           </DirText>
                         ) : (
-                          <span className="text-[11.5px] font-semibold text-[#b6c4bf]">{t("pg.noPrice")}</span>
+                          <span className="text-[11.5px] font-semibold text-tv-text-faint">{t("pg.noPrice")}</span>
                         )}
                       </Td>
                       <Td>
@@ -279,7 +279,7 @@ export function DraftsList({
                       </Td>
                       <Td>
                         <DirText dir="ltr">
-                          <span className="tv-tnum text-[11.5px] text-[#93aaa3]">
+                          <span className="tv-tnum text-[11.5px] text-tv-text-faint">
                             {draft.updated_at.slice(0, 16).replace("T", " ")}
                           </span>
                         </DirText>
@@ -383,7 +383,7 @@ function StartCard({
       </span>
       <span className="min-w-0">
         <span className="block text-[14.5px] font-extrabold text-[#0f3d38]">{t(titleKey)}</span>
-        <span className="mt-0.5 block text-[11.5px] font-semibold text-[#93aaa3]">{t(hintKey)}</span>
+        <span className="mt-0.5 block text-[11.5px] font-semibold text-tv-text-faint">{t(hintKey)}</span>
       </span>
     </>
   );

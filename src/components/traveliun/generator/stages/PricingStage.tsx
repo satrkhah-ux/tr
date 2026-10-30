@@ -225,7 +225,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
 
         {/* 1. What still has no price — the only thing that needs the agent here. */}
         {pricing.items.length === 0 ? (
-          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">
             {syncing ? t("pg.syncing") : t("pg.warn.noPricing")}
           </p>
         ) : missing.length === 0 ? (
@@ -366,7 +366,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
             {t("pg.ratesFallback")}
           </p>
         ) : lookups.ratesDate ? (
-          <p className="mt-3 text-[11.5px] font-bold text-[#93aaa3]">
+          <p className="mt-3 text-[11.5px] font-bold text-tv-text-faint">
             {t("pg.ratesLive", { date: lookups.ratesDate.slice(0, 10) })}
           </p>
         ) : null}
@@ -505,7 +505,7 @@ function PricingCard({
               })
             }
             disabled={manual}
-            className={`${fieldClass} tv-tnum text-center disabled:bg-[#f1f5f3] disabled:text-[#93aaa3]`}
+            className={`${fieldClass} tv-tnum text-center disabled:bg-[#f1f5f3] disabled:text-tv-text-faint`}
             placeholder="—"
           />
         </label>
@@ -609,10 +609,10 @@ function PricingCard({
 
 function LineFigure({ label, value, tone }: { label: string; value: string; tone: "brand" | "good" | "bad" | "muted" }) {
   const toneClass =
-    tone === "brand" ? "text-[#185045]" : tone === "good" ? "text-[#0f7a52]" : tone === "bad" ? "text-[#c22850]" : "text-[#93aaa3]";
+    tone === "brand" ? "text-[#185045]" : tone === "good" ? "text-[#0f7a52]" : tone === "bad" ? "text-[#c22850]" : "text-tv-text-faint";
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="text-[#93aaa3]">{label}</span>
+      <span className="text-tv-text-faint">{label}</span>
       <span className={`tv-tnum ${toneClass}`}>
         <DirText dir="ltr">{value}</DirText>
       </span>
@@ -624,7 +624,7 @@ function Total({ label, value, tone }: { label: string; value: string; tone: "br
   const toneClass = tone === "brand" ? "text-[#185045]" : tone === "good" ? "text-[#0f7a52]" : "text-[#557d78]";
   return (
     <div className="rounded-[12px] bg-[#f4f8f6] px-4 py-3">
-      <p className="text-[11px] font-bold text-[#93aaa3]">{label}</p>
+      <p className="text-[11px] font-bold text-tv-text-faint">{label}</p>
       <p className={`tv-tnum mt-1 text-[17px] font-extrabold ${toneClass}`}>
         <DirText dir="ltr">{value}</DirText>
       </p>

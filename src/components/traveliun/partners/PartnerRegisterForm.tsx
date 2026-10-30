@@ -148,7 +148,7 @@ export function PartnerRegisterForm() {
             </label>
           ))}
         </div>
-        <p className="text-[11.5px] font-semibold text-[#93aaa3]">PDF أو صورة، حتى 5 ميغابايت لكل ملف. تبقى المستندات عندنا ولا تُنشر.</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">PDF أو صورة، حتى 5 ميغابايت لكل ملف. تبقى المستندات عندنا ولا تُنشر.</p>
       </fieldset>
 
       <label className={label}>
@@ -163,7 +163,7 @@ export function PartnerRegisterForm() {
 
       {/* The same story the profile page tells: the identity is set with us after
           approval — an unapproved company has nothing to brand yet. */}
-      <p className="text-[11.5px] font-semibold text-[#93aaa3]">
+      <p className="text-[11.5px] font-semibold text-tv-text-faint">
         بعد الاعتماد ترسلون لنا شعار الشركة وألوانها، ونعتمدها لتظهر على عروضكم.
       </p>
 

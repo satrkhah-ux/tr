@@ -98,7 +98,7 @@ export function TelegramLink({ member }: { member: TeamMember }) {
           </select>
         </label>
       </div>
-      <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">
+      <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">
         {t("team.tg.hint")}{" "}
         {link ? (
           <a href={link} target="_blank" rel="noopener noreferrer" dir="ltr" className="font-bold text-[#185045] hover:underline">

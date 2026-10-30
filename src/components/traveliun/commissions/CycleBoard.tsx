@@ -57,7 +57,7 @@ export function CycleBoard({ view }: { view: CycleView }) {
               دورة عمولات <Num>{view.month}</Num>
               <StatusPill status={status} />
             </h1>
-            <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-6 text-[#93aaa3]">
+            <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-6 text-tv-text-faint">
               الملفات المسددة بالكامل في الشهر على ربحها الفعلي. المسودة تُحسب من جديد مع كل فتح؛ عند الإرسال للاعتماد تُجمَّد الأرقام والملفات خلفها، ولا تتغير بعدها.
             </p>
           </div>
@@ -136,7 +136,7 @@ export function CycleBoard({ view }: { view: CycleView }) {
 
         <Section title="الموظفون">
           {rows.length === 0 ? (
-            <p className="text-[12px] font-semibold text-[#93aaa3]">لا يوجد ملف اكتمل سداده في هذا الشهر.</p>
+            <p className="text-[12px] font-semibold text-tv-text-faint">لا يوجد ملف اكتمل سداده في هذا الشهر.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -225,7 +225,7 @@ export function CycleBoard({ view }: { view: CycleView }) {
         {cycle && (
           <Section title="التعديلات اليدوية">
             {view.adjustments.length === 0 ? (
-              <p className="text-[12px] font-semibold text-[#93aaa3]">لا توجد تعديلات.</p>
+              <p className="text-[12px] font-semibold text-tv-text-faint">لا توجد تعديلات.</p>
             ) : (
               <ul className="space-y-1.5">
                 {view.adjustments.map((a) => (

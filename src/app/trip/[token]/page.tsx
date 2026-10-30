@@ -82,7 +82,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
             <div className="min-w-0 border-s-4 border-[var(--trip)] ps-3">
               <p className="break-words text-[15px] font-extrabold text-[var(--trip)]">{hub.brand.name}</p>
               {hub.brand.nameLatin ? (
-                <p dir="ltr" className="text-end text-[11px] font-bold tracking-wide text-[#6b7c78]">
+                <p dir="ltr" className="text-end text-[11px] font-bold tracking-wide text-tv-text-faint">
                   {hub.brand.nameLatin}
                 </p>
               ) : null}
@@ -94,7 +94,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
           <div className="relative border-t border-[#d7e4e0] px-5 pb-5 pt-6 text-center sm:px-6">
             <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url('/traveliun/world-map.png')] bg-cover bg-center opacity-40" />
             <div className="relative">
-              <p className="text-[13px] font-bold text-[#6b7c78]">برنامج رحلتك إلى</p>
+              <p className="text-[13px] font-bold text-tv-text-faint">برنامج رحلتك إلى</p>
               <h1 className="mt-1 break-words text-[32px] font-extrabold leading-tight text-[var(--trip)]">{hub.destination || "رحلتك"}</h1>
               <span aria-hidden className="mx-auto mt-2 block h-[3px] w-16 rounded-full bg-[var(--gold)]" />
               {hub.customer_name ? <p className="mt-3 break-words text-[15px] font-extrabold text-[#263633]">{hub.customer_name}</p> : null}
@@ -104,7 +104,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                 <Metric label="الليالي" value={nights > 0 ? String(nights) : "—"} />
                 <Metric label="المسافرون" value={trip.travellers > 0 ? String(trip.travellers) : "—"} />
               </div>
-              <p className="mt-3 text-[12px] font-bold text-[#6b7c78]">
+              <p className="mt-3 text-[12px] font-bold text-tv-text-faint">
                 رقم الملف <bdi dir="ltr" className="text-[var(--trip)]">{hub.serial}</bdi>
               </p>
             </div>
@@ -186,7 +186,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                     >
                       <summary className="flex cursor-pointer list-none items-start gap-2 p-3.5 [&::-webkit-details-marker]:hidden">
                         <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-1.5 text-[12px] font-bold text-[#93aaa3]">
+                          <span className="flex flex-wrap items-center gap-1.5 text-[12px] font-bold text-tv-text-faint">
                             اليوم {d.day_number} · {dayLabel(d.date)}
                             {d.city ? ` · ${d.city}` : ""}
                             {when === "today" ? (
@@ -369,7 +369,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
 
         <Card title="مستنداتك">
           {hub.documents.length === 0 ? (
-            <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[13.5px] text-[#93aaa3]">
+            <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[13.5px] text-tv-text-faint">
               لم تصدر المستندات بعد. ستظهر هنا فور إصدارها — احتفظ بهذا الرابط.
             </p>
           ) : (
@@ -384,7 +384,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                   >
                     <span className="min-w-0">
                       <span className="block text-[14px] font-extrabold">{DOC_LABEL[d.kind] ?? d.kind}</span>
-                      <span className="mt-0.5 block text-[11.5px] font-semibold text-[#93aaa3]">
+                      <span className="mt-0.5 block text-[11.5px] font-semibold text-tv-text-faint">
                         <bdi dir="ltr">{d.issued_at}</bdi>
                       </span>
                     </span>
@@ -420,7 +420,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
         <footer className="rounded-2xl border-t-[3px] border-[var(--trip)] bg-white/90 px-5 py-4 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element -- see the header */}
           <img src={logo} alt="" className="mx-auto h-9 w-auto object-contain" />
-          <p className="mt-2 text-[12px] font-bold text-[#6b7c78]">
+          <p className="mt-2 text-[12px] font-bold text-tv-text-faint">
             {hub.brand.name}
             {hub.brand.phone ? <> · <bdi dir="ltr">{hub.brand.phone}</bdi></> : null}
             {hub.brand.website ? <> · <bdi dir="ltr">{hub.brand.website}</bdi></> : null}
@@ -458,9 +458,9 @@ function Metric({ label, value, day }: { label: string; value?: string; day?: st
     : [null, value ?? "—"];
   return (
     <div className="rounded-[14px] border border-[#d7e4e0] bg-[rgba(246,250,248,0.94)] px-2 py-3">
-      <p className="text-[11.5px] font-bold text-[#6b7c78]">{label}</p>
+      <p className="text-[11.5px] font-bold text-tv-text-faint">{label}</p>
       <p className="mt-1 break-words text-[17px] font-extrabold leading-tight text-[var(--trip)]">{date}</p>
-      {weekday ? <p className="mt-0.5 text-[11px] font-bold text-[#93aaa3]">{weekday}</p> : null}
+      {weekday ? <p className="mt-0.5 text-[11px] font-bold text-tv-text-faint">{weekday}</p> : null}
     </div>
   );
 }
@@ -618,7 +618,7 @@ function ServiceItem({ s, today, withDate }: { s: TripService; today: string; wi
           ) : null}
         </div>
       ) : s.date && s.date > today ? (
-        <p className="mx-3 mb-3 text-[11.5px] font-semibold text-[#93aaa3]">تظهر بيانات السائق هنا يوم الخدمة.</p>
+        <p className="mx-3 mb-3 text-[11.5px] font-semibold text-tv-text-faint">تظهر بيانات السائق هنا يوم الخدمة.</p>
       ) : null}
     </li>
   );

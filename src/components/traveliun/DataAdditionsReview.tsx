@@ -74,9 +74,9 @@ export function DataAdditionsReview({ initial, enabled }: { initial: AdditionFor
                     <span dir="auto">{r.name}</span>
                   )}
                 </td>
-                <td className="p-2 text-[#7a948f]" dir="auto">{r.typed_text}</td>
-                <td className="p-2 text-[#7a948f]">{[r.city, r.country].filter(Boolean).join(" — ") || "—"}</td>
-                <td className="p-2 text-[#7a948f]">
+                <td className="p-2 text-tv-text-faint" dir="auto">{r.typed_text}</td>
+                <td className="p-2 text-tv-text-faint">{[r.city, r.country].filter(Boolean).join(" — ") || "—"}</td>
+                <td className="p-2 text-tv-text-faint">
                   {r.author ?? "—"}
                   <div className="tv-tnum text-[11px]">{new Date(r.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })}</div>
                 </td>

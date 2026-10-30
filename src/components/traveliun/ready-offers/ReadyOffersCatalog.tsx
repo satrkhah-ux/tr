@@ -70,7 +70,7 @@ export function ReadyOffersCatalog({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ro.title")}</h1>
-            <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">
+            <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">
               {t("ro.subtitle", { ready: String(readyCount), total: String(offers.length) })}
             </p>
           </div>
@@ -125,7 +125,7 @@ export function ReadyOffersCatalog({
             </Link>
           </div>
         ) : visible.length === 0 ? (
-          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-12 text-center text-sm text-[#93aaa3]">
+          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-12 text-center text-sm text-tv-text-faint">
             {t("ro.empty")}
           </p>
         ) : (
@@ -226,7 +226,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
               {Number(offer.price).toLocaleString("en-US")}
             </span>
             <span className="text-[13px] font-bold text-[#557d78]">{offer.currency ?? "SAR"}</span>
-            <span className="text-[11px] font-semibold text-[#93aaa3]">{offer.price_basis || t("ro.priceNote")}</span>
+            <span className="text-[11px] font-semibold text-tv-text-faint">{offer.price_basis || t("ro.priceNote")}</span>
           </div>
         )}
       </div>
@@ -255,7 +255,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
       ) : null}
 
       {offer.validity_raw ? (
-        <p className="mt-2 text-[11.5px] font-bold text-[#93aaa3]">
+        <p className="mt-2 text-[11.5px] font-bold text-tv-text-faint">
           {t("ro.validity")}: {offer.validity_raw}
         </p>
       ) : null}
@@ -369,7 +369,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
             />
           </label>
           {uploading ? <Loader2 className="size-4 animate-spin text-[#185045]" /> : null}
-          <p className="text-[11.5px] font-bold text-[#78948f]">{t("ro.orLink")}</p>
+          <p className="text-[11.5px] font-bold text-tv-text-faint">{t("ro.orLink")}</p>
           <input
             value={design}
             onChange={(e) => setDesign(e.target.value)}
@@ -414,7 +414,7 @@ function Row({ icon, value }: { icon: React.ReactNode; value: string | null }) {
   if (!value) return null;
   return (
     <div className="flex items-start gap-2">
-      <span className="mt-0.5 shrink-0 text-[#93aaa3]">{icon}</span>
+      <span className="mt-0.5 shrink-0 text-tv-text-faint">{icon}</span>
       <span className="whitespace-pre-line">{value}</span>
     </div>
   );

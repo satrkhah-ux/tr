@@ -63,10 +63,10 @@ export function DriversPanel({ serial, guestName, bookings }: { serial: string; 
           {t("ops.drv.schedule")}
         </Link>
       </div>
-      <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.drv.hint")}</p>
+      <p className="mb-3 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.drv.hint")}</p>
 
       {rows.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("ops.drv.none")}</p>
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">{t("ops.drv.none")}</p>
       ) : (
         <ul className="grid gap-2.5 lg:grid-cols-2">
           {rows.map(({ b, kind }) => (
@@ -232,7 +232,7 @@ function DriverCard({
 function Fact({ label, value, icon, ltr, muted }: { label: string; value: string; icon?: ReactNode; ltr?: boolean; muted?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="flex items-center gap-1 text-[10.5px] font-bold text-[#93aaa3]">
+      <dt className="flex items-center gap-1 text-[10.5px] font-bold text-tv-text-faint">
         {icon}
         {label}
       </dt>
@@ -282,10 +282,10 @@ export function DriverSend({ bookingId, onSent }: { bookingId: string; onSent?: 
           <p className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
             <UserRound className="size-3.5" />
             {draft.to_label}
-            {draft.to_phone ? <DirText dir="ltr" className="font-semibold text-[#93aaa3]">{draft.to_phone}</DirText> : null}
+            {draft.to_phone ? <DirText dir="ltr" className="font-semibold text-tv-text-faint">{draft.to_phone}</DirText> : null}
             {draft.cities.length > 0 ? <span className="font-semibold text-[#557d78]">{t("wz.transport.drv.cities", { cities: draft.cities.join("، ") })}</span> : null}
           </p>
-          <p className="text-[11px] font-semibold text-[#93aaa3]">{t("ops.drv.review")}</p>
+          <p className="text-[11px] font-semibold text-tv-text-faint">{t("ops.drv.review")}</p>
           {draft.update ? <MessageBox bookingId={bookingId} draft={draft} part="update" initial={draft.update} onSent={onSent} /> : null}
           <MessageBox bookingId={bookingId} draft={draft} part="programme" initial={draft.programme} onSent={onSent} />
           <MessageBox bookingId={bookingId} draft={draft} part="hotels" initial={draft.hotels} onSent={onSent} />

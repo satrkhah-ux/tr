@@ -91,7 +91,7 @@ export function CatalogTextAdd({
           }}
           className={`${fieldClass} min-w-0 flex-1`}
         />
-        <button type="button" onClick={onCancel} aria-label="إلغاء" title="إلغاء" className="rounded-[7px] px-1 text-[#93aaa3] hover:text-[#c22850]">
+        <button type="button" onClick={onCancel} aria-label="إلغاء" title="إلغاء" className="rounded-[7px] px-1 text-tv-text-faint hover:text-[#c22850]">
           <X className="size-3.5" />
         </button>
       </span>
@@ -102,7 +102,7 @@ export function CatalogTextAdd({
           </button>
         ) : (
           <span className="flex flex-wrap items-center gap-1 text-[11.5px] font-bold text-[#185045]">
-            {hint.kind === "close" ? <span className="text-[#93aaa3]">هل تقصد:</span> : null}
+            {hint.kind === "close" ? <span className="text-tv-text-faint">هل تقصد:</span> : null}
             <button type="button" onClick={() => onDone(hint.name, true)} className="rounded-[8px] bg-[#e3efe9] px-2 py-1 text-[#0f7a52]">
               {hint.name}
             </button>

@@ -196,7 +196,7 @@ export function TableTransfer({
                 errors: plan.errors.length,
               })}
             </p>
-            <p className="mb-4 text-[12.5px] text-[#6d8a84]">{t("data.tools.import.noDelete")}</p>
+            <p className="mb-4 text-[12.5px] text-tv-text-faint">{t("data.tools.import.noDelete")}</p>
 
             {plan.errors.length > 0 ? (
               <ul className="mb-4 grid gap-1 rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] p-3 text-[13px] text-[#c22850]">

@@ -140,7 +140,7 @@ export function TripStage({ data, patch, lookups: initialLookups }: StageFormPro
         the agent is still describing the trip, not on a screen of their own
         that had to be clicked through first.
       */}
-      <p className="mb-3 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.scopeStageHint")}</p>
+      <p className="mb-3 text-[12.5px] font-semibold text-tv-text-faint">{t("pg.scopeStageHint")}</p>
       <div className="mb-5">
         <ScopeTiles data={data} patch={patch} />
         <FieldIssue field="scope" className="mt-2" />
@@ -165,7 +165,7 @@ export function TripStage({ data, patch, lookups: initialLookups }: StageFormPro
               country row would be wrong for half of every year. */}
           {tzNote ? (
             <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
-              <Clock className="size-3.5 text-[#93aaa3]" />
+              <Clock className="size-3.5 text-tv-text-faint" />
               {tzNote}
             </span>
           ) : null}
@@ -226,7 +226,7 @@ export function TripStage({ data, patch, lookups: initialLookups }: StageFormPro
           <FieldIssue field="trip.nights" />
         </label>
       </div>
-      <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.daysAuto")}</p>
+      <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("pg.daysAuto")}</p>
 
       {addingCountry ? <CatalogAddDialog table="countries" onClose={() => setAddingCountry(false)} onCreated={(row) => {
         setCountries(prev => [...prev.filter(c => c.id !== row.id), row]);

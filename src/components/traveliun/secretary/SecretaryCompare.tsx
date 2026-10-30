@@ -73,7 +73,7 @@ export function SecretaryCompare() {
       {proposals.map((p) => <div key={p.id} className="rounded-xl border border-[#e7eceb]">
         <button type="button" onClick={() => setOpen(open === p.id ? null : p.id)} className="flex w-full flex-wrap items-center gap-2 p-3 text-start text-sm">
           <strong>{p.title ?? "مقترح"}</strong>
-          <span className="text-xs text-[#8ba09b]">{when(p.createdAt)}</span>
+          <span className="text-xs text-tv-text-faint">{when(p.createdAt)}</span>
           <span className="flex-1" />
           <Link href={`/basic/${p.id}`} className="text-xs font-bold text-[var(--tv-brand)] underline" onClick={(e) => e.stopPropagation()}>افتح في بيسك</Link>
         </button>

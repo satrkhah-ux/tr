@@ -206,7 +206,7 @@ export function FlightsStep({ data }: StepProps) {
         <Plane className="size-4" />
         {t("wz.flights.title")}
       </h2>
-      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.flights.hint")}</p>
+      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-tv-text-faint">{t("wz.flights.hint")}</p>
       {flights.length > 0 ? (
         <ul className="grid gap-3">
           {flights.map((b) => (
@@ -216,7 +216,7 @@ export function FlightsStep({ data }: StepProps) {
       ) : notPulled(data, "flight") ? (
         <PullNotice operationId={data.operation.id} />
       ) : (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.flights.none")}</p>
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">{t("wz.flights.none")}</p>
       )}
     </section>
   );
@@ -319,7 +319,7 @@ function FlightCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="break-words text-[13px] font-extrabold text-[#0f3d38]">{booking.title}</p>
-          <p className="mt-0.5 text-[11px] font-semibold text-[#93aaa3]">
+          <p className="mt-0.5 text-[11px] font-semibold text-tv-text-faint">
             {t("wz.flights.ourRef")}: <DirText>{booking.company_ref ?? "—"}</DirText>
           </p>
         </div>
@@ -432,7 +432,7 @@ function FlightCard({
                 placeholder="065-2400000001"
                 className="tv-tnum block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]"
               />
-              <span className="font-semibold text-[#93aaa3]">{t("wz.flights.ticketsHint")}</span>
+              <span className="font-semibold text-tv-text-faint">{t("wz.flights.ticketsHint")}</span>
               {travelers > 0 && ticketCount !== travelers ? (
                 <span className="font-bold text-[#a86a10]">{t("wz.flights.countWarn", { tickets: String(ticketCount), travelers: String(travelers) })}</span>
               ) : null}

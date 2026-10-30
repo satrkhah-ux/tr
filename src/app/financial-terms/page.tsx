@@ -56,7 +56,7 @@ export default async function FinancialTermsPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] text-[#93aaa3]">{p.empty}</p>
+              <p className="text-[12.5px] text-tv-text-faint">{p.empty}</p>
             )}
           </section>
         ))}

@@ -128,7 +128,7 @@ export function RoomTypePicker({
         </select>
       ) : null}
       {oldName ? (
-        <span className="text-[10.5px] font-semibold text-[#93aaa3]">{t("pg.roomSavedAs", { name: oldName })}</span>
+        <span className="text-[10.5px] font-semibold text-tv-text-faint">{t("pg.roomSavedAs", { name: oldName })}</span>
       ) : null}
     </span>
   );

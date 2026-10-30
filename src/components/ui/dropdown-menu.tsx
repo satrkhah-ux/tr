@@ -102,7 +102,7 @@ function DropdownMenuSeparator({ className, ...props }: React.ComponentProps<typ
 }
 
 function DropdownMenuLabel({ className, ...props }: React.ComponentProps<typeof MenuPrimitive.GroupLabel>) {
-  return <MenuPrimitive.GroupLabel className={cn("px-3 py-1.5 text-[11px] font-bold text-[#8aa29b]", className)} {...props} />;
+  return <MenuPrimitive.GroupLabel className={cn("px-3 py-1.5 text-[11px] font-bold text-tv-text-faint", className)} {...props} />;
 }
 
 function DropdownMenuGroup(props: React.ComponentProps<typeof MenuPrimitive.Group>) {

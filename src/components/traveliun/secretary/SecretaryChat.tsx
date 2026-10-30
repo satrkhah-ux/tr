@@ -100,9 +100,9 @@ export function SecretaryChat({ tall = false, active = true, pendingError = null
         m.role === "user" ? "me-auto rounded-ss-sm border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white"
         : m.role === "plan" ? "ms-auto border-[#dddcc4] bg-[#faf9f1] text-[#5a5637]"
         : "ms-auto rounded-se-sm border-[#dfe8e4] bg-white text-[#185045]"}`}>
-        <p className={`mb-1 text-[11px] font-bold ${m.role === "user" ? "text-white/70" : "text-[#6c8680]"}`}>{m.role === "user" ? "أنت" : m.role === "plan" ? "مُراد · خطة اليوم" : "مُراد"}</p>
+        <p className={`mb-1 text-[11px] font-bold ${m.role === "user" ? "text-white/70" : "text-tv-text-faint"}`}>{m.role === "user" ? "أنت" : m.role === "plan" ? "مُراد · خطة اليوم" : "مُراد"}</p>
         <p className="whitespace-pre-wrap break-words">{m.content}</p>
-        <p className={`mt-1 text-[10px] ${m.role === "user" ? "text-white/70" : "text-[#8ba09b]"}`}>{when(m.created_at)}</p>
+        <p className={`mt-1 text-[10px] ${m.role === "user" ? "text-white/70" : "text-tv-text-faint"}`}>{when(m.created_at)}</p>
       </div>)}
       {busy && <p className="flex items-center gap-2 text-sm text-[#557d78]"><Loader2 className="size-4 animate-spin" /> سكرتيرك يكتب…</p>}
     </div>

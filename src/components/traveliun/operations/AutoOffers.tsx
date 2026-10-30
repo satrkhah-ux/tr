@@ -30,7 +30,7 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
   return (
     <section className="min-w-0 rounded-2xl border border-[#e2ebe7] bg-white p-4 sm:p-6 dark:border-[#22443b] dark:bg-[#12241f]">
       <h2 className="text-lg font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">بكجات مُراد وأسعارها</h2>
-      <p className="mt-1 text-sm leading-6 text-[#67847c]">
+      <p className="mt-1 text-sm leading-6 text-tv-text-faint">
         حدّد الدول التي يجهّز لها مُراد برنامجاً مقترحاً، وأسعار الخدمات والمدن والفنادق. يحفظ البرنامج في بيسك ليؤكده الموظف.
       </p>
 
@@ -65,8 +65,8 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
               </label>
             </div>
 
-            <p className="mt-3 text-xs leading-6 text-[#67847c]">السيارة لليوم، والغرفة لليلة لكل شخصين. الاستقبال والتوديع مرتان. الطلبات مع أطفال أو فوق الحد المحدد تُحوّل لموظف.</p>
-            <p className="mt-4 text-sm font-bold text-[#557d78]">مسار الرحلة والفنادق</p><p className="text-xs leading-6 text-[#67847c]">تُوزّع ليالي الرحلة بين المدن وفق النسب المحددة.</p>
+            <p className="mt-3 text-xs leading-6 text-tv-text-faint">السيارة لليوم، والغرفة لليلة لكل شخصين. الاستقبال والتوديع مرتان. الطلبات مع أطفال أو فوق الحد المحدد تُحوّل لموظف.</p>
+            <p className="mt-4 text-sm font-bold text-[#557d78]">مسار الرحلة والفنادق</p><p className="text-xs leading-6 text-tv-text-faint">تُوزّع ليالي الرحلة بين المدن وفق النسب المحددة.</p>
             {o.cities.map((c, k) => (
               <div key={k} className="mt-3 grid grid-cols-[minmax(0,1fr)_4rem_2rem] gap-2 rounded-xl bg-[#f5f8f6] p-2 sm:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1.6fr)_2rem] dark:bg-[#18372e]">
                 <label className="order-1 grid min-w-0 gap-1 text-xs text-[#557d78]">المدينة<input value={c.city} onChange={(e) => patch(i, { cities: o.cities.map((x, j) => (j === k ? { ...x, city: e.target.value } : x)) })} className={field} /></label>

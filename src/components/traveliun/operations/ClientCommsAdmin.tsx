@@ -31,7 +31,7 @@ function WaStatus({ k, status }: { k: WaTemplateKey; status: Record<string, stri
   const s = status?.[name];
   const [tone, text] =
     status === null
-      ? ["text-[#93aaa3]", "تعذّر قراءة حالة القالب من تيليتيل"]
+      ? ["text-tv-text-faint", "تعذّر قراءة حالة القالب من تيليتيل"]
       : s === "APPROVED"
         ? ["text-[#0f7a52]", "معتمد ✓ — يصل للعميل حتى بعد 24 ساعة"]
         : s === "PENDING"
@@ -40,7 +40,7 @@ function WaStatus({ k, status }: { k: WaTemplateKey; status: Record<string, stri
             ? ["text-[#c22850]", "رفضته ميتا — بعد 24 ساعة تُترك ملاحظة للموظف"]
             : ["text-[#a86a10]", "لم يُرفع بعد — بعد 24 ساعة تُترك ملاحظة للموظف"];
   return (
-    <p className="mt-2 text-[11.5px] font-semibold text-[#78948f]">
+    <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">
       قالب واتساب <bdi dir="ltr" className="font-mono">{name}</bdi>: <span className={`font-bold ${tone}`}>{text}</span>
     </p>
   );
@@ -67,7 +67,7 @@ export function ClientCommsAdmin({
       <div className="max-w-4xl space-y-4">
         <section className={card}>
           <h1 className="text-lg font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">رسائل العميل في محطات رحلته</h1>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#78948f]">
+          <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">
             تُرسل بواتساب إلى محادثة العميل، مرة واحدة لكل محطة، ولا تُرسل لعملاء الشركات الشريكة. المتغيّرات: {"{name} {destination} {serial} {date} {link} {rate_link}"}.
             يُوضع كل رابط في سطر وحده تلقائياً، و*النجمتان* تجعلان النص عريضاً في واتساب. بعد 24 ساعة من آخر رسالة للعميل يُرسل قالب ميتا المعتمد بدل النص.
           </p>
@@ -154,7 +154,7 @@ function GuidesEditor({ guides }: { guides: DestinationGuide[] }) {
   return (
     <section className={card}>
       <h2 className="text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">دليل الطوارئ لكل وجهة</h2>
-      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-[#78948f]">يظهر للمسافر في رابط رحلته بحسب وجهة العرض.</p>
+      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-tv-text-faint">يظهر للمسافر في رابط رحلته بحسب وجهة العرض.</p>
       <select id="guide-country" value={countryId} onChange={(e) => setCountryId(e.target.value)} className={`${field} mb-3 max-w-xs`}>
         {guides.map((g) => (
           <option key={g.country_id} value={g.country_id}>

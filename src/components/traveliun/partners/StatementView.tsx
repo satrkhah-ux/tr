@@ -38,14 +38,14 @@ export function StatementView({ statement, title }: { statement: PartnerStatemen
         </div>
       </div>
       {lines.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-[#93aaa3]">
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
           تظهر هنا فاتورة كل ملف يؤكّده عميلكم، وكل دفعة تسجَّل.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-right text-[12.5px]">
             <thead>
-              <tr className="text-[11.5px] font-bold text-[#93aaa3]">
+              <tr className="text-[11.5px] font-bold text-tv-text-faint">
                 <th className="pb-2">التاريخ</th>
                 <th className="pb-2">البيان</th>
                 <th className="pb-2">المرجع</th>
@@ -173,7 +173,7 @@ export function LedgerControls({ partnerId, limit }: { partnerId: string; limit:
             حفظ
           </button>
         </div>
-        <p className="text-[11px] font-semibold text-[#93aaa3]">
+        <p className="text-[11px] font-semibold text-tv-text-faint">
           حين يتجاوز المستحق الحد تُرفض «العميل أكّد» من بوابة الشركة، ويبقى التأكيد ممكناً من قسم العمليات عندنا.
         </p>
       </form>

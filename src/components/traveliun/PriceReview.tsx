@@ -91,7 +91,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
               );
             })}
           </div>
-          <p className="mt-2 text-[12px] font-semibold text-[#78948f]">{KINDS.find((k) => k.key === tab)?.note}</p>
+          <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">{KINDS.find((k) => k.key === tab)?.note}</p>
         </section>
 
         <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
@@ -103,7 +103,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
               ))}
             </select>
             <label className="relative min-w-0 flex-1 basis-56">
-              <Search className="pointer-events-none absolute start-2 top-2.5 size-4 text-[#93aaa3]" />
+              <Search className="pointer-events-none absolute start-2 top-2.5 size-4 text-tv-text-faint" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث باسم المدينة أو الجولة أو المطار" className={`${FIELD} w-full ps-8`} />
             </label>
             {tab === "airport" ? (
@@ -124,7 +124,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
                 <col className="w-[19%]" />
                 <col className="w-[14%]" />
               </colgroup>
-              <thead className="bg-[#f6f9f8] text-[11px] font-extrabold text-[#78948f]">
+              <thead className="bg-[#f6f9f8] text-[11px] font-extrabold text-tv-text-faint">
                 <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-start">
                   <th>البند</th>
                   <th>السيارة</th>
@@ -141,7 +141,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
                     <tr key={r.key} className={`align-top [&>td]:px-3 [&>td]:py-2.5 ${done ? "bg-[#f1faf5]" : t?.price ? "bg-[#f3f8fd]" : ""}`}>
                       <td>
                         <div className="font-bold leading-6 text-[#103f37]">{r.label}</div>
-                        <div className="text-[11px] font-semibold text-[#93aaa3]">{[r.country, r.city, r.sub].filter(Boolean).join(" · ")}</div>
+                        <div className="text-[11px] font-semibold text-tv-text-faint">{[r.country, r.city, r.sub].filter(Boolean).join(" · ")}</div>
                         {r.last ? (
                           <div className="mt-0.5 text-[10.5px] font-semibold text-[#0f7a52]">
                             عدّله {whoOf(r.last.by)} {ago(r.last.at)}
@@ -151,7 +151,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
                       <td className="font-semibold text-[#557d78]">{r.car || "—"}</td>
                       <td>
                         <div className="grid gap-0.5">
-                          {r.listed.length === 0 ? <span className="text-[#93aaa3]">لا سعر في القائمة</span> : null}
+                          {r.listed.length === 0 ? <span className="text-tv-text-faint">لا سعر في القائمة</span> : null}
                           {r.listed.map((l) => (
                             <span key={l} title={l} className={`tv-tnum truncate ${l.includes("مؤقت") ? "font-bold text-[#a86a10]" : "text-[#557d78]"}`}>
                               {l}
@@ -202,7 +202,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
                 })}
               </tbody>
             </table>
-            {list.length === 0 ? <p className="py-8 text-center text-[12.5px] font-semibold text-[#93aaa3]">لا بنود هنا — كلها مراجَعة.</p> : null}
+            {list.length === 0 ? <p className="py-8 text-center text-[12.5px] font-semibold text-tv-text-faint">لا بنود هنا — كلها مراجَعة.</p> : null}
           </div>
         </section>
 
@@ -216,11 +216,11 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
             آخر التحديثات
           </h2>
           {history.length === 0 ? (
-            <p className="mt-2 text-[12px] font-semibold text-[#93aaa3]">لم يُعدَّل شيء بعد. كل حفظ يظهر هنا باسم من عدّله.</p>
+            <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">لم يُعدَّل شيء بعد. كل حفظ يظهر هنا باسم من عدّله.</p>
           ) : (
             <div className="mt-2 overflow-x-auto">
               <table className="w-full min-w-[640px] text-start text-[12px]">
-                <thead className="text-[11px] font-extrabold text-[#78948f]">
+                <thead className="text-[11px] font-extrabold text-tv-text-faint">
                   <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
                     <th>متى</th>
                     <th>من</th>
@@ -237,7 +237,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
                       <td className="max-w-[28rem] truncate" title={h.label}>
                         {h.label}
                       </td>
-                      <td className="tv-tnum whitespace-nowrap text-[#93aaa3]">
+                      <td className="tv-tnum whitespace-nowrap text-tv-text-faint">
                         <DirText>{h.before}</DirText>
                       </td>
                       <td className="tv-tnum whitespace-nowrap font-extrabold">

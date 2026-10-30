@@ -308,7 +308,7 @@ export function TraveliunTable({
                   type="button"
                   onClick={() => setOffersMode(mode)}
                   className={`rounded-lg px-8 py-3 font-bold transition-colors ${
-                    offersMode === mode ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-[#6f8f88]"
+                    offersMode === mode ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint"
                   }`}
                 >
                   {mode === "confirmed" ? t("offers.confirmedTab") : t("offers.unconfirmedTab")}
@@ -343,7 +343,7 @@ export function TraveliunTable({
         <section className="rounded-2xl border border-[#e2ebe7] bg-white p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
           <div className="mb-[21px] flex flex-col flex-wrap gap-4 sm:flex-row sm:items-center">
             <div className="relative h-[46px] w-full max-w-[280px]">
-              <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-[#8aa29b]" aria-hidden />
+              <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" aria-hidden />
               <input
                 type="search"
                 value={search}
@@ -480,7 +480,7 @@ export function TraveliunTable({
                               />
                             </td>
                           ) : null}
-                          <td className="px-[18px] py-[17px] text-[#a4b8b2]">
+                          <td className="px-[18px] py-[17px] text-tv-text-faint">
                             <button
                               type="button"
                               onClick={() => setViewing(row)}
@@ -629,7 +629,7 @@ function CardsView({
             <button
               type="button"
               onClick={() => onAction(row)}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#e2ebe7] text-[#8aa29b] transition-colors hover:bg-[#e8f1ed] hover:text-[#185045]"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#e2ebe7] text-tv-text-faint transition-colors hover:bg-[#e8f1ed] hover:text-[#185045]"
               aria-label={actionsLabel}
             >
               <Settings className="size-4" />
@@ -639,12 +639,12 @@ function CardsView({
             {rest.map((column) =>
               column.multiline ? (
                 <div key={column.key} className="mt-1 grid gap-1 border-t border-[#eef4f1] pt-2 text-[13px]">
-                  <dt className="font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
+                  <dt className="font-semibold text-tv-text-faint">{t(column.labelKey)}</dt>
                   <dd className="min-w-0 font-medium text-[#0f3d38]"><Cell column={column} row={row} clamp /></dd>
                 </div>
               ) : (
                 <div key={column.key} className="flex items-start justify-between gap-3 text-[13px]">
-                  <dt className="shrink-0 font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
+                  <dt className="shrink-0 font-semibold text-tv-text-faint">{t(column.labelKey)}</dt>
                   <dd className="min-w-0 text-end font-medium text-[#0f3d38]"><Cell column={column} row={row} /></dd>
                 </div>
               ),
@@ -666,7 +666,7 @@ function Cell({ column, row, clamp = false }: { column: ColumnDef; row: DataRow;
         return id ? (refs[column.ref].find((o) => o.value === id)?.label ?? id) : null;
       })()
     : cellValue(row, column.key);
-  if (value === null || value === undefined || value === "") return <span className="text-[#c2cfca]">—</span>;
+  if (value === null || value === undefined || value === "") return <span className="text-tv-text-faint">—</span>;
   // an id shown by its name; a fixed option by its label
   if (column.source) return <span>{refs?.[column.source].find((o) => o.value === value)?.label ?? String(value)}</span>;
   const option = column.options?.find((o) => o.value === value);
@@ -682,13 +682,13 @@ function Cell({ column, row, clamp = false }: { column: ColumnDef; row: DataRow;
   // contained: the row height must not follow the image.
   if (column.type === "logo") {
     const url = airlineLogoUrl(String(value));
-    if (!url) return <span className="text-[#c2cfca]">—</span>;
+    if (!url) return <span className="text-tv-text-faint">—</span>;
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={url} alt="" className="h-6 w-14 object-contain object-center" />;
   }
   if (BOOLEAN_KEYS.has(column.key) || typeof value === "boolean") {
     const truthy = value === true || value === "true" || value === "Yes";
-    return <span className={truthy ? "font-bold text-[#0f7a52]" : "text-[#8aa29b]"}>{truthy ? t("yes") : t("no")}</span>;
+    return <span className={truthy ? "font-bold text-[#0f7a52]" : "text-tv-text-faint"}>{truthy ? t("yes") : t("no")}</span>;
   }
   if (column.type && LTR_TYPES.has(column.type)) {
     const numeric = column.type === "number" || column.type === "currency" || column.type === "serial" || column.type === "date";
@@ -830,7 +830,7 @@ function Footer({
 
   return (
     <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3 text-[12.5px] font-semibold text-[#8aa29b]">
+      <div className="flex items-center gap-3 text-[12.5px] font-semibold text-tv-text-faint">
         <span>
           {t("showing")} <span className="font-bold text-[#185045]">{count === 0 ? 0 : (page - 1) * pageSize + 1}</span>
           {" – "}
@@ -879,7 +879,7 @@ function PagerButton({ icon: Icon, label, disabled, onClick }: { icon: typeof Ch
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-md border border-[#dbe6e1] bg-white text-[#8ca49e] transition-colors hover:bg-[#f4f8f6] disabled:opacity-40"
+      className="flex h-9 w-9 items-center justify-center rounded-md border border-[#dbe6e1] bg-white text-tv-text-faint transition-colors hover:bg-[#f4f8f6] disabled:opacity-40"
     >
       <Icon className="size-5" />
     </button>
@@ -977,7 +977,7 @@ export function RecordForm({
         <div className="mb-5 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <div>
             <h2 className="text-lg font-extrabold">{title}</h2>
-            <p className="mt-1 text-sm text-[#6d8a84]">{t(config.titleKey)}</p>
+            <p className="mt-1 text-sm text-tv-text-faint">{t(config.titleKey)}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}><X className="size-5" /></button>
         </div>
@@ -1195,7 +1195,7 @@ function FieldInput({ column, countryId, value, required, onChange }: { column: 
           onChange={(e) => onChange(e.target.value)}
           className={formArea}
         />
-        <span className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-[#93aaa3]">
+        <span className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-tv-text-faint">
           <span>{t("data.form.oneItemPerLine")}</span>
           {runsOn(value) ? (
             <button
@@ -1265,13 +1265,13 @@ function RowActionModal({
         <div className="mb-5 grid gap-3 md:grid-cols-2">
           {config.columns.map((column) => (
             <div key={column.key} className={`rounded-[10px] bg-[#f4f8f6] p-3 ${column.multiline ? "md:col-span-2" : ""}`}>
-              <p className="mb-1 text-xs font-bold text-[#93aaa3]">{t(column.labelKey)}</p>
+              <p className="mb-1 text-xs font-bold text-tv-text-faint">{t(column.labelKey)}</p>
               <div className="text-sm"><Cell column={column} row={row} /></div>
             </div>
           ))}
           {onMerge ? (
             <div className="rounded-[10px] bg-[#f4f8f6] p-3 md:col-span-2">
-              <p className="mb-1 text-xs font-bold text-[#93aaa3]">{t("data.tools.usage.title")}</p>
+              <p className="mb-1 text-xs font-bold text-tv-text-faint">{t("data.tools.usage.title")}</p>
               <div className="text-sm"><HotelUsageLine usage={usage} /></div>
             </div>
           ) : null}

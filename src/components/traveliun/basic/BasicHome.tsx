@@ -116,7 +116,7 @@ export function BasicHome({
             <Zap className="size-5 text-[#e0a92a]" />
             {t("nav.basic")}
           </h1>
-          <p className="mt-1 mb-4 max-w-3xl text-[12.5px] font-semibold leading-6 text-[#78948f]">{tx("homeHint")}</p>
+          <p className="mt-1 mb-4 max-w-3xl text-[12.5px] font-semibold leading-6 text-tv-text-faint">{tx("homeHint")}</p>
           <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -159,13 +159,13 @@ export function BasicHome({
           </div>
           {showReady ? (
             <div className="mt-3 rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-              <p className="mb-2 text-[11.5px] font-semibold text-[#78948f]">{tx("readyHint")}</p>
+              <p className="mb-2 text-[11.5px] font-semibold text-tv-text-faint">{tx("readyHint")}</p>
               <ul className="grid gap-1.5 sm:grid-cols-2">
                 {readyOffers.map((o) => (
                   <li key={o.id} className="flex items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-bold text-[#185045]">{o.title}</span>
-                      <span className="tv-tnum block text-[11px] font-semibold text-[#78948f]">
+                      <span className="tv-tnum block text-[11px] font-semibold text-tv-text-faint">
                         {[o.country, o.nights ? `${o.nights} ${t("pg.nightsShort")}` : "", o.price ? `${Number(o.price).toLocaleString("en-US")} ${o.currency ?? ""}` : ""]
                           .filter(Boolean)
                           .join(" · ")}

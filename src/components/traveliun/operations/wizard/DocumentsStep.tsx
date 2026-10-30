@@ -50,7 +50,7 @@ export function DocumentsStep({ data }: StepProps) {
             <span className="min-w-0 flex-1 text-[12.5px] font-extrabold text-[#0f3d38]">
               {t(`ops.doc.${l.kind}` as TranslationKey)}
               {l.title ? <span className="ms-1.5 font-bold text-[#557d78]">{l.title}</span> : null}
-              <span className={`ms-2 text-[11.5px] font-bold ${l.state === "waiting" ? "text-[#a86a10]" : "text-[#93aaa3]"}`}>
+              <span className={`ms-2 text-[11.5px] font-bold ${l.state === "waiting" ? "text-[#a86a10]" : "text-tv-text-faint"}`}>
                 {l.state === "waiting" ? t(`wz.doc.why.${l.why}` as TranslationKey) : t(`wz.doc.${l.state}` as TranslationKey)}
               </span>
             </span>
@@ -78,7 +78,7 @@ export function DocumentsStep({ data }: StepProps) {
           <ul className="mt-1.5 grid gap-1 text-[12px] font-bold text-[#0f3d38] sm:grid-cols-2">
             {contacts.map(([key, value]) => (
               <li key={key}>
-                <span className="text-[#93aaa3]">{t(key)}: </span>
+                <span className="text-tv-text-faint">{t(key)}: </span>
                 <DirText>{value}</DirText>
               </li>
             ))}

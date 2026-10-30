@@ -120,7 +120,7 @@
   --tv-text-strong: #003c3a;
   --tv-text-brand: #185045;
   --tv-text-muted: #557d78;
-  --tv-text-faint: #93aaa3;
+  --tv-text-faint: #5e776f; /* was #93aaa3 (2.46:1) — same hue, 4.83:1 on white, 4.50:1 on #f4f8f6 */
   --tv-border-subtle: #e2ebe7;
   --tv-border-default: #dbe6e1;
   --tv-border-strong: #cfe0d9;

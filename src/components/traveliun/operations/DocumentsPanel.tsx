@@ -212,7 +212,7 @@ export function DocumentsPanel({
             ) : null}
           </div>
         </div>
-        <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.seedHint")}</p>
+        <p className="mb-3 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.seedHint")}</p>
 
         {/* the two counts an ops agent is actually tracking */}
         <div className="mb-3 flex flex-wrap gap-2 text-[11.5px] font-bold">
@@ -240,7 +240,7 @@ export function DocumentsPanel({
 
         {/* no booking at all is not «no booking API» — it is nothing pulled yet */}
         {bookings.length === 0 ? (
-          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">
             {t("ops.booking.none")}
           </p>
         ) : (
@@ -259,14 +259,14 @@ export function DocumentsPanel({
           </ul>
         )}
         {/* said where it is true: an open booking no supplier API books (the API is TBO's, hotels only) */}
-        {outstanding.some((b) => b.kind !== "hotel") ? <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.booking.noApiHint")}</p> : null}
+        {outstanding.some((b) => b.kind !== "hotel") ? <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.booking.noApiHint")}</p> : null}
 
         {sentRequests.length > 0 ? (
           <div className="mt-3 border-t border-[#f0f4f2] pt-3">
             <p className="mb-2 text-[11.5px] font-extrabold text-[#557d78]">{t("ops.request.sentLog")}</p>
             <ul className="space-y-1.5">
               {sentRequests.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold text-[#93aaa3]">
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold text-tv-text-faint">
                   <span className="text-[#0f3d38]">{r.to_label}</span>
                   <span>
                     {r.channel === "whatsapp" ? t("ops.dispatch.whatsapp") : t("ops.dispatch.manual")}
@@ -328,7 +328,7 @@ export function DocumentsPanel({
               className={field}
             />
           </label>
-          <p className="mt-1 text-[11px] font-semibold text-[#93aaa3]">{t("ops.doc.welcomeHint")}</p>
+          <p className="mt-1 text-[11px] font-semibold text-tv-text-faint">{t("ops.doc.welcomeHint")}</p>
         </div>
 
         {confirmed.some((b) => b.kind === "hotel") ? (
@@ -345,7 +345,7 @@ export function DocumentsPanel({
         ) : null}
 
         {live.length === 0 ? (
-          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">
             {t("ops.doc.issue")}
           </p>
         ) : (
@@ -360,12 +360,12 @@ export function DocumentsPanel({
                 <div className="min-w-0">
                   <p className="text-[13px] font-extrabold text-[#0f3d38]">
                     {t(`ops.doc.${d.kind}` as TranslationKey)}
-                    <span className="tv-tnum ms-2 text-[11px] font-bold text-[#93aaa3]">
+                    <span className="tv-tnum ms-2 text-[11px] font-bold text-tv-text-faint">
                       <DirText dir="ltr">{`v${d.version}`}</DirText>
                     </span>
                     {d.revoked_at ? <span className="ms-2 text-[11px] font-bold text-[#c22850]">{t("ops.doc.revoked")}</span> : null}
                   </p>
-                  <p className="tv-tnum mt-0.5 text-[11px] font-semibold text-[#93aaa3]">
+                  <p className="tv-tnum mt-0.5 text-[11px] font-semibold text-tv-text-faint">
                     <DirText dir="ltr">{d.created_at.slice(0, 10)}</DirText>
                   </p>
                 </div>
@@ -729,7 +729,7 @@ function BookingRow({
             {booking.title}
             {booking.city_name ? <span className="font-semibold text-[#557d78]"> — {booking.city_name}</span> : null}
           </p>
-          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#93aaa3]">
+          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-tv-text-faint">
             <span>{t(`ops.booking.${booking.kind}` as TranslationKey)}</span>
             {booking.start_date ? (
               <DirText dir="ltr">

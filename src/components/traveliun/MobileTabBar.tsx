@@ -141,7 +141,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
                 key={d.id}
                 href={d.href}
                 className={`relative flex flex-col items-center justify-center gap-1 ${
-                  active ? "text-[#185045] dark:text-[#7fd0b2]" : "text-[#7d968f] dark:text-[#7d968f]"
+                  active ? "text-[#185045] dark:text-[#7fd0b2]" : "text-tv-text-faint dark:text-[#7d968f]"
                 }`}
               >
                 <span
@@ -160,7 +160,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
             <button
               type="button"
               onClick={() => setCustomizing(true)}
-              className="flex flex-col items-center justify-center gap-1 text-[#7d968f]"
+              className="flex flex-col items-center justify-center gap-1 text-tv-text-faint"
             >
               <LayoutGrid className="size-[22px]" />
               <span className="text-[10px] font-semibold leading-none">{t("tabbar.more")}</span>
@@ -182,7 +182,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
               <RotateCcw className="size-3.5" /> {t("dash.resetDefault")}
             </button>
           </div>
-          <p className="px-5 pb-3 text-[12px] font-semibold text-[#8aa29b]">{t("tabbar.hint")}</p>
+          <p className="px-5 pb-3 text-[12px] font-semibold text-tv-text-faint">{t("tabbar.hint")}</p>
           <div className="space-y-1.5 overflow-y-auto px-4 pb-3">
             {allowed.map((d) => {
               const order = tabs.indexOf(d.id);
@@ -198,7 +198,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
                       : "border-[#e2ebe7] bg-white dark:border-[#294039] dark:bg-transparent"
                   }`}
                 >
-                  <d.icon className={`size-5 shrink-0 ${selected ? "text-[#185045] dark:text-[#7fd0b2]" : "text-[#7d968f]"}`} />
+                  <d.icon className={`size-5 shrink-0 ${selected ? "text-[#185045] dark:text-[#7fd0b2]" : "text-tv-text-faint"}`} />
                   <span className={`flex-1 truncate text-[13.5px] ${selected ? "font-extrabold text-[#0f3d38] dark:text-[#eaf3ef]" : "font-semibold text-[#557d78]"}`}>
                     {t(d.labelKey)}
                   </span>

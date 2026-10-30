@@ -24,7 +24,7 @@ export function TiersEditor({ partnerId, initial, title, hint }: { partnerId: st
   return (
     <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
       <h2 className="text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">{title}</h2>
-      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-[#78948f]">{hint}</p>
+      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-tv-text-faint">{hint}</p>
       <div className="grid gap-2">
         {rows.map((r, i) => (
           <div key={i} className="flex flex-wrap items-end gap-2">

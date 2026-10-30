@@ -20,7 +20,7 @@ import { TraveliunShell } from "../TraveliunShell";
 const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
 const CARD = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const LABEL = "grid gap-1 text-[11.5px] font-bold text-[#185045]";
-const STATUS_COLOR: Record<ExternalStatus, string> = { confirmed: "bg-[#eef6ff] text-[#1d4f8a]", paid_partial: "bg-[#fff6e6] text-[#8a5a10]", paid_full: "bg-[#e8f6ef] text-[#185045]", cancelled: "bg-[#f2f4f3] text-[#7a8a86]" };
+const STATUS_COLOR: Record<ExternalStatus, string> = { confirmed: "bg-[#eef6ff] text-[#1d4f8a]", paid_partial: "bg-[#fff6e6] text-[#8a5a10]", paid_full: "bg-[#e8f6ef] text-[#185045]", cancelled: "bg-[#f2f4f3] text-tv-text-faint" };
 
 /** `client`: what is typed in «العميل» (a name or a number); `phone`: the number saved; `name`: the picked client's */
 type Form = { id?: string; client: string; phone: string; name: string; travelStart: string; days: string; destination: string; status: ExternalStatus; paid: string; confirmed: string[] };

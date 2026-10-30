@@ -165,7 +165,7 @@ export function EditStage({ draftId, data, patch }: RepackageStageProps) {
               <li className="flex items-center gap-2">
                 <span className="text-[#557d78]">{t("rp.diff.price")}:</span>
                 <DirText dir="ltr"><span className="tv-tnum text-[#a86a10]">{before?.supplier_total ?? "—"}</span></DirText>
-                <ArrowLeftRight className="size-3 text-[#93aaa3]" />
+                <ArrowLeftRight className="size-3 text-tv-text-faint" />
                 <DirText dir="ltr"><span className="tv-tnum text-[#0f7a52]">{total ?? "—"} {data.final_currency}</span></DirText>
               </li>
             ) : null}
@@ -281,7 +281,7 @@ function AdditionsEditor({
                 aria-label={t("rp.add.itemPrice")}
                 onChange={(e) => setLine(a.id, { sell_price: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })}
               />
-              <span className="text-[11px] font-bold text-[#78948f]">{currency}</span>
+              <span className="text-[11px] font-bold text-tv-text-faint">{currency}</span>
             </label>
             <button type="button" className={removeButtonClass} aria-label={t("rp.delete")} onClick={() => onAdditions(additions.filter((x) => x.id !== a.id))}>
               <Trash2 className="size-3.5" />
@@ -328,7 +328,7 @@ function AdditionsEditor({
           <Plus className="size-4" />
           {t("rp.add.addFlight")}
         </button>
-        <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.add.nightsNote")}</p>
+        <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("rp.add.nightsNote")}</p>
       </div>
     </div>
   );

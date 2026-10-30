@@ -94,7 +94,7 @@ export function TraveliunClimateAdmin({ cities }: { cities: ClimateCity[] }) {
       <div className="tv-fade-up space-y-4" dir={dir}>
         <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h1 className="text-lg font-extrabold text-[#003c3a]">{t("climate.title")}</h1>
-          <p className="mt-1 text-[13px] font-medium text-[#6f8f88]">{t("climate.subtitle")}</p>
+          <p className="mt-1 text-[13px] font-medium text-tv-text-faint">{t("climate.subtitle")}</p>
           <div className="mt-4 max-w-[420px]">
             <label className="grid gap-2 text-[13px] font-bold text-[#185045]">
               {t("climate.selectCity")}
@@ -116,7 +116,7 @@ export function TraveliunClimateAdmin({ cities }: { cities: ClimateCity[] }) {
         </section>
 
         {!cityId ? (
-          <section className="rounded-2xl border border-dashed border-[#cfe0d9] bg-white p-10 text-center text-sm font-semibold text-[#93aaa3]">
+          <section className="rounded-2xl border border-dashed border-[#cfe0d9] bg-white p-10 text-center text-sm font-semibold text-tv-text-faint">
             {t("climate.pickCityFirst")}
           </section>
         ) : (

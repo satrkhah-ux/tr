@@ -89,7 +89,7 @@ export function ConfirmAllBookings({
           className="inline-flex h-10 items-center rounded-[9px] border border-[#b7d0c7] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-45"
         >
           {t("ops.confirmAll.apply")}
-          <DirText dir="ltr" className="ms-1.5 tv-tnum text-[#93aaa3]">{`(${picked.size})`}</DirText>
+          <DirText dir="ltr" className="ms-1.5 tv-tnum text-tv-text-faint">{`(${picked.size})`}</DirText>
         </button>
       </div>
       <div className="mb-3 flex flex-wrap gap-1.5">
@@ -136,7 +136,7 @@ export function ConfirmAllBookings({
               />
               <div className="min-w-0 self-center">
                 <p className="truncate text-[12.5px] font-extrabold text-[#0f3d38]">{b.title}</p>
-                <p className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                <p className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                   {t(`ops.booking.${b.kind}` as TranslationKey)}
                   {b.city_name ? ` · ${b.city_name}` : ""}
                   {b.start_date ? <DirText dir="ltr" className="ms-1.5">{b.start_date}</DirText> : null}

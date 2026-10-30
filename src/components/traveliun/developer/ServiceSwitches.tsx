@@ -63,7 +63,7 @@ export function ServiceSwitches({ flags, changes }: { flags: FeatureFlags; chang
   return (
     <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.services")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.services.hint")}</p>
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.services.hint")}</p>
 
       <ul className="mt-2 divide-y divide-[#e2ebe7] dark:divide-[#294039]">
         {FEATURES.map((feature) => {
@@ -84,7 +84,7 @@ export function ServiceSwitches({ flags, changes }: { flags: FeatureFlags; chang
                     {t(on ? "dev.services.on" : "dev.services.off")}
                   </span>
                 </p>
-                <p className="mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">{t(hint)}</p>
+                <p className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{t(hint)}</p>
                 {failed === feature ? (
                   <p role="alert" className="mt-1 text-[11.5px] font-bold text-[#c22850]">
                     {t("dev.services.failed")}
@@ -115,7 +115,7 @@ export function ServiceSwitches({ flags, changes }: { flags: FeatureFlags; chang
 
       <h3 className="mt-4 border-t border-dashed border-[#dce7e2] pt-3 text-[12.5px] font-extrabold text-[#557d78]">{t("dev.changes")}</h3>
       {changes.length === 0 ? (
-        <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.changes.empty")}</p>
+        <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.changes.empty")}</p>
       ) : (
         <ul className="mt-1.5 grid gap-1">
           {changes.map((c) => (
@@ -123,7 +123,7 @@ export function ServiceSwitches({ flags, changes }: { flags: FeatureFlags; chang
               <span className="min-w-0 break-words">
                 {t(c.on ? "dev.changes.on" : "dev.changes.off", { who: c.who ?? "—", feature: nameOf(c.feature) })}
               </span>
-              <time dateTime={c.at} dir="ltr" className="text-[11px] font-bold text-[#93aaa3]">
+              <time dateTime={c.at} dir="ltr" className="text-[11px] font-bold text-tv-text-faint">
                 {whenText(c.at, true)}
               </time>
             </li>

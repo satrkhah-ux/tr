@@ -26,7 +26,7 @@ export function PartnerTeam({ team }: { team: TeamMember[] }) {
   return (
     <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-5 dark:border-[#22443b] dark:bg-[#12241f]">
       <h2 className="text-[14px] font-extrabold text-[var(--tv-brand)]">فريق الشركة</h2>
-      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-[#78948f]">
+      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-tv-text-faint">
         مدير الحساب يرى كشف الحساب ويدير الفريق؛ موظف المبيعات يُصدر العروض ويسجّل تأكيد العملاء.
       </p>
 
@@ -36,7 +36,7 @@ export function PartnerTeam({ team }: { team: TeamMember[] }) {
             <span className="min-w-0 font-bold">
               {m.name ? `${m.name} · ` : ""}
               <DirText dir="ltr">{m.email}</DirText>
-              {m.me ? <span className="ms-1.5 text-[11px] text-[#93aaa3]">(أنت)</span> : null}
+              {m.me ? <span className="ms-1.5 text-[11px] text-tv-text-faint">(أنت)</span> : null}
             </span>
             <span className="flex items-center gap-2 text-[11.5px] font-bold">
               <span className="text-[#557d78]">{ROLE[m.role]}</span>

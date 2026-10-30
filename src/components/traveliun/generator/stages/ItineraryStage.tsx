@@ -269,7 +269,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           <DirText dir="ltr">{String(day.day_number)}</DirText>
         </span>
         <span className="text-[12.5px] font-extrabold text-[#185045]">{day.city_name || "—"}</span>
-        {day.date ? <span className="text-[11.5px] font-bold text-[#93aaa3]">{dateOf(day)}</span> : null}
+        {day.date ? <span className="text-[11.5px] font-bold text-tv-text-faint">{dateOf(day)}</span> : null}
         {day.ai_generated ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-[#efe7fb] px-2 py-0.5 text-[10.5px] font-extrabold text-[#6b3fa0]">
             <Sparkles className="size-3" />
@@ -481,7 +481,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
       <FieldIssue field="itinerary" className="mb-3" />
 
       {!day ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">
           {t("pg.itin.empty")}
         </p>
       ) : (
@@ -510,7 +510,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
                         <span className={`size-2 rounded-full ${written ? "bg-[#2aa87a]" : active ? "bg-white/50" : "bg-[#d8e3de]"}`} />
                         {t("pg.itin.dayN", { n: d.day_number })}
                       </span>
-                      <span className={`text-[10.5px] font-bold ${active ? "text-[#bfe9d9]" : "text-[#93aaa3]"}`}>{dateOf(d)}</span>
+                      <span className={`text-[10.5px] font-bold ${active ? "text-[#bfe9d9]" : "text-tv-text-faint"}`}>{dateOf(d)}</span>
                       <span className={`max-w-[140px] truncate text-[10.5px] font-bold ${active ? "text-white" : "text-[#557d78]"}`}>{d.city_name || "—"}</span>
                     </button>
                   );
@@ -560,8 +560,8 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
                               <span className="tv-tnum inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-[#eef4f1] text-[11px] font-extrabold text-[#185045]">
                                 {d.day_number}
                               </span>
-                              <span className="shrink-0 text-[11px] font-bold text-[#93aaa3]">{dateOf(d)}</span>
-                              <span className={`min-w-0 flex-1 truncate text-[12.5px] font-bold ${d.title.trim() ? "text-[#185045]" : "text-[#b9c9c4]"}`}>
+                              <span className="shrink-0 text-[11px] font-bold text-tv-text-faint">{dateOf(d)}</span>
+                              <span className={`min-w-0 flex-1 truncate text-[12.5px] font-bold ${d.title.trim() ? "text-[#185045]" : "text-tv-text-faint"}`}>
                                 {d.title.trim() || "—"}
                               </span>
                               {tours.length > 0 ? (
@@ -584,7 +584,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
       )}
 
       {days.length > 0 ? (
-        <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-5 text-[#93aaa3]">
+        <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-5 text-tv-text-faint">
           <RefreshCw className="mt-0.5 size-3.5 shrink-0" />
           {t("pg.itin.hint")}
         </p>

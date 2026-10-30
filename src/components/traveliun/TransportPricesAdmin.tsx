@@ -183,7 +183,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
                       {kindsAvailable.map((k) => (
                         <button key={k} type="button" role="radio" aria-checked={kind === k}
                           onClick={() => { setKind(k); setId(""); }}
-                          className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold ${kind === k ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-[#6f8f88]"}`}>
+                          className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold ${kind === k ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint"}`}>
                           {KIND_LABEL[k]}
                         </button>
                       ))}
@@ -226,7 +226,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {data.cars.map((car) => (
                       <label key={car.name} className="flex items-center justify-between gap-3 rounded-[10px] border border-[#e2ebe7] px-3 py-2 text-[13px] font-bold text-[#185045]">
-                        <span>{car.name}{car.pax ? <span className="font-normal text-[#78948f]"> ({car.pax})</span> : null}</span>
+                        <span>{car.name}{car.pax ? <span className="font-normal text-tv-text-faint"> ({car.pax})</span> : null}</span>
                         <input type="number" min={0} dir="ltr" value={prices[car.name] ?? ""} placeholder="—"
                           onChange={(e) => setPrices((prev) => ({ ...prev, [car.name]: e.target.value }))}
                           className={`${field} tv-tnum w-28 text-center`} />
@@ -257,7 +257,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
               <input type="search" value={roadQuery} onChange={(e) => setRoadQuery(e.target.value)} placeholder={t("searchPlaceholder")} className={`${field} h-9 w-56`} />
             </div>
             {shownRoads.length === 0 ? (
-              <p className="text-[13px] font-semibold text-[#93aaa3]">{t("tp.savedEmpty")}</p>
+              <p className="text-[13px] font-semibold text-tv-text-faint">{t("tp.savedEmpty")}</p>
             ) : (
               <ul className="grid gap-2">
                 {shownRoads.map((road) => (

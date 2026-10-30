@@ -29,7 +29,7 @@ export function DataQualityBoard({ report }: { report: QualityReport }) {
   return (
     <TraveliunShell title="data.quality.title">
       <div className="tv-fade-up space-y-4">
-        <p className="text-[12.5px] font-semibold text-[#6d8a84]">{t("data.quality.subtitle")}</p>
+        <p className="text-[12.5px] font-semibold text-tv-text-faint">{t("data.quality.subtitle")}</p>
         {!report.ok ? (
           <p role="alert" className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-4 py-3 text-[13px] font-semibold text-[#c22850]">
             {t(report.error)}
@@ -61,14 +61,14 @@ export function DataQualityBoard({ report }: { report: QualityReport }) {
                       ) : null}
                       {card && card.top.length > 0 ? (
                         <div className="mt-2 border-t border-dashed border-[#e2ebe7] pt-2">
-                          <p className="mb-1 text-[11px] font-bold text-[#93aaa3]">{t("data.quality.top")}</p>
+                          <p className="mb-1 text-[11px] font-bold text-tv-text-faint">{t("data.quality.top")}</p>
                           <ul className="space-y-1 text-[12px]">
                             {card.top.map((hotel) => (
                               <li key={hotel.id} className="flex items-center gap-2">
                                 <Link href={`/hotels?id=${hotel.id}`} className="min-w-0 truncate font-semibold text-[#185045] hover:underline">
                                   <DirText dir="auto">{hotel.name}</DirText>
                                 </Link>
-                                <span className="ms-auto shrink-0 text-[11px] font-semibold text-[#93aaa3]">{t("data.quality.uses", { n: hotel.uses })}</span>
+                                <span className="ms-auto shrink-0 text-[11px] font-semibold text-tv-text-faint">{t("data.quality.uses", { n: hotel.uses })}</span>
                               </li>
                             ))}
                           </ul>

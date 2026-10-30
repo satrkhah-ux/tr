@@ -152,7 +152,7 @@ export function SecretaryDayBoard({ board, compact = false }: { board: Secretary
             <ChevronDown size={14} className={silentOpen ? "rotate-180" : ""} />
           </button>
           {silentOpen && <div className="mt-2 space-y-2">
-            <label className="flex items-center gap-2 rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-sm"><Search size={14} className="text-[#8ba09b]" />
+            <label className="flex items-center gap-2 rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-sm"><Search size={14} className="text-tv-text-faint" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث بالاسم…" className="min-w-0 flex-1 bg-transparent outline-none" />
             </label>
             {silent.map((i) => <Row key={i.key} item={i} index={null} nowMs={nowMs} readOnly={view.readOnly} onDone={(k) => void done(k)} busyKey={busyKey} />)}

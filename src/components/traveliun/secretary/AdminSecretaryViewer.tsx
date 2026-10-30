@@ -54,7 +54,7 @@ export function AdminSecretaryViewer({ employees }: { employees: { id: string; n
         {!view.messages.length && <p className="text-sm text-[#5b7a71]">لا رسائل بعد.</p>}
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {view.messages.map((m) => <div key={m.id} className={`rounded-xl border p-3 text-sm leading-7 ${m.role === "user" ? "border-[#cfe0db] bg-[#f4f8f6]" : m.role === "plan" ? "border-amber-200 bg-amber-50" : "border-[#e7eceb] bg-white"}`}>
-            <p className="mb-1 text-[10px] font-bold text-[#8ba09b]">{who(m)} · {when(m.created_at)}</p>
+            <p className="mb-1 text-[10px] font-bold text-tv-text-faint">{who(m)} · {when(m.created_at)}</p>
             <p className="whitespace-pre-wrap break-words">{m.content}</p>
           </div>)}
         </div>

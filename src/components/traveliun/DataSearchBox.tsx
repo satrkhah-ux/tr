@@ -62,7 +62,7 @@ export function DataSearchBox() {
       <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
         <h1 className="mb-2 text-[15px] font-extrabold text-[#003c3a]">{t("data.search.title")}</h1>
         <div className="relative">
-          <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -81,7 +81,7 @@ export function DataSearchBox() {
       ) : null}
 
       {shown && shown.places.length === 0 && shown.services.length === 0 && !busy ? (
-        <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("data.search.none")}</p>
+        <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">{t("data.search.none")}</p>
       ) : null}
 
       {shown?.places.map((p) =>
@@ -101,7 +101,7 @@ export function DataSearchBox() {
         ) : (
           <section key={`t${p.id}`} className="rounded-2xl border border-[#e2ebe7] bg-white p-4">
             <h2 className="mb-2 text-[14px] font-extrabold text-[#185045]">
-              {p.name} <span className="text-[12px] font-bold text-[#93aaa3]">· {p.country}</span>
+              {p.name} <span className="text-[12px] font-bold text-tv-text-faint">· {p.country}</span>
             </h2>
             <div className="flex flex-wrap gap-2">
               <Figure label="data.search.hotels" n={p.counts.hotels} href={`/hotels?country_id=${p.countryId ?? ""}&city_id=${p.id}`} />

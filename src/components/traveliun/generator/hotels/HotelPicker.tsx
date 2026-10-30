@@ -249,12 +249,12 @@ export function HotelPicker({
             ) : error ? (
               <p className="py-2 text-[12.5px] font-bold text-[#c22850]">{error}</p>
             ) : results === null ? (
-              <p className="py-3 text-center text-[12px] font-bold text-[#93aaa3]">
+              <p className="py-3 text-center text-[12px] font-bold text-tv-text-faint">
                 اضغط «بحث» لعرض الفنادق المتاحة لهذه الليالي.
               </p>
             ) : visible.length > 0 ? (
               <div className="space-y-1.5">
-                <p className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                <p className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                   <DirText dir="ltr">{visible.length}</DirText> فندق
                 </p>
                 {visible.slice(0, shown).map((hotel) => (
@@ -276,7 +276,7 @@ export function HotelPicker({
                 ) : null}
               </div>
             ) : (
-              <div className="py-2 text-[12.5px] text-[#93aaa3]">
+              <div className="py-2 text-[12.5px] text-tv-text-faint">
                 <p>{t("pg.supplier.noResults")}</p>
                 {source === "internal" ? (
                   <AddHotelInline countryName={countryName} cityName={stay.cityName} onCreated={onHotelCreated} />

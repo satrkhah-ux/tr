@@ -36,7 +36,7 @@ export function VisaTravelers({
       saveLabel="حفظ المسافرين"
       hint={gap !== 0 ? <p className="text-[13px] font-bold text-[#a86a10]">{gap > 0 ? `بقي ${gap} من المتقدمين لم تُدخل بياناتهم.` : "المدخلون أكثر من عدد المتقدمين في الملف."}</p> : null}
     >
-      {value.length === 0 ? <p className="text-sm font-semibold text-[#8aa29b]">لم يُدخل مسافر بعد. أضف مسافراً، أو اقرأ جواز السفر من المستندات.</p> : null}
+      {value.length === 0 ? <p className="text-sm font-semibold text-tv-text-faint">لم يُدخل مسافر بعد. أضف مسافراً، أو اقرأ جواز السفر من المستندات.</p> : null}
       <ul className="space-y-3">
         {value.map((t, i) => (
           <li key={t.id} className="space-y-3 rounded-[12px] border border-[#e2ebe7] p-3">

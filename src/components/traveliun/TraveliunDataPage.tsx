@@ -226,7 +226,7 @@ function TraveliunOffersPage({ page }: TraveliunDataPageProps) {
             <Legend label={t("legacy.lastEdit")} color="bg-[#f3c400]" />
             <Legend label={t("legacy.editTag")} color="bg-[#dfe9e5]" />
             <Legend label={t("legacy.newTag")} color="bg-[#e3f1ee]" />
-            <Search className="size-6 text-[#8aa29b]" />
+            <Search className="size-6 text-tv-text-faint" />
           </div>
 
           <SearchBox value={query} onChange={setQuery} />
@@ -255,7 +255,7 @@ function FilterCard({ page }: TraveliunDataPageProps) {
             <span>{filter.label}</span>
             <span className="flex h-[47px] items-center rounded-[7px] border border-[#ddd4d3] px-3 text-sm font-normal text-[#557d78]">
               {filter.value ?? t("chooseOption")}
-              <ChevronDown className="me-auto size-4 text-[#9caaa6]" />
+              <ChevronDown className="me-auto size-4 text-tv-text-faint" />
             </span>
           </label>
         ))}
@@ -306,7 +306,7 @@ function SearchBox({ value, onChange }: { value: string; onChange: (value: strin
   const { t } = useTraveliunUI();
   return (
     <div className="relative h-[46px] w-full max-w-[250px]">
-      <Search className="absolute end-3 top-1/2 size-6 -translate-y-1/2 text-[#8aa29b]" />
+      <Search className="absolute end-3 top-1/2 size-6 -translate-y-1/2 text-tv-text-faint" />
       <input
         className="h-full w-full rounded-md border border-[#e7ece9] bg-[#edf2ef] pe-[95px] ps-4 text-sm text-[#557d78] outline-none placeholder:text-[#9cafaa] focus:border-[#b7c8c2]"
         placeholder={t("searchPlaceholder")}
@@ -353,7 +353,7 @@ function DataTable({
                 key={`${page.route}-${rowIndex}`}
                 className="cursor-pointer border-b border-[#eef2f0] text-[#557d78] transition-colors hover:bg-[#f6faf8]"
               >
-                <td className="relative px-[18px] py-[17px] text-[#a4b8b2]">
+                <td className="relative px-[18px] py-[17px] text-tv-text-faint">
                   <button
                     type="button"
                     className="flex size-[30px] items-center justify-center rounded-lg transition-colors hover:bg-[#e8f1ed] hover:text-[#185045]"
@@ -382,7 +382,7 @@ function DataTable({
                   const value = translateCell(offers ? offerCellValue(row, column.key) : row[column.key]);
                   return (
                     <td key={column.key} className="tv-tnum px-[14px] py-[17px] align-middle leading-6">
-                      {value ? <DirText dir="auto">{value}</DirText> : <span className="text-[#c2cfca]">—</span>}
+                      {value ? <DirText dir="auto">{value}</DirText> : <span className="text-tv-text-faint">—</span>}
                     </td>
                   );
                 })}
@@ -467,7 +467,7 @@ function AddRecordModal({
         <div className="mb-5 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <div>
             <h2 className="text-lg font-bold">{t("add")}</h2>
-            <p className="mt-1 text-sm text-[#6d8a84]">{t(routeTitleKey(page.route))}</p>
+            <p className="mt-1 text-sm text-tv-text-faint">{t(routeTitleKey(page.route))}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}>
             <X className="size-5" />
@@ -509,7 +509,7 @@ function EmployeeActionMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete
         className="flex h-10 w-full items-center justify-between px-4 font-semibold transition-colors hover:bg-[#edf3f0]"
         onClick={onEdit}
       >
-        <Pencil className="size-4 text-[#6f8f88]" />
+        <Pencil className="size-4 text-tv-text-faint" />
         {t("edit")}
       </button>
       <button
@@ -549,7 +549,7 @@ function RowActionModal({
         <div className="mb-5 grid gap-3 md:grid-cols-2">
           {page.columns.slice(0, 8).map((column) => (
             <div key={column.key} className="rounded-md bg-[#f4f8f6] p-3">
-              <p className="mb-1 text-xs font-bold text-[#8aa29b]">{columnLabel(t, column.label)}</p>
+              <p className="mb-1 text-xs font-bold text-tv-text-faint">{columnLabel(t, column.label)}</p>
               <p className="text-sm">{translateCell(row[column.key]) || "-"}</p>
             </div>
           ))}
@@ -662,8 +662,8 @@ function EmployeeModal({
                 }`}
                 onClick={() => setRolesOpen((value) => !value)}
               >
-                <ChevronDown className={`size-4 text-[#aab8b3] transition-transform ${rolesOpen ? "rotate-180" : ""}`} />
-                <span className={form.role ? "text-[#185045]" : "text-[#7b8582]"}>{form.role ? t(roleOptionKey[form.role] ?? "legacy.roleAll") : t("chooseOption")}</span>
+                <ChevronDown className={`size-4 text-tv-text-faint transition-transform ${rolesOpen ? "rotate-180" : ""}`} />
+                <span className={form.role ? "text-[#185045]" : "text-tv-text-faint"}>{form.role ? t(roleOptionKey[form.role] ?? "legacy.roleAll") : t("chooseOption")}</span>
               </button>
               {rolesOpen ? (
                 <div className="absolute left-0 right-0 top-[78px] z-10 overflow-hidden rounded-md border border-[#d8e0dc] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.16)]">
@@ -671,7 +671,7 @@ function EmployeeModal({
                     <button
                       key={option}
                       type="button"
-                      className={`block h-[36px] w-full px-4 text-start text-[13px] text-[#6d7f79] hover:bg-[#f4f6f8] ${
+                      className={`block h-[36px] w-full px-4 text-start text-[13px] text-tv-text-faint hover:bg-[#f4f6f8] ${
                         index === 2 ? "bg-[#f0f2f5]" : ""
                       }`}
                       onClick={() => {
@@ -955,8 +955,8 @@ function PermissionToggle({
 }) {
   const { t } = useTraveliunUI();
   return (
-    <button type="button" onClick={onClick} className="flex w-full items-center justify-end gap-2 text-start text-[14px] text-[#7b8582]">
-      <span className="text-[#bbc6c2]">‹</span>
+    <button type="button" onClick={onClick} className="flex w-full items-center justify-end gap-2 text-start text-[14px] text-tv-text-faint">
+      <span className="text-tv-text-faint">‹</span>
       <span
         className={`flex size-[18px] items-center justify-center rounded-[4px] text-[13px] font-bold text-white ${
           state === "empty" ? "border border-[#b7c7c1] bg-white" : "bg-[#185045]"
@@ -1145,7 +1145,7 @@ function PagerButton({
     <button
       type="button"
       className={`flex h-9 w-9 items-center justify-center rounded-md border border-[#dfe8e4] bg-white ${
-        muted ? "text-[#c8d6d1]" : "text-[#8ca49e]"
+        muted ? "text-tv-text-faint" : "text-tv-text-faint"
       }`}
     >
       <Icon className="size-5" />

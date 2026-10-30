@@ -7,7 +7,7 @@ import { DirText } from "@/components/DirText";
 /** Shared pieces of the «العمولات» pages — the operations money pages' look. */
 
 export const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
-export const th = "px-2.5 py-2 text-start text-[11px] font-bold text-[#93aaa3] whitespace-nowrap";
+export const th = "px-2.5 py-2 text-start text-[11px] font-bold text-tv-text-faint whitespace-nowrap";
 export const td = "px-2.5 py-2 text-[12px] font-bold text-[#0f3d38] whitespace-nowrap";
 export const field = "h-10 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045]";
 export const primary =
@@ -43,11 +43,11 @@ export function StatusPill({ status }: { status: string }) {
 export function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: string }) {
   return (
     <div className="rounded-xl border border-[#e2ebe7] bg-[#fbfdfc] p-4">
-      <div className="text-[11.5px] font-bold text-[#93aaa3]">{label}</div>
+      <div className="text-[11.5px] font-bold text-tv-text-faint">{label}</div>
       <div className={`mt-1 text-[19px] font-extrabold ${tone ?? "text-[#003c3a]"}`}>
         <Num>{value}</Num>
       </div>
-      {hint && <div className="mt-1 text-[11px] font-semibold text-[#93aaa3]">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] font-semibold text-tv-text-faint">{hint}</div>}
     </div>
   );
 }

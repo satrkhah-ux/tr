@@ -121,7 +121,7 @@ export function TravelersPanel({
           </button>
         </div>
       </div>
-      <p className="mb-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+      <p className="mb-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
         <Lock className="size-3.5" />
         {t("ops.passport.audited")}
       </p>
@@ -175,7 +175,7 @@ export function TravelersPanel({
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Users className="size-4" />}
             {t("ops.trav.seed")}
           </button>
-          <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.trav.seedHint")}</p>
+          <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.trav.seedHint")}</p>
         </div>
       ) : (
         <ul className="space-y-2">
@@ -330,10 +330,10 @@ function TravelerRow({
     <li className="rounded-[11px] border border-[#e2ebe7] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className={`truncate text-[13px] font-extrabold ${traveler.display_name ? "text-[#0f3d38]" : "text-[#93aaa3]"}`}>
+          <p className={`truncate text-[13px] font-extrabold ${traveler.display_name ? "text-[#0f3d38]" : "text-tv-text-faint"}`}>
             {traveler.display_name || placeholder}
           </p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#93aaa3]">
+          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-tv-text-faint">
             <span>{t(KIND_KEY(traveler.traveler_kind))}</span>
             {traveler.age != null ? <span>{t("ops.trav.soldAge", { n: traveler.age })}</span> : null}
             {traveler.birth_date ? (
@@ -450,7 +450,7 @@ function TravelerRow({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-bold text-[#93aaa3]">{t("ops.trav.visa")}</span>
+        <span className="text-[11px] font-bold text-tv-text-faint">{t("ops.trav.visa")}</span>
         <select
           value={traveler.visa_status}
           disabled={pending}
@@ -589,7 +589,7 @@ function TravelerRow({
               {t("ops.passport.nationality")}
               {fillTag("nationality")}
               {form.nationality.trim() && nationalityName(form.nationality, language) !== form.nationality.trim() ? (
-                <span className="text-[10.5px] font-semibold text-[#93aaa3]">{nationalityName(form.nationality, language)}</span>
+                <span className="text-[10.5px] font-semibold text-tv-text-faint">{nationalityName(form.nationality, language)}</span>
               ) : null}
             </span>
             <input value={form.nationality} onChange={(e) => set({ nationality: e.target.value })} className={`${field} ${manual("nationality")}`} />
@@ -664,7 +664,7 @@ function TravelerRow({
             {t("ops.passport.unavailable")}
           </p>
         ) : (
-          <p className="mt-2 text-[11.5px] font-bold text-[#93aaa3]">{t("ops.passport.none")}</p>
+          <p className="mt-2 text-[11.5px] font-bold text-tv-text-faint">{t("ops.passport.none")}</p>
         )
       ) : null}
     </li>

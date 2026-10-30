@@ -32,7 +32,7 @@ export function VisaListReview({ total, reviews }: { total: number; reviews: Vis
           {t("data.visas.review.summary", { total, ready: total - todo, todo })}
         </span>
       </summary>
-      <p className="mt-2 text-[12px] font-semibold text-[#93aaa3]">{todo ? t("data.visas.review.hint") : t("data.visas.review.clean")}</p>
+      <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">{todo ? t("data.visas.review.hint") : t("data.visas.review.clean")}</p>
       {todo ? (
         <ul className="mt-3 grid gap-2">
           {reviews.map((r) => (
@@ -40,7 +40,7 @@ export function VisaListReview({ total, reviews }: { total: number; reviews: Vis
               {/* the table opens that one row's details from ?id= */}
               <a href={`/visas?id=${r.id}`} className="min-w-[110px] text-[13px] font-extrabold text-[#185045] underline-offset-4 hover:underline">
                 {r.country}
-                {r.visa_type ? <span className="font-semibold text-[#93aaa3]"> · {r.visa_type}</span> : null}
+                {r.visa_type ? <span className="font-semibold text-tv-text-faint"> · {r.visa_type}</span> : null}
               </a>
               <span className="flex flex-1 flex-wrap gap-1.5">
                 {r.issues.map((issue) => (

@@ -97,7 +97,7 @@ export function SupplierPanel({
           </Link>
         ) : null}
       </div>
-      <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.sup.hint")}</p>
+      <p className="mb-3 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.sup.hint")}</p>
 
       <div className="space-y-3">
         {work.suppliers.map((s) => (
@@ -125,7 +125,7 @@ export function SupplierPanel({
           </p>
           {unassigned.length > 0 ? (
             <>
-              <p className="mb-1.5 text-[11.5px] font-bold text-[#93aaa3]">{t("ops.sup.unassigned")}</p>
+              <p className="mb-1.5 text-[11.5px] font-bold text-tv-text-faint">{t("ops.sup.unassigned")}</p>
               <ul className="space-y-1.5">
                 {unassigned.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[9px] border border-[#eef3f1] px-3 py-2">
@@ -316,7 +316,7 @@ function SupplierBookingRow({ booking, info, work }: { booking: OperationBooking
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[12.5px] font-extrabold text-[#0f3d38]">{booking.title}</p>
-          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#93aaa3]">
+          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-tv-text-faint">
             {booking.start_date ? <DirText dir="ltr">{booking.start_date}</DirText> : null}
             <span className={`rounded-full px-2 py-0.5 ${STATE_STYLE[state]}`}>{t(`ops.sup.state.${state}`, { h: hours })}</span>
             {booking.status === "confirmed" ? (
@@ -564,7 +564,7 @@ export function PaymentList({ payments }: { payments: CaseSupplierPayment[] }) {
           <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold">
             <span className="text-[#557d78]">
               {t(`ops.sup.pay.kind.${p.kind}`)} · {t(`ops.sup.pay.method.${p.method as (typeof METHODS)[number]}`)}
-              <span className="tv-tnum ms-2 font-semibold text-[#93aaa3]">
+              <span className="tv-tnum ms-2 font-semibold text-tv-text-faint">
                 <DirText dir="ltr">{`${p.paid_on}${p.reference ? ` · ${p.reference}` : ""}`}</DirText>
               </span>
             </span>

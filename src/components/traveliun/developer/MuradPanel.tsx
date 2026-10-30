@@ -56,7 +56,7 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
   return (
     <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("murad.title")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("murad.hint")}</p>
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("murad.hint")}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-bold text-[#557d78]">
         <span>
@@ -81,7 +81,7 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
       </p>
 
       <h3 className="mt-4 border-t border-dashed border-[#dce7e2] pt-3 text-[12.5px] font-extrabold text-[#557d78]">{t("murad.phones")}</h3>
-      <p className="mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">{t("murad.phones.hint")}</p>
+      <p className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{t("murad.phones.hint")}</p>
       {data.testPhone ? (
         <p className="mt-1.5 text-[12px] font-semibold text-[#557d78]">
           {t("murad.phones.test")}{" "}
@@ -89,7 +89,7 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
         </p>
       ) : null}
       <ul className="mt-1.5 grid gap-1">
-        {phones.length === 0 ? <li className="text-[12px] font-semibold text-[#93aaa3]">{t("murad.phones.empty")}</li> : null}
+        {phones.length === 0 ? <li className="text-[12px] font-semibold text-tv-text-faint">{t("murad.phones.empty")}</li> : null}
         {phones.map((p) => (
           <li key={p} className="flex items-center justify-between gap-2 text-[12.5px] font-bold text-[#0f3d38]">
             <bdi dir="ltr" className="font-mono">
@@ -129,13 +129,13 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
 
       <h3 className="mt-4 border-t border-dashed border-[#dce7e2] pt-3 text-[12.5px] font-extrabold text-[#557d78]">{t("murad.log")}</h3>
       {data.logs.length === 0 ? (
-        <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("murad.log.empty")}</p>
+        <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("murad.log.empty")}</p>
       ) : (
         <ul className="mt-1.5 grid gap-1.5">
           {data.logs.map((l) => (
             <li key={l.id} className="rounded-[10px] bg-[#f7faf8] px-3 py-2 text-[12px] font-semibold text-[#557d78] dark:bg-[#0f1f1b]">
               <div className="flex flex-wrap items-center gap-2">
-                <time dateTime={l.at} dir="ltr" className="text-[11px] font-bold text-[#93aaa3]">
+                <time dateTime={l.at} dir="ltr" className="text-[11px] font-bold text-tv-text-faint">
                   {whenText(l.at, true)}
                 </time>
                 <bdi dir="ltr" className="font-mono text-[#0f3d38]">

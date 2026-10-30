@@ -52,13 +52,13 @@ export function RepackageAccountsCard({ draftId, refreshKey = 0 }: { draftId: st
           </Link>
         ) : null}
       </div>
-      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{view.hasCase ? t("ops.money.caseHint") : t("rp.acc.noCase")}</p>
+      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-tv-text-faint">{view.hasCase ? t("ops.money.caseHint") : t("rp.acc.noCase")}</p>
 
       <div className="grid gap-3 md:grid-cols-2">
-        {lines.length === 0 ? <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.money.noFigures")}</p> : null}
+        {lines.length === 0 ? <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.money.noFigures")}</p> : null}
         {lines.map((l) => (
           <div key={l.currency} className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-            <p className="text-[11.5px] font-bold text-[#93aaa3]">{t("ops.money.expected")} · {l.currency}</p>
+            <p className="text-[11.5px] font-bold text-tv-text-faint">{t("ops.money.expected")} · {l.currency}</p>
             <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[12px] font-bold text-[#557d78]">
               <Row label={t("ops.money.sale")}>{fmtMoney(l.revenue, l.currency)}</Row>
               <Row label={t("ops.money.cost")}>{fmtMoney(l.cost, l.currency)}</Row>
@@ -69,7 +69,7 @@ export function RepackageAccountsCard({ draftId, refreshKey = 0 }: { draftId: st
         ))}
 
         <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-          <p className="text-[11.5px] font-bold text-[#93aaa3]">{t("ops.money.actual")}</p>
+          <p className="text-[11.5px] font-bold text-tv-text-faint">{t("ops.money.actual")}</p>
           <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[12px] font-bold text-[#557d78]">
             <Row label={t("ops.money.received")}>{fmtMoney(view.paid, currency)}</Row>
             <Row label={t("rp.acc.remaining")} tone={view.remaining != null && view.remaining > 0 ? "text-[#a86a10]" : undefined}>

@@ -51,7 +51,7 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div>
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("rp.title")}</h1>
-            <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("rp.subtitle")}</p>
+            <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("rp.subtitle")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* a ticket the client already holds, re-set in our identity — no supplier, no price */}
@@ -120,8 +120,8 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
                     <span className="min-w-0 truncate">{row.customer_name ?? t("rp.noClient")}</span>
                   </p>
                   {row.destination ? <p className="text-[12.5px] font-semibold text-[#557d78]">{row.destination}</p> : null}
-                  {row.supplier_name ? <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.supplier")}: {row.supplier_name}</p> : null}
-                  <p className="tv-tnum mt-1.5 text-[11px] text-[#93aaa3]">{t("pg.lastUpdated")}: <DirText dir="ltr">{row.updated_at.slice(0, 16).replace("T", " ")}</DirText></p>
+                  {row.supplier_name ? <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("rp.supplier")}: {row.supplier_name}</p> : null}
+                  <p className="tv-tnum mt-1.5 text-[11px] text-tv-text-faint">{t("pg.lastUpdated")}: <DirText dir="ltr">{row.updated_at.slice(0, 16).replace("T", " ")}</DirText></p>
                 </div>
                 <div className="mt-4 flex items-center gap-2">
                   <Link href={stageHref(row.id, "import")} className="inline-flex h-10 flex-1 items-center justify-center rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439]">{t("rp.continue")}</Link>

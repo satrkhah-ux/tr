@@ -74,7 +74,7 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
               {t("ops.backToBoard")}
             </Link>
           </div>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("ops.drv.scheduleHint")}</p>
+          <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("ops.drv.scheduleHint")}</p>
           <div className="mt-4 flex flex-wrap items-end gap-2">
             <label className="grid gap-1.5 text-[11.5px] font-bold text-[#185045]">
               {t("ops.drv.date")}
@@ -133,12 +133,12 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
             {groups.map((g) => (
               <section key={g.city} className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] print:rounded-none print:border-black print:shadow-none">
                 <h2 className="mb-2 text-[14px] font-extrabold text-[#185045]">
-                  {g.city || "—"} <span className="tv-tnum text-[12px] text-[#93aaa3]">({g.rows.length})</span>
+                  {g.city || "—"} <span className="tv-tnum text-[12px] text-tv-text-faint">({g.rows.length})</span>
                 </h2>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[760px] text-start text-[12px]">
                     <thead>
-                      <tr className="border-b border-[#e2ebe7] text-[11px] font-bold text-[#93aaa3]">
+                      <tr className="border-b border-[#e2ebe7] text-[11px] font-bold text-tv-text-faint">
                         <th className="px-2 py-1.5 text-start">{t("ops.drv.time")}</th>
                         <th className="px-2 py-1.5 text-start">{t("ops.drv.case")}</th>
                         <th className="px-2 py-1.5 text-start">{t("ops.drv.pax")}</th>

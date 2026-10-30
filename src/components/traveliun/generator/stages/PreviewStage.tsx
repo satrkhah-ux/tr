@@ -50,7 +50,7 @@ export function PreviewStage({ draftId, data, patch, flush, lookups }: StageForm
       <section className={`${sectionClass} flex flex-wrap items-center justify-between gap-3`}>
         <div>
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.previewTitle")}</h2>
-          <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("pg.previewNote")}</p>
+          <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("pg.previewNote")}</p>
         </div>
         {produced ? (
           <div className="flex flex-wrap items-center gap-2">

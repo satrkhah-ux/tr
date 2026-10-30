@@ -186,7 +186,7 @@ export function PartnerWelcome({ home = "/b2b", homeLabel = "العودة لبو
       className="rounded-2xl border border-[#e2ebe7] bg-white p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]"
     >
       <h2 className="text-base font-extrabold text-[#003c3a]">اختر كلمة المرور</h2>
-      <p className="mb-4 mt-1 text-[12px] font-semibold text-[#93aaa3]">
+      <p className="mb-4 mt-1 text-[12px] font-semibold text-tv-text-faint">
         هذه كلمتك أنت — لا يعرفها أحد في ترافليون ولا تُخزَّن لدينا.
       </p>
 

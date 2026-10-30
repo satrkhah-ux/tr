@@ -47,6 +47,6 @@ export function ErrorWatch() {
     <button type="button" onClick={() => sendErrorToMurad(errorReportFrom(alert.text, alert.action))} className="font-bold text-red-800 hover:underline">
       ظهر خطأ — أرسله لمُراد
     </button>
-    <button type="button" onClick={() => setDismissed(alert.text)} aria-label="إخفاء" className="rounded-full p-1 text-[#8ba09b] hover:bg-[#f4f8f6]"><X className="size-3.5" /></button>
+    <button type="button" onClick={() => setDismissed(alert.text)} aria-label="إخفاء" className="rounded-full p-1 text-tv-text-faint hover:bg-[#f4f8f6]"><X className="size-3.5" /></button>
   </div>;
 }

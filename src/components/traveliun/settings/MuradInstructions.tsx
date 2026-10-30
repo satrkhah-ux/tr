@@ -29,7 +29,7 @@ export function MuradInstructions({ data }: { data: { instructions: InstructionR
   }
   return <section dir="rtl" className="min-w-0 space-y-5 rounded-2xl border border-[#dbe6e1] bg-white p-4 text-[#185045] sm:p-6 dark:border-[#294039] dark:bg-[#12241f] dark:text-[#eaf3ef]">
     <div><h2 className="text-xl font-extrabold">تعليمات الإدارة لمُراد</h2>
-      <p className="mt-2 text-sm leading-6 text-[#67847c] dark:text-[#9db8ae]">اكتب قراراً أو معلومة يعتمدها مُراد. تُطبّق عند الضغط على «نفّذ»، ويظهر لك ما تغيّر.</p></div>
+      <p className="mt-2 text-sm leading-6 text-tv-text-faint dark:text-[#9db8ae]">اكتب قراراً أو معلومة يعتمدها مُراد. تُطبّق عند الضغط على «نفّذ»، ويظهر لك ما تغيّر.</p></div>
     <textarea aria-label="تعليمات الإدارة لمُراد" rows={3} maxLength={2000} className={field} value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب التعليمات هنا…" disabled={busy} />
     <div className="flex flex-wrap gap-3">
       <button disabled={busy || !text.trim()} onClick={() => send(text)} className="rounded-lg bg-[#185045] px-6 py-3 font-bold text-white disabled:opacity-50">{busy ? "مُراد يقرأ…" : "نفّذ"}</button>

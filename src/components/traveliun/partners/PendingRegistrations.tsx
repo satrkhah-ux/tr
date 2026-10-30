@@ -38,7 +38,7 @@ export function PendingRegistrations({ companies }: { companies: PartnerCompany[
       <h2 className="text-sm font-extrabold text-[#a86a10]">
         طلبات شراكة بانتظار القرار ({pending.length})
       </h2>
-      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">
+      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-tv-text-faint">
         الشركة لا ترى شيئاً ولا تدخل النظام قبل الاعتماد. النسبة تُحدَّد هنا، ولا يمكن للشركة التأثير فيها.
       </p>
       <div className="space-y-2.5">
@@ -69,7 +69,7 @@ function PendingRow({ company }: { company: PartnerCompany }) {
             {company.contact_name ? <span>{company.contact_name}</span> : null}
           </p>
           {company.registration_note ? (
-            <p className="mt-1 text-[11.5px] text-[#93aaa3]">{company.registration_note}</p>
+            <p className="mt-1 text-[11.5px] text-tv-text-faint">{company.registration_note}</p>
           ) : null}
           <RequestDetails company={company} />
         </div>
@@ -294,7 +294,7 @@ function RequestDetails({ company }: { company: PartnerCompany }) {
   return (
     <div className="mt-1.5 space-y-1">
       {facts.length ? <p className="text-[11.5px] font-bold text-[#557d78]">{facts.join(" · ")}</p> : null}
-      <p className="text-[11px] font-semibold text-[#93aaa3]">
+      <p className="text-[11px] font-semibold text-tv-text-faint">
         {company.terms_accepted_at
           ? `وافقت على شروط التعاون (${company.terms_version ?? "—"}) في ${company.terms_accepted_at.slice(0, 10)}`
           : "لا موافقة مسجّلة على شروط التعاون"}

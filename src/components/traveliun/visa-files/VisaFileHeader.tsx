@@ -34,7 +34,7 @@ export function VisaFileHeader({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/visa-files" className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] px-2 text-sm font-bold text-[#557d78] hover:bg-[#f4f8f6]"><ArrowRight className="size-4" /> اللوحة</Link>
-          <DirText className="text-sm font-bold text-[#6f8f88]">{file.serial}</DirText>
+          <DirText className="text-sm font-bold text-tv-text-faint">{file.serial}</DirText>
           <StatusChip status={file.status} />
         </div>
         <button type="button" className={btn} onClick={onRefresh} disabled={refreshing}>

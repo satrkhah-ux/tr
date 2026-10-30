@@ -135,7 +135,7 @@ export function OperationsBoard({
         <section className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ops.title")}</h1>
-            <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.subtitle")}</p>
+            <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.subtitle")}</p>
           </div>
           {canSeeMoney ? <MoneyLinks /> : null}
 
@@ -184,7 +184,7 @@ export function OperationsBoard({
               {activeFilters > 0 ? <span className="tv-tnum rounded-full bg-[#185045] px-1.5 text-[10.5px] text-white">{activeFilters}</span> : null}
             </button>
             <div className="relative basis-full sm:ms-auto sm:basis-auto">
-              <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+              <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

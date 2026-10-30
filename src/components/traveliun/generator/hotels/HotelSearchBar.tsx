@@ -25,7 +25,7 @@ export type SearchBarGuests = { adults: number; children: number; rooms: number 
 
 const cell =
   "relative flex min-h-[70px] min-w-0 items-center gap-2.5 border-e border-[#e0ebe7] px-4 py-2.5 transition-colors last:border-e-0 focus-within:rounded-[13px] focus-within:bg-[#f7fbf9]";
-const cellLabel = "block text-[9.5px] font-bold text-[#78948f] whitespace-nowrap";
+const cellLabel = "block text-[9.5px] font-bold text-tv-text-faint whitespace-nowrap";
 const cellInput =
   "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[12px] font-bold text-[#123e3a] outline-none placeholder:text-[#9bb0ac]";
 
@@ -220,7 +220,7 @@ export function HotelSearchBar({
                 max={10}
                 onChange={(rooms) => onGuests({ ...guests, rooms })}
               />
-              <p className="mt-2 text-[9.5px] font-semibold text-[#8ba19d]">
+              <p className="mt-2 text-[9.5px] font-semibold text-tv-text-faint">
                 تعديل الأشخاص هنا يحدّث بيانات الرحلة، والغرف تخصّ هذا الفندق.
               </p>
               <button
@@ -268,7 +268,7 @@ function Counter({
     <div className="flex min-h-[62px] items-center justify-between gap-5 border-b border-[#edf3f1]">
       <span className="flex flex-col gap-0.5">
         <strong className="text-[12px] font-bold text-[#123e3a]">{title}</strong>
-        <small className="whitespace-nowrap text-[9px] text-[#8ba19d]">{hint}</small>
+        <small className="whitespace-nowrap text-[9px] text-tv-text-faint">{hint}</small>
       </span>
       <span className="flex items-center gap-3">
         <button

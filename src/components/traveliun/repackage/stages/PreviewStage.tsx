@@ -126,7 +126,7 @@ export function PreviewStage({ draftId, data, replace, flush }: RepackageStagePr
               issue={produceRepackageOffer}
               onIssued={() => setStamp((n) => n + 1)}
             />
-            <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.preview.unsentNote")}</p>
+            <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("rp.preview.unsentNote")}</p>
           </section>
 
           {file ? <RepackageConfirm draftId={draftId} file={file} onConfirmed={() => setStamp((n) => n + 1)} /> : null}

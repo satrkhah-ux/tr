@@ -31,7 +31,7 @@ export function SectionTabs({ pathname }: { pathname: string }) {
             aria-current={active ? "page" : undefined}
             className={cn(
               "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-bold transition-colors",
-              active ? "border-[var(--tv-brand)] text-[var(--tv-brand)]" : "border-transparent text-[#6b7f7a] hover:text-[var(--tv-brand)]",
+              active ? "border-[var(--tv-brand)] text-[var(--tv-brand)]" : "border-transparent text-tv-text-faint hover:text-[var(--tv-brand)]",
             )}
           >
             {t(tab.labelKey as TranslationKey)}

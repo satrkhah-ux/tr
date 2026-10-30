@@ -113,7 +113,7 @@ export function SupplierSearchTry({ code, countries }: { code: string; countries
           {t("settings.supplierTry.back")}
         </Link>
         <h1 className="text-lg font-extrabold text-[#003c3a]">{t("settings.supplierTry.title")}</h1>
-        <p className="mt-1 mb-5 text-[12.5px] font-semibold text-[#93aaa3]">{t("settings.supplierTry.subtitle")}</p>
+        <p className="mt-1 mb-5 text-[12.5px] font-semibold text-tv-text-faint">{t("settings.supplierTry.subtitle")}</p>
 
         <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -232,7 +232,7 @@ function Outcome({ code, result, query }: { code: string; result: SearchTryResul
         <section className="rounded-[12px] border border-[#e7f0ec] bg-[#f8fbf9] p-3">
           <p className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[12.5px] font-extrabold text-[#185045]">
             {t("settings.supplierTry.calls")}
-            <DirText dir="ltr" className="tv-tnum text-[11px] font-bold text-[#93aaa3]">{result.at} UTC</DirText>
+            <DirText dir="ltr" className="tv-tnum text-[11px] font-bold text-tv-text-faint">{result.at} UTC</DirText>
           </p>
           <ul className="space-y-1.5">
             {result.calls.map((c, i) => <CallLine key={i} call={c} />)}
@@ -261,7 +261,7 @@ function ListedHotels({ code, hotels, priced, initial }: { code: string; hotels:
         <h2 className="text-[14.5px] font-extrabold text-[#003c3a]">{t("settings.supplierTry.listed.title")}</h2>
         <span className="tv-tnum text-[12px] font-bold text-[#557d78]">{t("settings.supplierTry.listed.count", { shown: list.length, total: hotels.length })}</span>
       </div>
-      <p className="mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.supplierTry.listed.hint")}</p>
+      <p className="mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.supplierTry.listed.hint")}</p>
       <div className="mb-3 flex flex-wrap gap-2">
         <input
           dir="ltr"
@@ -277,7 +277,7 @@ function ListedHotels({ code, hotels, priced, initial }: { code: string; hotels:
         </select>
       </div>
       {list.length === 0 ? (
-        <p className="py-4 text-center text-[13px] font-bold text-[#93aaa3]">{t("settings.supplierTry.listed.none")}</p>
+        <p className="py-4 text-center text-[13px] font-bold text-tv-text-faint">{t("settings.supplierTry.listed.none")}</p>
       ) : (
         <ul className="divide-y divide-[#eef4f1]">
           {list.slice(0, shown).map((h) => (
@@ -288,7 +288,7 @@ function ListedHotels({ code, hotels, priced, initial }: { code: string; hotels:
                 aria-expanded={open === h.code}
                 className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-2 text-start hover:bg-[#f8fbf9]"
               >
-                <ChevronDown className={`size-4 shrink-0 text-[#93aaa3] transition-transform ${open === h.code ? "rotate-180" : ""}`} aria-hidden />
+                <ChevronDown className={`size-4 shrink-0 text-tv-text-faint transition-transform ${open === h.code ? "rotate-180" : ""}`} aria-hidden />
                 <DirText dir="ltr" className="text-[13px] font-bold text-[#0f3d38]">{h.name}</DirText>
                 {h.stars ? (
                   <span className="inline-flex items-center gap-0.5 text-[11.5px] font-bold text-[#b7791f]">
@@ -297,7 +297,7 @@ function ListedHotels({ code, hotels, priced, initial }: { code: string; hotels:
                   </span>
                 ) : null}
                 {priced.has(h.code) ? <span className="rounded-full bg-[#e6f4ee] px-2 text-[11px] font-bold text-[#0f7a52]">{t("settings.supplierTry.listed.priced")}</span> : null}
-                <DirText dir="ltr" className="tv-tnum ms-auto text-[11px] font-bold text-[#93aaa3]">#{h.code}</DirText>
+                <DirText dir="ltr" className="tv-tnum ms-auto text-[11px] font-bold text-tv-text-faint">#{h.code}</DirText>
               </button>
               {open === h.code ? <HotelDetails code={code} hotelCode={h.code} /> : null}
             </li>
@@ -325,7 +325,7 @@ function HotelDetails({ code, hotelCode }: { code: string; hotelCode: string }) 
   }, [code, hotelCode, t]);
   if (!state) {
     return (
-      <p className="flex items-center gap-2 pb-3 ps-7 text-[12px] font-semibold text-[#93aaa3]">
+      <p className="flex items-center gap-2 pb-3 ps-7 text-[12px] font-semibold text-tv-text-faint">
         <Loader2 className="size-3.5 animate-spin" aria-hidden /> {t("settings.supplierTry.details.loading")}
       </p>
     );
@@ -350,7 +350,7 @@ function HotelDetails({ code, hotelCode }: { code: string; hotelCode: string }) 
       ) : null}
       {h.facilities.length ? (
         <div>
-          <p className="mb-1 text-[11.5px] font-bold text-[#93aaa3]">{t("settings.supplierTry.details.facilities")}</p>
+          <p className="mb-1 text-[11.5px] font-bold text-tv-text-faint">{t("settings.supplierTry.details.facilities")}</p>
           <div dir="ltr" className="flex flex-wrap gap-1">
             {h.facilities.map((f) => <span key={f} className="rounded-full bg-[#f4f8f6] px-2 py-0.5 text-[11px] font-semibold text-[#557d78]">{f}</span>)}
           </div>
@@ -415,7 +415,7 @@ function HotelRow({ hotel }: { hotel: SearchTryHotel }) {
     <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <DirText dir="ltr" className="text-[14.5px] font-extrabold text-[#003c3a]">{hotel.name}</DirText>
-        <span className="flex items-center gap-2 text-[11.5px] font-bold text-[#93aaa3]">
+        <span className="flex items-center gap-2 text-[11.5px] font-bold text-tv-text-faint">
           {hotel.stars ? (
             <span className="inline-flex items-center gap-1 text-[#b7791f]">
               <Star className="size-3.5 fill-current" />
@@ -430,22 +430,22 @@ function HotelRow({ hotel }: { hotel: SearchTryHotel }) {
           <li key={i} className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-[#eef4f1] py-2 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_auto_auto]">
             <div>
               <DirText dir="ltr" className="font-bold text-[#0f3d38]">{r.room}</DirText>
-              <div className="text-[11.5px] font-semibold text-[#93aaa3]">{BOARD_LABEL[r.board] ? t(BOARD_LABEL[r.board]) : r.board}</div>
+              <div className="text-[11.5px] font-semibold text-tv-text-faint">{BOARD_LABEL[r.board] ? t(BOARD_LABEL[r.board]) : r.board}</div>
             </div>
             <div>
               <span className={`text-[11.5px] font-bold ${r.refundable ? "text-[#0f7a52]" : "text-[#c22850]"}`}>
                 {t(r.refundable ? "settings.supplierTry.refundable" : "settings.supplierTry.nonRefundable")}
               </span>
-              {r.refundable ? <div className="tv-tnum text-[11px] text-[#93aaa3]">{r.policy}</div> : null}
+              {r.refundable ? <div className="tv-tnum text-[11px] text-tv-text-faint">{r.policy}</div> : null}
             </div>
             {r.net !== null ? (
               <div className="whitespace-nowrap">
-                <div className="text-[11px] font-bold text-[#93aaa3]">{t("settings.supplierTry.net")}</div>
+                <div className="text-[11px] font-bold text-tv-text-faint">{t("settings.supplierTry.net")}</div>
                 <DirText dir="ltr" className="tv-tnum font-bold text-[#557d78]">{money(r.net)} {r.currency}</DirText>
               </div>
             ) : null}
             <div className="whitespace-nowrap">
-              <div className="text-[11px] font-bold text-[#93aaa3]">{t("settings.supplierTry.sell")}</div>
+              <div className="text-[11px] font-bold text-tv-text-faint">{t("settings.supplierTry.sell")}</div>
               {r.sell !== null ? (
                 <>
                   <DirText dir="ltr" className={`tv-tnum font-extrabold ${r.blocked ? "text-[#c22850]" : "text-[#185045]"}`}>{money(r.sell)} SAR</DirText>

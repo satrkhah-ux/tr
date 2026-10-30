@@ -558,7 +558,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
       <section className={sectionClass}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.citiesTitle")}</h2>
-          <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.datesAuto")}</p>
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("pg.datesAuto")}</p>
         </div>
         <FieldIssue field="cities" className="mb-3" />
         <FieldIssue field="hotels" className="mb-3" />
@@ -581,7 +581,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
         ) : null}
 
         {data.cities.length === 0 ? (
-          <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+          <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">
             {t("pg.err.noCities")}
           </p>
         ) : (
@@ -631,7 +631,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                         <DirText dir="ltr">{new Intl.NumberFormat("en-US").format(price)}</DirText>
                       </span>
                     ) : null}
-                    <span className="shrink-0 text-[11.5px] font-bold text-[#93aaa3]">{t("pg.flow.edit")}</span>
+                    <span className="shrink-0 text-[11.5px] font-bold text-tv-text-faint">{t("pg.flow.edit")}</span>
                   </button>
                 );
               }
@@ -735,7 +735,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           </button>
                         ) : null}
                       </div>
-                      <p className="mt-1.5 text-[11px] font-semibold text-[#93aaa3]">
+                      <p className="mt-1.5 text-[11px] font-semibold text-tv-text-faint">
                         {t("pg.newCityHint", { country: data.trip.country || "—" })}
                       </p>
                       {cityError ? (
@@ -785,7 +785,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           )}
                         </>
                       ) : (
-                        <span className="text-[11.5px] font-bold text-[#93aaa3]">{t("pg.chooseCityFirst")}</span>
+                        <span className="text-[11.5px] font-bold text-tv-text-faint">{t("pg.chooseCityFirst")}</span>
                       )}
                     </div>
                   ) : null}
@@ -831,7 +831,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
               // No coverage means the city has no name or no nights yet — nothing
               // to pick a hotel for. (Also narrows `cov` for the block below.)
               if (!cov) {
-                return <p className="text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.chooseCityFirst")}</p>;
+                return <p className="text-[12.5px] font-semibold text-tv-text-faint">{t("pg.chooseCityFirst")}</p>;
               }
               return (
                 <div className="space-y-3">
@@ -956,18 +956,18 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
             <Sparkles className="size-4 text-[#2aa87a]" />
             {t("pg.reuseTitle")}
           </h3>
-          <p className="mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("pg.reuseHint")}</p>
+          <p className="mb-3 text-[12px] font-semibold text-tv-text-faint">{t("pg.reuseHint")}</p>
           {copied ? (
             <p className="mb-3 rounded-[10px] border border-[#bfe5d4] bg-[#e9f7f0] px-4 py-2.5 text-[12.5px] font-bold text-[#0f7a52]">
               {t("pg.reuseCopied")}
             </p>
           ) : null}
           {!reuseEligible ? (
-            <p className="text-[12.5px] text-[#93aaa3]">{t("pg.reuseNoMatches")}</p>
+            <p className="text-[12.5px] text-tv-text-faint">{t("pg.reuseNoMatches")}</p>
           ) : programs === null ? (
             <div className="tv-shimmer h-16 rounded-[10px]" />
           ) : programs.length === 0 ? (
-            <p className="text-[12.5px] text-[#93aaa3]">{t("pg.reuseNoMatches")}</p>
+            <p className="text-[12.5px] text-tv-text-faint">{t("pg.reuseNoMatches")}</p>
           ) : (
             <ul className="space-y-2">
               {programs.map((program) => (

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 type Setup = NonNullable<Awaited<ReturnType<typeof getMuradControl>>>;
 const field = "min-h-11 w-full min-w-0 rounded-xl border border-[#dbe6e1] bg-white px-3 py-2.5 text-sm text-[#185045] outline-none focus:border-[#185045] focus:ring-2 focus:ring-[#185045]/10 dark:border-[#294039] dark:bg-[#12241f] dark:text-[#eaf3ef]";
 const card = "min-w-0 rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-6 dark:border-[#294039] dark:bg-[#12241f]";
-const hint = "text-sm leading-6 text-[#67847c] dark:text-[#9db8ae]";
+const hint = "text-sm leading-6 text-tv-text-faint dark:text-[#9db8ae]";
 const lines = (v: string) => v.split(/[\n,،]+/).map(x => x.trim()).filter(Boolean);
 const editable = (c: MuradControl) => ({ ...c, admins: c.admins ?? [], noHandoff: c.noHandoff ?? [] });
 const sections = [

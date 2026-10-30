@@ -109,7 +109,7 @@ export function HotelsStep({ data }: StepProps) {
       ) : notPulled(data, "hotel") ? (
         <PullNotice operationId={operationId} />
       ) : (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.hotels.none")}</p>
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">{t("wz.hotels.none")}</p>
       )}
       <button
         type="button"
@@ -205,7 +205,7 @@ function HotelRow({
   }
 
   const rooms = roomLines(booking.detail);
-  const dot = <span className="hidden text-[#b7cac4] sm:inline">·</span>;
+  const dot = <span className="hidden text-tv-text-faint sm:inline">·</span>;
 
   return (
     <li
@@ -468,7 +468,7 @@ function HotelEntry({
         </p>
       ) : null}
       {fills.length > 0 ? (
-        <p className="break-words text-[11px] font-semibold text-[#93aaa3]">
+        <p className="break-words text-[11px] font-semibold text-tv-text-faint">
           {t("wz.hotels.fill")} <DirText dir="auto">{fills.join(" · ")}</DirText>
         </p>
       ) : null}

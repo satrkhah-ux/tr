@@ -84,7 +84,7 @@ export function OperationsFilters({
           {t("ops.list.clear")}
         </button>
       ) : null}
-      {!filters.status ? <p className="w-full text-[11px] font-semibold text-[#93aaa3]">{t("ops.list.closedHidden")}</p> : null}
+      {!filters.status ? <p className="w-full text-[11px] font-semibold text-tv-text-faint">{t("ops.list.closedHidden")}</p> : null}
     </div>
   );
 }
@@ -153,10 +153,10 @@ function Movement<T extends ListedCase & { id: string }>({
       <p className="mb-1.5 flex items-center gap-1.5 text-[12px] font-extrabold text-[#557d78]">
         {icon}
         {title}
-        <span className="tv-tnum text-[#93aaa3]">({rows.length})</span>
+        <span className="tv-tnum text-tv-text-faint">({rows.length})</span>
       </p>
       {rows.length === 0 ? (
-        <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.list.nothing")}</p>
+        <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.list.nothing")}</p>
       ) : (
         <ul className="space-y-1">
           {rows.map((o) => (
@@ -166,7 +166,7 @@ function Movement<T extends ListedCase & { id: string }>({
                   {o.customer_name || "—"}
                   {o.destination ? <span className="font-semibold text-[#557d78]"> — {o.destination}</span> : null}
                 </span>
-                <span className="tv-tnum text-[11px] text-[#93aaa3]">
+                <span className="tv-tnum text-[11px] text-tv-text-faint">
                   <DirText dir="ltr">{`${o.serial} · ${dateOf(o) ?? ""}`}</DirText>
                 </span>
               </Link>

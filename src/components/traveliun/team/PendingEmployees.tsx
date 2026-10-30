@@ -35,7 +35,7 @@ export function PendingEmployees({ pending, roles }: { pending: PendingRegistrat
   return (
     <section className="rounded-2xl border border-[#f2e2b4] bg-[#fffdf7] p-5">
       <h2 className="text-sm font-extrabold text-[#a86a10]">{t("team.pending.title", { n: pending.length })}</h2>
-      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("team.pending.hint")}</p>
+      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-tv-text-faint">{t("team.pending.hint")}</p>
       {notice ? <p className="mb-2 text-[12px] font-bold text-[#0f7a52]">{t(notice)}</p> : null}
       <div className="space-y-2.5">
         {pending.map((r) => (
@@ -92,7 +92,7 @@ function PendingRow({
           <p className="text-[13px] font-extrabold text-[#003c3a]">
             {request.arabic_name}
             {request.english_name ? (
-              <span className="ms-2 text-[11.5px] font-bold text-[#93aaa3]">
+              <span className="ms-2 text-[11.5px] font-bold text-tv-text-faint">
                 <DirText dir="ltr">{request.english_name}</DirText>
               </span>
             ) : null}
@@ -100,9 +100,9 @@ function PendingRow({
           <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11.5px] font-bold text-[#557d78]">
             <DirText dir="ltr">{request.email}</DirText>
             <DirText dir="ltr">{request.mobile}</DirText>
-            <span className="text-[#93aaa3]">{date}</span>
+            <span className="text-tv-text-faint">{date}</span>
           </p>
-          {request.note ? <p className="mt-1 text-[11.5px] text-[#93aaa3]">{request.note}</p> : null}
+          {request.note ? <p className="mt-1 text-[11.5px] text-tv-text-faint">{request.note}</p> : null}
         </div>
 
         <div className="flex flex-wrap items-end gap-2">

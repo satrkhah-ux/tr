@@ -441,7 +441,7 @@ function ClosedCard({
       <span className="text-[13px] font-extrabold text-[#185045]">{label}</span>
       <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         {summary.length === 0 ? (
-          <span className="text-[11.5px] font-semibold text-[#b6c9c2]">{notStarted}</span>
+          <span className="text-[11.5px] font-semibold text-tv-text-faint">{notStarted}</span>
         ) : (
           summary.map((chip) => (
             <span
@@ -453,7 +453,7 @@ function ClosedCard({
           ))
         )}
       </span>
-      <span className="shrink-0 text-[11.5px] font-bold text-[#93aaa3]">{editLabel}</span>
+      <span className="shrink-0 text-[11.5px] font-bold text-tv-text-faint">{editLabel}</span>
     </button>
   );
 }
@@ -536,7 +536,7 @@ function ProduceBar({
   return (
     <div className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[12px] font-semibold text-[#93aaa3]">{t("pg.previewNote")}</p>
+        <p className="text-[12px] font-semibold text-tv-text-faint">{t("pg.previewNote")}</p>
         <button
           type="button"
           onClick={() => void produce()}

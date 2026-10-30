@@ -309,7 +309,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
                       <DirText dir="ltr">{`${(Number(total) - Number(buyPrice)).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${currency}`}</DirText>
                     </span>
                   ) : (
-                    <span className="text-sm text-[#93aaa3]">—</span>
+                    <span className="text-sm text-tv-text-faint">—</span>
                   )}
                 </div>
               </Field>
@@ -407,7 +407,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
   );
 }
 function Empty({ text }: { text: string }) {
-  return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#9cafaa]">{text}</p>;
+  return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">{text}</p>;
 }
 
 const field = "h-[46px] rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#0f3d38] outline-none transition-colors focus:border-[#2aa87a]";

@@ -106,7 +106,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
 
   return (
     <div className="mt-2 grid gap-3 rounded-[9px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-      <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.room.hint")}</p>
+      <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("ops.room.hint")}</p>
 
       {lines.length > 1 ? (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -287,7 +287,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
             </label>
           </div>
         ))}
-        <p className="text-[11px] font-semibold text-[#93aaa3] sm:col-span-2">{t("ops.room.customHint")}</p>
+        <p className="text-[11px] font-semibold text-tv-text-faint sm:col-span-2">{t("ops.room.customHint")}</p>
       </div>
 
       <label className={`${label} sm:max-w-xs`}>

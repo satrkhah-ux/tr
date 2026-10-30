@@ -130,7 +130,7 @@ export function ReissueOffer({
   return (
     <div className={className}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.reissue.hint")}</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("pg.reissue.hint")}</p>
         <button
           type="button"
           onClick={() => void reissue()}

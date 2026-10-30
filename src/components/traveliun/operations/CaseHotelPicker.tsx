@@ -55,7 +55,7 @@ export function CatalogHotelPick({
         placeholder={t("ops.booking.pickHotelPh")}
         onPick={(h) => onPick(h ? (hotels.find((x) => x.id === h.id) ?? null) : null)}
       />
-      <span className="text-[11px] font-semibold text-[#93aaa3]">{t("ops.booking.typedHint")}</span>
+      <span className="text-[11px] font-semibold text-tv-text-faint">{t("ops.booking.typedHint")}</span>
     </div>
   );
 }

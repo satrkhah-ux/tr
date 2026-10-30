@@ -123,7 +123,7 @@ export function OfferSend({
         <div className="w-full basis-full space-y-2 rounded-[12px] border border-[#cfe0d9] bg-[#f7fbf9] p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[11.5px] font-bold text-[#557d78]">{tx("sendReview")}</p>
-            <button type="button" onClick={() => setDraft(null)} aria-label={tx("cancelEdit")} className="rounded-[7px] p-1 text-[#7a948f] hover:bg-white">
+            <button type="button" onClick={() => setDraft(null)} aria-label={tx("cancelEdit")} className="rounded-[7px] p-1 text-tv-text-faint hover:bg-white">
               <X className="size-4" />
             </button>
           </div>
@@ -157,7 +157,7 @@ export function OfferSend({
           {blockedText ? (
             <p className="text-[11.5px] font-bold text-[#a86a10]">{blockedText}</p>
           ) : (
-            <p className="text-[11px] font-semibold text-[#7a948f]">{tx("sendTemplateHint")}</p>
+            <p className="text-[11px] font-semibold text-tv-text-faint">{tx("sendTemplateHint")}</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
             <button

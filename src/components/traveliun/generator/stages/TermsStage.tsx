@@ -30,7 +30,7 @@ export function TermsStage({ data, patch, lookups }: StageFormProps) {
   return (
     <section className={sectionClass}>
       <h2 className="mb-1 text-base font-extrabold text-[#003c3a]">{t("pg.terms")}</h2>
-      <p className="mb-4 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.termsHint")}</p>
+      <p className="mb-4 text-[12.5px] font-semibold text-tv-text-faint">{t("pg.termsHint")}</p>
       <ListEditor
         titleKey="pg.terms"
         variant="terms"

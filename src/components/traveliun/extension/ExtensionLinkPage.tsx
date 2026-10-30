@@ -131,7 +131,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                 الإضافة غير مثبتة في هذا المتصفح — ثبّتها أولاً (اطلب الحزمة من الإدارة)، ثم افتح هذه الصفحة من جديد.
               </p>
             )}
-            {ext ? <span className="text-[11.5px] font-semibold text-[#78948f]">الإضافة مثبتة · الإصدار {ext.version}</span> : null}
+            {ext ? <span className="text-[11.5px] font-semibold text-tv-text-faint">الإضافة مثبتة · الإصدار {ext.version}</span> : null}
           </div>
           {note ? (
             <p className={`mt-3 text-[13px] font-bold ${note.ok ? "text-[#185045]" : "text-[#c43d3d]"}`} role="status">
@@ -156,14 +156,14 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
             ) : null}
           </div>
           {initial.length === 0 ? (
-            <p className="mt-2 text-[12.5px] font-semibold text-[#78948f]">لا جهاز مربوط بعد.</p>
+            <p className="mt-2 text-[12.5px] font-semibold text-tv-text-faint">لا جهاز مربوط بعد.</p>
           ) : (
             <ul className="mt-2 divide-y divide-[#edf2ef]">
               {initial.map((l) => (
                 <li key={l.id} className="flex flex-wrap items-center gap-3 py-2.5">
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-bold text-[#185045]">{l.label || "متصفح"}</span>
-                    <span className="block text-[11.5px] font-semibold text-[#78948f]">
+                    <span className="block text-[11.5px] font-semibold text-tv-text-faint">
                       رُبط {fmt(l.created_at)} · آخر استعمال {fmt(l.last_used_at)} · ينتهي {fmt(l.expires_at)}
                     </span>
                   </span>

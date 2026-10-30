@@ -89,14 +89,14 @@ export function StaySummary({
               {perNight != null ? (
                 <span className="text-[14px] font-extrabold text-[#0f3d38]">
                   <DirText dir="ltr">{`${perNight} ${currency}`}</DirText>
-                  <span className="text-[11px] font-bold text-[#93aaa3]"> / ليلة</span>
+                  <span className="text-[11px] font-bold text-tv-text-faint"> / ليلة</span>
                 </span>
               ) : null}
               <span className="text-[12px] font-bold text-[#557d78]">
                 <DirText dir="ltr">{`${Math.round(total)} ${currency}`}</DirText> إجمالي
               </span>
               {canInternal && s ? (
-                <span className="text-[11px] font-bold text-[#93aaa3]">
+                <span className="text-[11px] font-bold text-tv-text-faint">
                   {t("pg.supplier.net")}: <DirText dir="ltr">{`${s.net_base} SAR`}</DirText>
                   {s.margin_pct != null ? ` · ${t("pg.marginCol")} ${s.margin_pct}%` : ""}
                 </span>

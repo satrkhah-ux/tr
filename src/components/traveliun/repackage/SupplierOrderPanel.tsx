@@ -215,7 +215,7 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
               {t("rp.order.manual")}
             </button>
           </div>
-          {!draft.canSendWhatsapp ? <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.order.noWhatsapp")}</p> : null}
+          {!draft.canSendWhatsapp ? <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("rp.order.noWhatsapp")}</p> : null}
         </div>
       ) : null}
     </section>

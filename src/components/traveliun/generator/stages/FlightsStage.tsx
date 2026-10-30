@@ -518,7 +518,7 @@ export function FlightsStage({
         </div>
 
         {domestic.length === 0 ? (
-          <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+          <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">
             {t("pg.noDomesticFlights")}
           </p>
         ) : (
@@ -635,7 +635,7 @@ function FlightLookup({ flightNo, onPick }: { flightNo: string; onPick: (hit: Fl
               </span>
             ) : null}
           </span>
-          <span className="text-[10px] font-bold text-[#93aaa3]">
+          <span className="text-[10px] font-bold text-tv-text-faint">
             {hit.airline}
             {hit.schedule_date ? ` · ${t("pg.flightLookup.scheduleFrom", { date: hit.schedule_date })}` : ""}
           </span>
@@ -834,7 +834,7 @@ function FlightRow({
             onChange={(e) => setDeparture(index, e.target.value)}
             className={`${fieldClass} tv-tnum`}
           />
-          <span className="text-[10.5px] font-semibold text-[#93aaa3]">
+          <span className="text-[10.5px] font-semibold text-tv-text-faint">
             {flight.from_tz ? t("pg.localTimeAt", { tz: flight.from_tz }) : t("pg.localTimePick")}
           </span>
           {flight.date_user_set ? (
@@ -860,7 +860,7 @@ function FlightRow({
             onChange={(e) => updateRow(index, { arrival_at: e.target.value === "" ? null : e.target.value })}
             className={`${fieldClass} tv-tnum`}
           />
-          <span className="text-[10.5px] font-semibold text-[#93aaa3]">
+          <span className="text-[10.5px] font-semibold text-tv-text-faint">
             {flight.to_tz ? t("pg.localTimeAt", { tz: flight.to_tz }) : t("pg.localTimePick")}
           </span>
         </label>
@@ -944,7 +944,7 @@ function FlightRow({
             ) : null}
           </>
         ) : bothDatesSet ? (
-          <span className="text-[11px] font-semibold text-[#93aaa3]">{t("pg.durationNeedsAirports")}</span>
+          <span className="text-[11px] font-semibold text-tv-text-faint">{t("pg.durationNeedsAirports")}</span>
         ) : null}
         <button type="button" onClick={() => removeRow(index)} className={`${removeButtonClass} ms-auto`}>
           {t("pg.removeRow")}

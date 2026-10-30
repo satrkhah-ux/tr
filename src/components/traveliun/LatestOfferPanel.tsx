@@ -117,7 +117,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                     );
                   })}
                 </div>
-                <p className="mt-3 text-[11.5px] font-semibold text-[#93aaa3]">
+                <p className="mt-3 text-[11.5px] font-semibold text-tv-text-faint">
                   {t("hub.advisory")}
                 </p>
               </article>
@@ -160,7 +160,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="py-6 text-center text-sm text-[#93aaa3]">{t("hub.noCities")}</p>
+                  <p className="py-6 text-center text-sm text-tv-text-faint">{t("hub.noCities")}</p>
                 )}
               </article>
             </section>
@@ -178,7 +178,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
 function InfoBlock({ label, value, strong = false, numeric = false }: { label: string; value: string; strong?: boolean; numeric?: boolean }) {
   return (
     <div className="rounded-[11px] bg-[#f4f8f6] p-3">
-      <p className="text-[11px] font-bold text-[#93aaa3]">{label}</p>
+      <p className="text-[11px] font-bold text-tv-text-faint">{label}</p>
       <p className={`mt-1.5 text-[13.5px] ${numeric ? "tv-tnum" : ""} ${strong ? "font-extrabold text-[#0f7a52]" : "font-bold text-[#185045]"}`}>
         {numeric ? <DirText>{value}</DirText> : value}
       </p>

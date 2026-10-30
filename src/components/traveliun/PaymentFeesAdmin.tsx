@@ -39,7 +39,7 @@ export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees
   return (
     <section className="mt-4 max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("pay.fees.title")}</h2>
-      <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("pay.fees.hint")}</p>
+      <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("pay.fees.hint")}</p>
       <div className="grid gap-1.5">
         {PAY_METHODS.map((m) => (
           <div key={m} className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#eef2f0] px-3 py-2">
@@ -80,7 +80,7 @@ export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees
         ))}
       </div>
       <h3 className="mt-4 text-[13px] font-extrabold text-[#185045]">{t("pay.settle.title")}</h3>
-      <p className="mt-1 mb-2 text-[12px] font-semibold text-[#93aaa3]">{t("pay.settle.hint")}</p>
+      <p className="mt-1 mb-2 text-[12px] font-semibold text-tv-text-faint">{t("pay.settle.hint")}</p>
       <div className="flex flex-wrap items-center gap-3 text-[12px] font-bold text-[#557d78]">
         <label className="flex items-center gap-1.5">
           {t("pay.settle.weekday")}

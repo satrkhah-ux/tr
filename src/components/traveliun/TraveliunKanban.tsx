@@ -101,7 +101,7 @@ export function TraveliunKanban() {
                 type="button"
                 onClick={() => setStatusFilter(btn.key)}
                 className={`rounded-lg px-4 py-2 font-bold transition-colors ${
-                  statusFilter === btn.key ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-[#6f8f88] hover:text-[#185045]"
+                  statusFilter === btn.key ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint hover:text-[#185045]"
                 }`}
               >
                 {btn.label}
@@ -109,7 +109,7 @@ export function TraveliunKanban() {
             ))}
           </div>
           <div className="relative h-11 w-full max-w-[280px]">
-            <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-[#8aa29b]" />
+            <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -118,7 +118,7 @@ export function TraveliunKanban() {
             />
           </div>
           {savingId ? (
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#6f8f88]"><Loader2 className="size-4 animate-spin" /> {t("saving")}</span>
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-tv-text-faint"><Loader2 className="size-4 animate-spin" /> {t("saving")}</span>
           ) : null}
           {error ? <span className="text-sm font-semibold text-[#c22850]">{error}</span> : null}
         </section>
@@ -158,7 +158,7 @@ export function TraveliunKanban() {
                         <p className="tv-tnum mb-3 font-bold text-[#185045]"><DirText dir="ltr">{card.serial}</DirText></p>
                         {card.offer_date ? (
                           <p className="mb-2 flex items-center gap-2">
-                            <CalendarDays className="size-4 text-[#8ca49e]" />
+                            <CalendarDays className="size-4 text-tv-text-faint" />
                             <DirText dir="ltr" className="tv-tnum">{card.offer_date}</DirText>
                           </p>
                         ) : null}
@@ -176,7 +176,7 @@ export function TraveliunKanban() {
                       </article>
                     ))}
                     {column.cards.length === 0 ? (
-                      <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-6 text-center text-xs text-[#9cafaa]">{t("noCards")}</p>
+                      <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-6 text-center text-xs text-tv-text-faint">{t("noCards")}</p>
                     ) : null}
                   </div>
                 </div>
@@ -192,7 +192,7 @@ export function TraveliunKanban() {
             <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
               <div>
                 <h2 className="tv-tnum text-lg font-extrabold"><DirText dir="ltr">{selected.serial}</DirText></h2>
-                <p className="mt-1 text-sm text-[#6d8a84]">{stageName(selected.stage)}</p>
+                <p className="mt-1 text-sm text-tv-text-faint">{stageName(selected.stage)}</p>
               </div>
               <button type="button" onClick={() => setSelected(null)} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}><X className="size-5" /></button>
             </div>

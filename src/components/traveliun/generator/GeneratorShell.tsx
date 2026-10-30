@@ -206,7 +206,7 @@ export function GeneratorShell({
                 row is a link straight to the box that is wrong. */}
             {stage === "preview" ? (
             <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-              <p className="mb-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]">{t("pg.validationPanel")}</p>
+              <p className="mb-2 text-[11px] font-extrabold tracking-wide text-tv-text-faint">{t("pg.validationPanel")}</p>
               {validation.blocking.length === 0 && validation.warnings.length === 0 ? (
                 <p className="flex items-start gap-2 text-[12px] font-bold text-[#0f7a52]">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
@@ -244,7 +244,7 @@ export function GeneratorShell({
             {stage !== "preview" && previewOpen ? (
               <div className="hidden xl:block">
                 <div className="sticky top-[90px]">
-                  <p className="mb-2 text-[11px] font-bold text-[#93aaa3]">{t("pg.previewHint")}</p>
+                  <p className="mb-2 text-[11px] font-bold text-tv-text-faint">{t("pg.previewHint")}</p>
                   <div className="max-h-[calc(100vh/var(--tv-zoom)_-_160px)] overflow-y-auto rounded-[14px]">
                     <div className="origin-top scale-[0.62] rtl:origin-top-right ltr:origin-top-left" style={{ width: "161%" }}>
                       <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer, draftFinance(data, lookups))} {...draftBrand(data, lookups.partners, canPricing && !can("pricing.view"))} />
@@ -324,7 +324,7 @@ function StepDot({ index, status, active }: { index: number; status: StageStatus
   if (status === "error") return <XCircle className="size-6 shrink-0 text-[#c22850]" />;
   if (status === "partial") return <CircleDot className="size-6 shrink-0 text-[#d99a00]" />;
   return (
-    <span className={`${shell} bg-[#eef4f1] text-[#93aaa3]`}>
+    <span className={`${shell} bg-[#eef4f1] text-tv-text-faint`}>
       <DirText dir="ltr">{String(index + 1)}</DirText>
     </span>
   );
@@ -364,7 +364,7 @@ function IssueList({
               >
                 {icon}
                 <span className="flex-1">{issueText(issue)}</span>
-                <ChevronLeft className="mt-0.5 size-3.5 shrink-0 text-[#b6c9c2] ltr:rotate-180" />
+                <ChevronLeft className="mt-0.5 size-3.5 shrink-0 text-tv-text-faint ltr:rotate-180" />
               </Link>
             </li>
           );

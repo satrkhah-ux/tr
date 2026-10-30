@@ -56,7 +56,7 @@ export function PaymentPriceCalculator() {
                 <span className="text-[11px] font-bold text-[#a86a10]">{t("pay.fees.unset")}</span>
               ) : (
                 <>
-                  {q.fee > 0 ? <span className="tv-tnum text-[11px] font-semibold text-[#93aaa3]">+{fmt(q.fee)}</span> : null}
+                  {q.fee > 0 ? <span className="tv-tnum text-[11px] font-semibold text-tv-text-faint">+{fmt(q.fee)}</span> : null}
                   <span className="tv-tnum font-extrabold text-[#0f3d38]">
                     <DirText dir="ltr">{`${fmt(q.total)} SAR`}</DirText>
                   </span>
@@ -68,7 +68,7 @@ export function PaymentPriceCalculator() {
                       window.setTimeout(() => setCopied(""), 1400);
                     }}
                     aria-label={t("copy")}
-                    className="rounded p-1 text-[#6f8f88] hover:bg-white hover:text-[var(--tv-brand)]"
+                    className="rounded p-1 text-tv-text-faint hover:bg-white hover:text-[var(--tv-brand)]"
                   >
                     {copied === q.method ? <span className="text-[10px] font-bold">✓</span> : <Copy className="size-3.5" />}
                   </button>

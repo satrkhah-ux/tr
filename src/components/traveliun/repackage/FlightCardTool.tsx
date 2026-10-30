@@ -164,7 +164,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
             {t("nav.repackage")}
           </Link>
           <h1 className="text-lg font-extrabold text-[#003c3a]">{t("fc.title")}</h1>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("fc.subtitle")}</p>
+          <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("fc.subtitle")}</p>
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -194,7 +194,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   );
                 })}
               </div>
-              <p className="text-[12px] text-[#93aaa3]">{t(source.hintKey)}</p>
+              <p className="text-[12px] text-tv-text-faint">{t(source.hintKey)}</p>
 
               {kind === "text" ? (
                 <textarea
@@ -236,7 +236,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   </button>
                 ) : null}
               </div>
-              <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+              <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
                 <ShieldCheck className="size-3.5" />
                 {t("fc.privacy")}
               </p>
@@ -364,7 +364,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   </div>
                 </div>
               ) : (
-                <p className="rounded-[10px] border border-dashed border-[#d7e4e0] px-4 py-10 text-center text-[12.5px] text-[#93aaa3]">
+                <p className="rounded-[10px] border border-dashed border-[#d7e4e0] px-4 py-10 text-center text-[12.5px] text-tv-text-faint">
                   {t("fc.previewEmpty")}
                 </p>
               )}

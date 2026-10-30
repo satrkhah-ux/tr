@@ -46,7 +46,7 @@ export function TraveliunGuide({ files }: { files: GuideFile[] }) {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold text-[#185045]">{file.name}</span>
-                      {size ? <span className="tv-tnum text-xs text-[#93aaa3]"><DirText dir="ltr">{size}</DirText></span> : null}
+                      {size ? <span className="tv-tnum text-xs text-tv-text-faint"><DirText dir="ltr">{size}</DirText></span> : null}
                     </span>
                   </a>
                 );

@@ -276,7 +276,7 @@ export function RecentFiles({
           ))}
         </select>
         <label className="relative min-w-40 flex-1">
-          <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-tv-text-faint" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -307,7 +307,7 @@ export function RecentFiles({
               >
                 {tx("pickAll")}
               </button>
-              <button type="button" onClick={() => setPicked(new Set())} className="h-8 rounded-[8px] px-2 text-[#78948f] hover:underline">
+              <button type="button" onClick={() => setPicked(new Set())} className="h-8 rounded-[8px] px-2 text-tv-text-faint hover:underline">
                 {tx("clearPicked")}
               </button>
             </>
@@ -317,7 +317,7 @@ export function RecentFiles({
       ) : null}
 
       {days.length === 0 ? (
-        <p className="text-[12.5px] font-semibold text-[#93aaa3]">
+        <p className="text-[12.5px] font-semibold text-tv-text-faint">
           {drafts.length === 0 ? tx("emptyList") : who === "mine" ? tx("mineEmpty") : tx("noMatch")}
           {who === "mine" && drafts.length > 0 ? (
             <button type="button" onClick={() => setWho("all")} className="ms-2 font-bold text-[#2aa87a] hover:underline">
@@ -336,7 +336,7 @@ export function RecentFiles({
               {/* no overflow clip: «العميل أكّد» opens its choice over the rows */}
               <div className="@container rounded-[10px] border border-[#e3ece8] [&>ul>li:last-child]:rounded-b-[10px]">
                 {/* the columns, said once per day — the rows below keep exactly these */}
-                <div className={`${COLS} hidden border-s-4 border-transparent bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-[#78948f] @4xl:grid`}>
+                <div className={`${COLS} hidden border-s-4 border-transparent bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-tv-text-faint @4xl:grid`}>
                   <span>{tx("colClient")}</span>
                   <span>{tx("colTrip")}</span>
                   <span>{tx("colTotal")}</span>
@@ -370,11 +370,11 @@ export function RecentFiles({
                                   className="size-4 shrink-0 accent-[#c22850] disabled:opacity-30"
                                 />
                               ) : null}
-                              <Link href={`/basic/${d.id}`} className={`block min-w-0 truncate text-[13px] font-bold hover:underline ${name ? "text-[#103f37]" : "text-[#a3b5b0]"}`}>
+                              <Link href={`/basic/${d.id}`} className={`block min-w-0 truncate text-[13px] font-bold hover:underline ${name ? "text-[#103f37]" : "text-tv-text-faint"}`}>
                                 {name ?? tx("unnamed")}
                               </Link>
                             </span>
-                            <span className="block truncate text-[11px] font-semibold text-[#78948f]">
+                            <span className="block truncate text-[11px] font-semibold text-tv-text-faint">
                               {d.destination ?? ""}
                               {d.destination && d.produced_serial ? " · " : ""}
                               {d.produced_serial ? <DirText>{d.produced_serial}</DirText> : null}
@@ -402,22 +402,22 @@ export function RecentFiles({
                           </span>
                           <span className="tv-tnum hidden text-[11.5px] font-semibold text-[#557d78] @4xl:block">
                             {d.travel_date ? <DirText className="block">{d.travel_date}</DirText> : null}
-                            <span className="block text-[#93aaa3]">
+                            <span className="block text-tv-text-faint">
                               {[d.nights ? nightsText(d.nights, language) : "", d.travelers ? tx("travellersN", { n: d.travelers }) : ""].filter(Boolean).join(" · ") || "—"}
                             </span>
                           </span>
                           {/* the money and who made it, one cell */}
                           <span className="tv-tnum hidden min-w-0 @4xl:block">
                             <span className="block text-[12px] font-extrabold text-[#185045]">
-                              {money ? <DirText>{money}</DirText> : <span className="font-semibold text-[#a3b5b0]">—</span>}
+                              {money ? <DirText>{money}</DirText> : <span className="font-semibold text-tv-text-faint">—</span>}
                             </span>
-                            <span className="block truncate text-[11px] font-semibold text-[#93aaa3]">{d.created_by_name ?? "—"}</span>
+                            <span className="block truncate text-[11px] font-semibold text-tv-text-faint">{d.created_by_name ?? "—"}</span>
                           </span>
                           <span className="hidden @4xl:block">
                             <FileStateChip state={state} version={d.version} sentVersion={states[d.id]?.sent_version} stale={states[d.id]?.stale} />
                           </span>
                           {/* a phone: the state, the date, the money and the maker on one small line */}
-                          <span className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[#78948f] @4xl:hidden">
+                          <span className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-tv-text-faint @4xl:hidden">
                             <FileStateChip state={state} version={d.version} sentVersion={states[d.id]?.sent_version} stale={states[d.id]?.stale} />
                             {d.travel_date ? <DirText className="tv-tnum">{d.travel_date}</DirText> : null}
                             {money ? <DirText className="tv-tnum font-extrabold text-[#185045]">{money}</DirText> : null}

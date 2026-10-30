@@ -181,9 +181,9 @@ export function AssignBooking({
           <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
             <Building2 className="size-3.5" />
             {draft.to_label}
-            {draft.to_phone ? <span className="font-semibold text-[#93aaa3]" dir="ltr">{draft.to_phone}</span> : null}
+            {draft.to_phone ? <span className="font-semibold text-tv-text-faint" dir="ltr">{draft.to_phone}</span> : null}
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.request.review")}</p>
+          <p className="mb-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.request.review")}</p>
           {/* editable on purpose — what gets stored is what actually went out */}
           <textarea
             value={body}

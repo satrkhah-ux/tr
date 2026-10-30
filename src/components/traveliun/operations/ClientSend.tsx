@@ -96,7 +96,7 @@ export function ClientSend({ operationId }: { operationId: string }) {
       {list && list.items.length > 0 ? (
         <div className="mt-2 rounded-[10px] border border-[#d6eadf] bg-[#f6fbf8] p-2.5">
           <p className="text-[12px] font-extrabold text-[#185045]">{t("trip.status.prepared")}</p>
-          <p className="mb-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("trip.status.preparedHint")}</p>
+          <p className="mb-1.5 text-[11px] font-semibold text-tv-text-faint">{t("trip.status.preparedHint")}</p>
           <ul className="space-y-1">
             {list.items.map((m) => (
               <li key={m.key} className="flex flex-wrap items-center justify-between gap-2 text-[12px] font-bold text-[#0f3d38]">
@@ -128,9 +128,9 @@ export function ClientSend({ operationId }: { operationId: string }) {
           <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
             <UserRound className="size-3.5" />
             {draft.to_name || "—"}
-            <DirText dir="ltr" className="font-semibold text-[#93aaa3]">{draft.to_phone}</DirText>
+            <DirText dir="ltr" className="font-semibold text-tv-text-faint">{draft.to_phone}</DirText>
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.toClient.review")}</p>
+          <p className="mb-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.toClient.review")}</p>
           {draft.blocked ? <p className="mb-2 text-[11.5px] font-bold text-[#a86a10]">{t(draft.blocked)}</p> : null}
           {/* editable on purpose — what is kept is what actually went out */}
           <textarea

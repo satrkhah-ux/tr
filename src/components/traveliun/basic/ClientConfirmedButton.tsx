@@ -81,7 +81,7 @@ export function ClientConfirmedButton({
       <span className="absolute end-0 top-full z-30 mt-1 grid w-60 gap-1 rounded-[10px] border border-[#bfe5d4] bg-white p-2 shadow-[0_8px_24px_rgba(0,60,58,0.14)]">
         <span className="flex items-center justify-between text-[11.5px] font-extrabold text-[#185045]">
           {tx("howConfirmed")}
-          <button type="button" aria-label={tx("closeLabel")} onClick={() => setAsking(false)} className="rounded p-0.5 text-[#78948f] hover:bg-[#f4f8f6]">
+          <button type="button" aria-label={tx("closeLabel")} onClick={() => setAsking(false)} className="rounded p-0.5 text-tv-text-faint hover:bg-[#f4f8f6]">
             <X className="size-3.5" />
           </button>
         </span>
@@ -97,7 +97,7 @@ export function ClientConfirmedButton({
             {tx(`channel_${c}`)}
           </button>
         ))}
-        <span className="text-[10.5px] font-semibold text-[#78948f]">{tx("confirmGoesToBookings")}</span>
+        <span className="text-[10.5px] font-semibold text-tv-text-faint">{tx("confirmGoesToBookings")}</span>
         {error ? <span className="text-[11px] font-bold text-[#c22850]">{error}</span> : null}
       </span>
       <button type="button" onClick={() => setAsking(false)} className={`inline-flex h-8 items-center justify-center gap-1 rounded-[8px] bg-[#0b6140] text-[11.5px] font-bold text-white ${className}`}>

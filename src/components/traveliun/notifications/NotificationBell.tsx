@@ -155,7 +155,7 @@ export function NotificationBell() {
               className={`block w-full rounded-lg border p-2.5 text-start ${r.read_at ? "border-[#eef3f1] bg-white opacity-70" : "border-[#cfe0db] bg-[#f4f8f6]"}`}>
               <p className="text-sm font-bold leading-6 text-[#185045]">{r.title}</p>
               {r.body && <p className="text-xs leading-5 text-[#557d78] line-clamp-2">{r.body}</p>}
-              <p className="mt-0.5 text-[10px] text-[#8ba09b]">{kindLabel(r.kind)} · {relativeTime(r.created_at)}</p>
+              <p className="mt-0.5 text-[10px] text-tv-text-faint">{kindLabel(r.kind)} · {relativeTime(r.created_at)}</p>
             </button>);
           })}
         </div>

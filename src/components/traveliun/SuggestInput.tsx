@@ -99,7 +99,7 @@ export function SuggestInput({
                 >
                   <span className="min-w-0 flex-1">
                     {s.label ?? s.value}
-                    {s.sub ? <span className="block text-[11px] font-semibold text-[#7a948f]">{s.sub}</span> : null}
+                    {s.sub ? <span className="block text-[11px] font-semibold text-tv-text-faint">{s.sub}</span> : null}
                   </span>
                   {s.hint ? <span className="tv-tnum shrink-0 text-[11px] font-bold text-[#557d78]">{s.hint}</span> : null}
                 </Autocomplete.Item>

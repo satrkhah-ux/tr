@@ -65,7 +65,7 @@ export function VisaNewFileView(p: ViewProps) {
     >
       <section className={card}>
         <h1 className="text-xl font-extrabold text-[#003c3a]">ملف تأشيرة جديد</h1>
-        <p className="mt-1 text-[13px] font-semibold text-[#6f8f88]">اسحب بيانات العميل من تليتيل أو أدخلها بيدك، ثم الدولة والعدد والخدمات.</p>
+        <p className="mt-1 text-[13px] font-semibold text-tv-text-faint">اسحب بيانات العميل من تليتيل أو أدخلها بيدك، ثم الدولة والعدد والخدمات.</p>
       </section>
 
       <section className={`${card} space-y-3`} aria-labelledby="pull-h">
@@ -88,13 +88,13 @@ export function VisaNewFileView(p: ViewProps) {
             <label className={label}>
               ابحث بالاسم أو الرقم
               <span className="relative block">
-                <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+                <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
                 <input type="search" className={`${field} ps-9`} value={tele.q} onChange={(e) => p.onSearch(e.target.value)} placeholder="اسم العميل أو جواله" />
               </span>
             </label>
             {tele.phase === "loading" ? <Notice tone="busy">جارٍ البحث في تليتيل…</Notice> : null}
             {tele.message ? <Notice tone="error">{tele.message}</Notice> : null}
-            {tele.phase === "done" && tele.candidates.length === 0 ? <p className="text-sm font-semibold text-[#6f8f88]">لا توجد محادثة بهذا الاسم أو الرقم. يمكنك إدخال بيانات العميل بيدك أدناه.</p> : null}
+            {tele.phase === "done" && tele.candidates.length === 0 ? <p className="text-sm font-semibold text-tv-text-faint">لا توجد محادثة بهذا الاسم أو الرقم. يمكنك إدخال بيانات العميل بيدك أدناه.</p> : null}
             {tele.candidates.length > 0 ? (
               <ul className="space-y-2" aria-label="محادثات تليتيل">
                 {tele.candidates.map((c) => (
@@ -102,7 +102,7 @@ export function VisaNewFileView(p: ViewProps) {
                     <button type="button" disabled={tele.pulling !== null} onClick={() => p.onPull(c.conversationId)} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-start hover:bg-[#f4f8f6] disabled:opacity-60">
                       <span className="min-w-0">
                         <span className="block truncate font-extrabold text-[#003c3a]">{c.contactName || `عميل #${c.conversationId}`}</span>
-                        <span className="block text-xs text-[#6f8f88]">
+                        <span className="block text-xs text-tv-text-faint">
                           {c.phone ? <DirText>{c.phone}</DirText> : "بلا رقم"} · آخر نشاط {fmtDateTime(new Date(epochMs(c.lastActivityAt)).toISOString())}
                           {c.assignee ? ` · ${c.assignee}` : ""}
                         </span>
@@ -154,7 +154,7 @@ export function VisaNewFileView(p: ViewProps) {
         <div className="sm:col-span-2" aria-live="polite">
           {catalog.kind === "loading" ? <Notice tone="busy">جارٍ البحث في قائمة التأشيرات…</Notice> : null}
           {catalog.kind === "error" ? <Notice tone="error">{`تعذّر قراءة قائمة التأشيرات، يمكنك المتابعة بإدخال النوع والرسوم بيدك. ${catalog.message}`}</Notice> : null}
-          {catalog.kind === "none" ? <p className="text-[13px] font-semibold text-[#6f8f88]">لا توجد هذه الدولة في قائمة التأشيرات؛ أدخل النوع والرسوم بيدك.</p> : null}
+          {catalog.kind === "none" ? <p className="text-[13px] font-semibold text-tv-text-faint">لا توجد هذه الدولة في قائمة التأشيرات؛ أدخل النوع والرسوم بيدك.</p> : null}
           {catalog.kind === "ready" ? (
             <fieldset className="space-y-2">
               <legend className="mb-1 text-[12px] font-bold text-[#185045]">من قائمة التأشيرات والأسعار — اختر نوع التأشيرة</legend>
@@ -230,7 +230,7 @@ export function VisaNewFileView(p: ViewProps) {
 
 /** what the conversation holds: chips, one per attachment, to be filed as documents on the saved file */
 function Attachments({ pull }: { pull: TeletelPull }) {
-  if (pull.attachments.length === 0) return <p className="text-[13px] font-semibold text-[#6f8f88]">لا مرفقات في هذه المحادثة.</p>;
+  if (pull.attachments.length === 0) return <p className="text-[13px] font-semibold text-tv-text-faint">لا مرفقات في هذه المحادثة.</p>;
   return (
     <div>
       <p className="mb-2 text-[12px] font-bold text-[#185045]">مرفقات المحادثة ({pull.attachments.length}) — تُصنَّف مستنداتٍ بعد إنشاء الملف</p>
@@ -241,7 +241,7 @@ function Attachments({ pull }: { pull: TeletelPull }) {
             <li key={`${a.messageId}-${a.attachmentId}`} className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#dbe6e1] bg-white px-3 py-1.5 text-xs font-bold text-[#185045]">
               <Icon className="size-4 shrink-0" />
               <span className="max-w-48 truncate">{a.fileName}</span>
-              <span className="shrink-0 font-semibold text-[#8aa29b]">{a.fromClient ? "من العميل" : "منا"}</span>
+              <span className="shrink-0 font-semibold text-tv-text-faint">{a.fromClient ? "من العميل" : "منا"}</span>
             </li>
           );
         })}

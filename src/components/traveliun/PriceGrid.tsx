@@ -82,13 +82,13 @@ export function PriceGrid({ cities }: { cities: GridCity[] }) {
               role="tab"
               aria-selected={mode === m}
               onClick={() => void load(m, cityId)}
-              className={`rounded-lg px-5 py-2 font-bold ${mode === m ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-[#6f8f88]"}`}
+              className={`rounded-lg px-5 py-2 font-bold ${mode === m ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint"}`}
             >
               {t(`data.model.grid.mode.${m}`)}
             </button>
           ))}
         </div>
-        <p className="mb-3 text-[12px] font-semibold text-[#6d8a84]">{t(`data.model.grid.hint.${mode}`)} {t("data.model.grid.clearHint")}</p>
+        <p className="mb-3 text-[12px] font-semibold text-tv-text-faint">{t(`data.model.grid.hint.${mode}`)} {t("data.model.grid.clearHint")}</p>
 
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-[12px] font-bold text-[#185045]">
@@ -146,15 +146,15 @@ export function PriceGrid({ cities }: { cities: GridCity[] }) {
 
         {grid && !error ? (
           grid.cars.length === 0 ? (
-            <p className="text-[13px] font-semibold text-[#93aaa3]">{t("data.model.grid.noCars")}</p>
+            <p className="text-[13px] font-semibold text-tv-text-faint">{t("data.model.grid.noCars")}</p>
           ) : grid.rows.length === 0 ? (
-            <p className="text-[13px] font-semibold text-[#93aaa3]">{empty}</p>
+            <p className="text-[13px] font-semibold text-tv-text-faint">{empty}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full border-separate border-spacing-1 text-[13px]">
                 <thead>
                   <tr>
-                    <th className="min-w-56 text-start font-bold text-[#93aaa3]">{rowLabel}</th>
+                    <th className="min-w-56 text-start font-bold text-tv-text-faint">{rowLabel}</th>
                     {grid.cars.map((car) => (
                       <th key={car} className="min-w-28 text-center font-bold text-[#557d78]">{car}</th>
                     ))}
@@ -181,7 +181,7 @@ export function PriceGrid({ cities }: { cities: GridCity[] }) {
                               onBlur={(e) => void save(row.id, car, e.target.value)}
                               className={`${field} tv-tnum w-full text-center ${state === "failed" ? "border-[#c43d5a]" : ""}`}
                             />
-                            <span className="block min-h-4 text-center text-[10.5px] font-semibold text-[#93aaa3]">
+                            <span className="block min-h-4 text-center text-[10.5px] font-semibold text-tv-text-faint">
                               {state === "saving" ? "…" : state === "failed" ? t("data.model.grid.failed") : cell && cell.currency !== currency ? cell.currency : state === "saved" ? t("data.model.grid.saved") : ""}
                             </span>
                           </td>

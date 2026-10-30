@@ -62,7 +62,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
                 </button>
               )}
             </form>
-            <p className="mt-3 text-[12px] font-semibold text-[#8aa29b]">
+            <p className="mt-3 text-[12px] font-semibold text-tv-text-faint">
               {tamara ? "تنتقل إلى صفحة تمارا الآمنة لتقسيم المبلغ." : "تنتقل إلى صفحة ماي فاتورة الآمنة للدفع بمدى أو البطاقة أو Apple Pay."}
             </p>
           </>

@@ -26,7 +26,7 @@ export function PartnerCustomers({ customers }: { customers: PartnerCustomer[] }
             </p>
           </div>
           <label className="relative w-full max-w-[280px]">
-            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-[#93aaa3]" />
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
             <input
               id="partner-customers-search"
               value={q}
@@ -39,14 +39,14 @@ export function PartnerCustomers({ customers }: { customers: PartnerCustomer[] }
 
         <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
           {shown.length === 0 ? (
-            <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-[#93aaa3]">
+            <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
               {customers.length === 0 ? "يظهر عملاؤكم هنا مع أول عرض تُصدرونه باسم عميل." : "لا نتائج لهذا البحث."}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-right text-[12.5px]">
                 <thead>
-                  <tr className="text-[11.5px] font-bold text-[#93aaa3]">
+                  <tr className="text-[11.5px] font-bold text-tv-text-faint">
                     <th className="pb-2">العميل</th>
                     <th className="pb-2">الجوال</th>
                     <th className="pb-2">العروض</th>

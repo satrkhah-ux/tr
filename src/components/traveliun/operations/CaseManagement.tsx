@@ -176,7 +176,7 @@ export function CaseManagement({
             <Lock className="size-3.5" />
             {t("ops.list.notes")}
           </h2>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.list.notesHint")}</p>
+          <p className="mb-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.list.notesHint")}</p>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -193,13 +193,13 @@ export function CaseManagement({
             {t("ops.list.addNote")}
           </button>
           {notes.length === 0 ? (
-            <p className="mt-3 text-[12px] font-semibold text-[#93aaa3]">{t("ops.list.noNotes")}</p>
+            <p className="mt-3 text-[12px] font-semibold text-tv-text-faint">{t("ops.list.noNotes")}</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {notes.map((n) => (
                 <li key={n.id} className="rounded-[10px] bg-[#f8fbf9] px-3 py-2">
                   <p className="whitespace-pre-line break-words text-[12.5px] font-semibold text-[#0f3d38]">{n.meta.note}</p>
-                  <p className="tv-tnum mt-1 text-[10.5px] font-bold text-[#93aaa3]">
+                  <p className="tv-tnum mt-1 text-[10.5px] font-bold text-tv-text-faint">
                     {n.actor ?? "—"} · <DirText dir="ltr">{riyadh(n.created_at)}</DirText>
                   </p>
                 </li>
@@ -215,13 +215,13 @@ export function CaseManagement({
           {t("ops.list.activity")}
         </h2>
         {log.length === 0 ? (
-          <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.list.noActivity")}</p>
+          <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.list.noActivity")}</p>
         ) : (
           <>
             <ol className="space-y-1.5">
               {(showAll ? log : log.slice(0, 12)).map((a) => (
                 <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 text-[12px] font-semibold text-[#334f4b]">
-                  <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                  <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                     <DirText dir="ltr">{riyadh(a.created_at)}</DirText>
                   </span>
                   <span className="font-extrabold text-[#0f3d38]">{a.actor ?? "—"}</span>

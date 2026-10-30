@@ -104,7 +104,7 @@ export function AlmatarAdmin({
           <h1 className="flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
             <Car className="size-5" /> حجوزات المطار
           </h1>
-          <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-[#93aaa3]">
+          <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-tv-text-faint">
             شريك مواصلات فقط في تايلاند وماليزيا وإندونيسيا، بلائحة أسعار 15 أكتوبر 2026 السارية حتى ديسمبر 2027. أسعاره وحجوزاته في جداول خاصة به لا تختلط ببيانات ترافليون. الفوتشر يصدر بهوية المطار.
           </p>
           {!hasCompany ? <p className="mt-2 text-[12.5px] font-bold text-[#c22850]">شركة المطار غير موجودة بعد — تُنشأ مع المهاجرة 0100.</p> : null}
@@ -129,7 +129,7 @@ export function AlmatarAdmin({
         <section className={card}>
           <h2 className="text-base font-extrabold text-[#003c3a]">الحجوزات</h2>
           {bookings.length === 0 ? (
-            <p className="mt-2 text-[12px] font-semibold text-[#93aaa3]">لا توجد حجوزات بعد.</p>
+            <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">لا توجد حجوزات بعد.</p>
           ) : (
             <div className="mt-3 overflow-x-auto">
               <table className="w-full border-collapse">
@@ -151,7 +151,7 @@ export function AlmatarAdmin({
                         <td className={td}>
                           <span dir="ltr">{b.ref}</span>
                           {b.request_ref ? (
-                            <div className="max-w-[150px] whitespace-normal text-[11px] font-semibold text-[#93aaa3]">
+                            <div className="max-w-[150px] whitespace-normal text-[11px] font-semibold text-tv-text-faint">
                               <span dir="ltr">{b.request_ref}</span>{" "}
                               {firstOfRequest ? (
                                 <a href={`/b2b/transport-request/${b.request_ref}`} target="_blank" rel="noreferrer" className="font-bold text-[#185045] underline">
@@ -164,7 +164,7 @@ export function AlmatarAdmin({
                         </td>
                         <td className={`${td} min-w-[200px] whitespace-normal`}>
                           {s ? `${s.name_ar} — ${s.scope_ar}` : b.service_id}
-                          <div className="text-[11px] text-[#93aaa3]">{s?.country_ar}</div>
+                          <div className="text-[11px] text-tv-text-faint">{s?.country_ar}</div>
                         </td>
                         <td className={td} dir="ltr">
                           {b.service_date} {b.service_time.slice(0, 5)}
@@ -174,14 +174,14 @@ export function AlmatarAdmin({
                         </td>
                         <td className={`${td} min-w-[130px] whitespace-normal`}>
                           {b.lead_name}
-                          <div className="text-[11px] text-[#93aaa3]" dir="ltr">
+                          <div className="text-[11px] text-tv-text-faint" dir="ltr">
                             {b.passengers} pax {b.lead_phone ?? ""}
                           </div>
                         </td>
                         <td className={`${td} whitespace-normal`}>
                           {b.flight_no ? <div dir="ltr">{b.flight_no}</div> : null}
                           <div className="text-[11px] text-[#557d78]">{[b.pickup, b.dropoff].filter(Boolean).join(" ← ")}</div>
-                          {b.notes ? <div className="text-[11px] text-[#93aaa3]">{b.notes}</div> : null}
+                          {b.notes ? <div className="text-[11px] text-tv-text-faint">{b.notes}</div> : null}
                         </td>
                         <td className={td}>
                           {sar(Number(b.total_sar))}
@@ -235,7 +235,7 @@ export function AlmatarAdmin({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-base font-extrabold text-[#003c3a]">لائحة الأسعار ({services.length} خدمة)</h2>
-              <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">ما تدفعه المطار بالريال، صافٍ وربحنا داخله. ربحنا التقديري = السعر × الهامش.</p>
+              <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">ما تدفعه المطار بالريال، صافٍ وربحنا داخله. ربحنا التقديري = السعر × الهامش.</p>
             </div>
             {canAdmin ? (
               <form onSubmit={saveMargin} className="flex items-end gap-2">
@@ -293,7 +293,7 @@ export function AlmatarAdmin({
             <h2 className="flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
               <KeyRound className="size-4" /> حساب دخول المطار
             </h2>
-            <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-[#93aaa3]">
+            <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-tv-text-faint">
               يدخل المطار من بوابة الشركات (/b2b) باسم المستخدم. اكتب كلمة مرور مؤقتة بيدك — لا تُحفظ ولا تُسجَّل هنا — وسيُلزم الحساب بتغييرها عند أول دخول، ويستطيع تغييرها بعد ذلك من شاشته. 10 أحرف على الأقل، حروف وأرقام، ولا تحتوي اسم المستخدم.
             </p>
             {logins.length ? (

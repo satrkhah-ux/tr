@@ -200,7 +200,7 @@ export function HotelCombobox({
               setAdding(false);
               onPick(null);
             }}
-            className="absolute inset-y-0 end-7 flex w-6 items-center justify-center text-[#93aaa3] hover:text-[#c22850]"
+            className="absolute inset-y-0 end-7 flex w-6 items-center justify-center text-tv-text-faint hover:text-[#c22850]"
           >
             <X className="size-3.5" />
           </button>
@@ -215,7 +215,7 @@ export function HotelCombobox({
       <Combobox.Portal container={unzoomedRoot()}>
         <Combobox.Positioner sideOffset={4} className="z-[170] outline-none">
           <Combobox.Popup className={`${ZOOMED_POPUP} min-w-56 overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}>
-            <Combobox.Empty className="px-2 py-2 text-[12px] text-[#93aaa3] empty:hidden">{t("noResults")}</Combobox.Empty>
+            <Combobox.Empty className="px-2 py-2 text-[12px] text-tv-text-faint empty:hidden">{t("noResults")}</Combobox.Empty>
             <Combobox.List>
               {(h: HotelOption) => (
                 <Combobox.Item

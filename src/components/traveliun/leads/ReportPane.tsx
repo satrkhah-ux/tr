@@ -352,7 +352,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
               </button>
             ) : null}
           </div>
-          <p className="text-[11.5px] font-semibold text-[#78948f]">
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">
             النص قابل للتعديل قبل النسخ — وما كتبته بيدك يُترك إذا تغيّرت الفترة أو التصحيحات تحته. «الاستفسارات» ليس له تصنيف في النظام — انقل إليه الطلب من «مراجعة وتصحيح». لا يُرسل شيء لأحد من هنا.
           </p>
         </div>
@@ -360,7 +360,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
         <div className="space-y-2 rounded-[12px] border border-[#e3ece8] bg-white p-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[14rem] flex-1">
-              <Search className="pointer-events-none absolute start-2.5 top-2 size-4 text-[#93aaa3]" />
+              <Search className="pointer-events-none absolute start-2.5 top-2 size-4 text-tv-text-faint" />
               <input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder="ابحث بالموظف أو الوجهة أو القسم" className={`${FIELD} ps-8`} />
             </div>
             <span className="tv-tnum text-[12px] font-bold text-[#557d78]">{shown.length} طلب</span>
@@ -428,7 +428,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
               </button>
             </div>
           ) : null}
-          <p className="text-[11.5px] font-semibold text-[#78948f]">التصحيحات هنا تغيّر التقرير فقط، ولا تُكتب في النظام — وتبقى ما دامت الصفحة مفتوحة، ثم تزول.</p>
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">التصحيحات هنا تغيّر التقرير فقط، ولا تُكتب في النظام — وتبقى ما دامت الصفحة مفتوحة، ثم تزول.</p>
         </div>
       )}
     </section>

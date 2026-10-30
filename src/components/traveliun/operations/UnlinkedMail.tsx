@@ -63,7 +63,7 @@ function MailRow({
     <li className="flex flex-wrap items-center gap-2 py-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-bold text-[#185045]">{mail.subject || "—"}</p>
-        <p className="truncate text-[11.5px] font-semibold text-[#93aaa3]" dir="ltr">{mail.from_address || "—"}</p>
+        <p className="truncate text-[11.5px] font-semibold text-tv-text-faint" dir="ltr">{mail.from_address || "—"}</p>
       </div>
       <span className="shrink-0 rounded-full border border-[#dbe6e1] bg-[#f6faf8] px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">{t(kindKey)}</span>
       <div className="w-64 max-w-full">

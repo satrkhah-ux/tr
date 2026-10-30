@@ -100,7 +100,7 @@ export function OfferVersions({
       <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 px-3 py-2 text-start">
         <History className="size-4 text-[#185045]" />
         <span className="text-[12.5px] font-extrabold text-[#185045]">{t("pg.versions.title")}</span>
-        {versions ? <span className="text-[11px] font-bold text-[#93aaa3]">({versions.length})</span> : null}
+        {versions ? <span className="text-[11px] font-bold text-tv-text-faint">({versions.length})</span> : null}
         <ChevronDown className={`ms-auto size-4 text-[#557d78] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
@@ -155,7 +155,7 @@ export function OfferVersions({
                         ))}
                       </ul>
                     ) : (
-                      <p className="mt-1 text-[11px] text-[#93aaa3]">{t("pg.versions.sameAsBefore")}</p>
+                      <p className="mt-1 text-[11px] text-tv-text-faint">{t("pg.versions.sameAsBefore")}</p>
                     )
                   ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -196,7 +196,7 @@ export function OfferVersions({
                         </button>
                       )
                     ) : !v.current ? (
-                      <span className="text-[11px] text-[#93aaa3]">{t("pg.versions.noDraft")}</span>
+                      <span className="text-[11px] text-tv-text-faint">{t("pg.versions.noDraft")}</span>
                     ) : null}
                   </div>
                 </li>

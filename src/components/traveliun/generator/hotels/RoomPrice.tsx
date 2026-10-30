@@ -114,7 +114,7 @@ export function RoomPrice({
       ) : null}
       {/* only when it DISAGREES with the box — repeating the same number is noise */}
       {differs && remembered ? (
-        <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#93aaa3]">
+        <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-tv-text-faint">
           {t("pg.lastSavedNight")}
           <DirText dir="ltr" className="tv-tnum font-bold text-[#557d78]">{`${remembered.price} ${remembered.currency}`}</DirText>
           <button

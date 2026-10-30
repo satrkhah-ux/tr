@@ -85,7 +85,7 @@ export function SupervisionSetup({ initial }: { initial: Data }) {
       </table></div>
       <p className="mt-3 text-xs text-[#557d78]">الإجازات العامة وإجازات الموظفين وأزرار الحالة («لدي عميل»، «صلاة»…) لا تُحسب تأخيراً — تُدار من قسم الحضور.</p>
       <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.on} onChange={(e) => setSettings({ ...settings, on: e.target.checked })} /> الإشراف يعمل</label>
-      <p className="mt-1 text-xs text-[#8ba09b]">مدد خاصة لقسم بعينه (فريق Teletel) تُحفظ في الإعداد نفسه وتعلو على هذه.</p>
+      <p className="mt-1 text-xs text-tv-text-faint">مدد خاصة لقسم بعينه (فريق Teletel) تُحفظ في الإعداد نفسه وتعلو على هذه.</p>
       <button type="button" disabled={busy} onClick={() => void saveSettings()} className="mt-3 rounded-lg bg-[var(--tv-brand)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{busy ? <Loader2 size={13} className="animate-spin" /> : "احفظ الإعدادات"}</button>
     </section>
     {msg && <p role="status" className="text-sm text-[#185045]">{msg}</p>}

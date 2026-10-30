@@ -189,7 +189,7 @@ function Chip({ on, icon: Icon, label, onClick }: { on: boolean; icon: typeof Ca
       aria-pressed={on}
       onClick={onClick}
       className={`inline-flex min-h-8 max-sm:min-h-10 items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-2.5 py-1 text-[12px] font-semibold transition-colors duration-150 hover:border-[#165749] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#73B7A4] motion-reduce:transition-none max-sm:text-[11px] ${
-        on ? "border-[#BCE4D3] bg-[#EAF8F2] text-[#0F4339]" : "border-[#DBE4E2] bg-white text-[#687F7B]"
+        on ? "border-[#BCE4D3] bg-[#EAF8F2] text-[#0F4339]" : "border-[#DBE4E2] bg-white text-tv-text-faint"
       }`}
     >
       {on ? <CircleCheck className="size-[13px] fill-[#165749] text-white" /> : <Circle className="size-[13px]" />}
@@ -1671,7 +1671,7 @@ export function BasicEditor({
           </div>
         ) : null}
         {cities.length === 0 ? (
-          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-[#93aaa3]">{tx("noCities")}</p>
+          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-tv-text-faint">{tx("noCities")}</p>
         ) : (
           cities.map((city, i) => {
             if (focus && !focus.includes(city.city_name)) return null;
@@ -1856,7 +1856,7 @@ export function BasicEditor({
           <div>
             {pricingError ? <p role="alert" className="mb-2 text-[12px] font-bold text-[#c22850]">{pricingError}</p> : null}
             {data.pricing.items.length === 0 ? (
-              <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
+              <p className="text-[12px] font-semibold text-tv-text-faint">{tx("noLines")}</p>
             ) : (
               <div className="space-y-2.5">
                 {/* one card per section: red while a price is missing, folded once it is complete */}
@@ -1905,7 +1905,7 @@ export function BasicEditor({
                           <span className="min-w-0 truncate text-[12px] font-bold text-[#185045]" title={item.description}>
                             {item.description}
                           </span>
-                          <span className="tv-tnum hidden text-center text-[11px] font-bold text-[#7a948f] sm:block">{per ? tx("night") : `× ${item.quantity}`}</span>
+                          <span className="tv-tnum hidden text-center text-[11px] font-bold text-tv-text-faint sm:block">{per ? tx("night") : `× ${item.quantity}`}</span>
                           <input
                             type="number" inputMode="decimal"
                             min={0}

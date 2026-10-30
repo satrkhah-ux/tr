@@ -109,7 +109,7 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
               }}
             />
             {pkg.arrival_date && nights > 0 ? (
-              <span className="text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.client.departureHint", { nights })}</span>
+              <span className="text-[11.5px] font-semibold text-tv-text-faint">{t("rp.client.departureHint", { nights })}</span>
             ) : null}
           </label>
         </div>
@@ -218,11 +218,11 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
 
         {/* original file side-by-side */}
         <div className="space-y-2">
-          <p className="flex items-center gap-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]"><FileText className="size-4" />{t("rp.review.original")}</p>
+          <p className="flex items-center gap-2 text-[11px] font-extrabold tracking-wide text-tv-text-faint"><FileText className="size-4" />{t("rp.review.original")}</p>
           {fileUrl ? (
             <iframe title={t("rp.review.original")} src={fileUrl} className="h-[560px] w-full rounded-[14px] border border-[#e2ebe7] bg-white" />
           ) : (
-            <div className="flex h-[200px] items-center justify-center rounded-[14px] border border-dashed border-[#dbe6e1] text-[13px] text-[#93aaa3]">{t("rp.review.openFile")}</div>
+            <div className="flex h-[200px] items-center justify-center rounded-[14px] border border-dashed border-[#dbe6e1] text-[13px] text-tv-text-faint">{t("rp.review.openFile")}</div>
           )}
         </div>
       </div>

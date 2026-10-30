@@ -110,7 +110,7 @@ export function AddHotelInline({
         />
       </div>
       {/* Said plainly: this is the agency's catalogue, not a note on one file. */}
-      <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">{t("pg.addHotelNote")}</p>
+      <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">{t("pg.addHotelNote")}</p>
       {error ? <p className="mt-1.5 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
       <div className="mt-2 flex gap-2">
         <button

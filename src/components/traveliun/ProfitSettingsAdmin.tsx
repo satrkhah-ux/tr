@@ -38,7 +38,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
     <TraveliunShell title="nav.profitPolicy">
       <section className="max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.profit.title")}</h2>
-        <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.profit.hint")}</p>
+        <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.profit.hint")}</p>
         <div role="radiogroup" aria-label={t("settings.profit.title")} className="flex flex-wrap gap-2">
           {(["staff", "managers"] as const).map((option) => (
             <button
@@ -84,7 +84,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
             {state === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
             {t("settings.profit.save")}
           </button>
-          <p className="basis-full text-[11.5px] font-semibold text-[#93aaa3]">{t("settings.profit.defaultHint")}</p>
+          <p className="basis-full text-[11.5px] font-semibold text-tv-text-faint">{t("settings.profit.defaultHint")}</p>
         </div>
 
         {state === "saved" ? (
@@ -96,7 +96,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
 
       <section className="mt-4 max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.usd.title")}</h2>
-        <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.usd.hint")}</p>
+        <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.usd.hint")}</p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="grid gap-1 text-[12px] font-bold text-[#185045]">
             {t("settings.usd.label")}

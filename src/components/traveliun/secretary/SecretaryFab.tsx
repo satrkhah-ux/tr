@@ -93,7 +93,7 @@ export function SecretaryFab() {
       </div>
       <div className="flex border-b border-[#dfe8e4] bg-white text-sm font-bold">
         {([["plan", "خطتي"], ["chat", "اسأل مُراد"]] as const).map(([k, label]) => <button key={k} type="button" onClick={() => setTab(k)}
-          className={`flex-1 px-3 py-2 ${tab === k ? "border-b-2 border-[var(--tv-brand)] text-[var(--tv-brand)]" : "text-[#8ba09b]"}`}>{label}</button>)}
+          className={`flex-1 px-3 py-2 ${tab === k ? "border-b-2 border-[var(--tv-brand)] text-[var(--tv-brand)]" : "text-tv-text-faint"}`}>{label}</button>)}
       </div>
       {tab === "plan"
         ? <div className="min-h-0 flex-1 overflow-y-auto p-3">

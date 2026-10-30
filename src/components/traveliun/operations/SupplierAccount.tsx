@@ -75,7 +75,7 @@ export function SupplierAccountsList({
             <Wallet className="size-5" />
             {t("ops.sup.accounts")}
           </h1>
-          <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("ops.sup.listHint")}</p>
+          <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("ops.sup.listHint")}</p>
 
           {canManage ? (
             <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -120,7 +120,7 @@ export function SupplierAccountsList({
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-extrabold text-[#0f3d38]">{s.name}</span>
-                    {s.categories ? <span className="text-[11px] font-bold text-[#93aaa3]">{s.categories}</span> : null}
+                    {s.categories ? <span className="text-[11px] font-bold text-tv-text-faint">{s.categories}</span> : null}
                   </span>
                   <BalanceChips balances={s.balances} />
                 </Link>
@@ -156,7 +156,7 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
               <h1 className="flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
                 <Store className="size-5" />
                 {supplier.name}
-                {supplier.name_en ? <span className="text-[13px] font-bold text-[#93aaa3]">{supplier.name_en}</span> : null}
+                {supplier.name_en ? <span className="text-[13px] font-bold text-tv-text-faint">{supplier.name_en}</span> : null}
               </h1>
               <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-bold text-[#557d78]">
                 {supplier.categories ? <span>{supplier.categories}</span> : null}
@@ -179,7 +179,7 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {balances.length === 0 ? (
-              <p className="text-[12px] font-bold text-[#93aaa3]">{t("ops.sup.settled")}</p>
+              <p className="text-[12px] font-bold text-tv-text-faint">{t("ops.sup.settled")}</p>
             ) : (
               balances.map((b) => (
                 <div key={b.currency} className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 text-[12px] font-bold text-[#557d78]">
@@ -201,7 +201,7 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
         <section className={card}>
           <h2 className="mb-2 text-sm font-extrabold text-[#185045]">{t("ops.sup.bookings")}</h2>
           {bookings.length === 0 ? (
-            <p className="text-[12.5px] font-semibold text-[#93aaa3]">{t("ops.sup.noBookings")}</p>
+            <p className="text-[12.5px] font-semibold text-tv-text-faint">{t("ops.sup.noBookings")}</p>
           ) : (
             <ul className="space-y-1.5">
               {bookings.map((b) => (
@@ -212,7 +212,7 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
                     </Link>
                     <span className="text-[#0f3d38]">{b.title}</span>
                     {b.start_date ? (
-                      <span className="tv-tnum ms-2 text-[#93aaa3]">
+                      <span className="tv-tnum ms-2 text-tv-text-faint">
                         <DirText dir="ltr">{b.start_date}</DirText>
                       </span>
                     ) : null}
@@ -257,7 +257,7 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
             />
           ) : null}
           {payments.length === 0 ? (
-            <p className="mt-2 text-[12.5px] font-semibold text-[#93aaa3]">{t("ops.sup.noPayments")}</p>
+            <p className="mt-2 text-[12.5px] font-semibold text-tv-text-faint">{t("ops.sup.noPayments")}</p>
           ) : (
             <PaymentList payments={payments} />
           )}

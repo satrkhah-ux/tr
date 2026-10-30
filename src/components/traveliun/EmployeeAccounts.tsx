@@ -104,7 +104,7 @@ export function EmployeeAccounts() {
             <KeyRound className="size-4 text-[#185045]" />
             {t("emp.accountsTitle")}
           </h2>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("emp.accountsHint")}</p>
+          <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("emp.accountsHint")}</p>
 
           {rows !== null && missing > 0 ? (
             <p className="mt-3 flex items-center gap-2 rounded-[10px] border border-[#f2e2b4] bg-[#fffdf7] px-4 py-2.5 text-[12px] font-bold text-[#a86a10]">
@@ -129,7 +129,7 @@ export function EmployeeAccounts() {
           {rows === null ? (
             <div className="tv-shimmer h-40" />
           ) : rows.length === 0 ? (
-            <p className="p-6 text-center text-sm text-[#93aaa3]">{t("noData")}</p>
+            <p className="p-6 text-center text-sm text-tv-text-faint">{t("noData")}</p>
           ) : (
             <table className="w-full text-start text-[13px]">
               <thead>
@@ -160,7 +160,7 @@ export function EmployeeAccounts() {
                         </span>
                       )}
                     </td>
-                    <td className="tv-tnum px-4 py-3 text-[12px] text-[#93aaa3]">
+                    <td className="tv-tnum px-4 py-3 text-[12px] text-tv-text-faint">
                       {/* Invited is not the same as using it — a person who never
                           opened the mail reads as active everywhere else. */}
                       {row.active && !row.last_sign_in_at ? t("emp.neverSignedIn") : fmt(row.last_sign_in_at)}

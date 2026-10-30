@@ -207,11 +207,11 @@ export function OfferPreviewToolbar({
             </button>
           ))}
         </div>
-        <span className="text-[11px] font-semibold text-[#93aaa3]">الغلاف والشعار والألوان تتبع الشركة المختارة، والسعر قرار هذا الملف — يُحفظ عليه ويتبعه رابط العميل.</span>
+        <span className="text-[11px] font-semibold text-tv-text-faint">الغلاف والشعار والألوان تتبع الشركة المختارة، والسعر قرار هذا الملف — يُحفظ عليه ويتبعه رابط العميل.</span>
       </div>
 
       {publishedVersion != null && message == null ? (
-        <p className="flex w-full items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+        <p className="flex w-full items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
           <CheckCircle2 className="size-3.5 text-[#0f7a52]" />
           رابط العميل وملف الـ PDF يعرضان النسخة المنشورة — لا يتغيّران عند تعديل العرض لاحقًا حتى تعيد النشر.
         </p>

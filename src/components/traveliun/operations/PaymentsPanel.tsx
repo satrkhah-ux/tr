@@ -311,7 +311,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
             {t(`ops.payment.${payment.kind}` as TranslationKey)}
             {payment.method ? <span className="ms-2 font-semibold text-[#557d78]">{t(`ops.pay.method.${payment.method}` as TranslationKey)}</span> : null}
           </p>
-          <p className="tv-tnum mt-0.5 font-semibold text-[#93aaa3]">
+          <p className="tv-tnum mt-0.5 font-semibold text-tv-text-faint">
             <DirText dir="ltr">{payment.paid_at}</DirText>
             {payment.reference ? (
               <span className="ms-2">
@@ -324,7 +324,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
               </span>
             ) : null}
           </p>
-          {payment.note ? <p className="mt-0.5 font-semibold text-[#93aaa3]">{payment.note}</p> : null}
+          {payment.note ? <p className="mt-0.5 font-semibold text-tv-text-faint">{payment.note}</p> : null}
         </div>
         <span className={`tv-tnum shrink-0 ${refund ? "text-[#c22850]" : "text-[#0f3d38]"}`}>
           <DirText dir="ltr">{`${refund ? "-" : ""}${fmt(payment.amount)} ${payment.currency}`}</DirText>
@@ -476,7 +476,7 @@ function Schedule({
           </div>
         )}
       </div>
-      {stored ? null : <p className="mt-1 text-[11px] font-semibold text-[#93aaa3]">{t("ops.pay.scheduleDefault")}</p>}
+      {stored ? null : <p className="mt-1 text-[11px] font-semibold text-tv-text-faint">{t("ops.pay.scheduleDefault")}</p>}
 
       {draft ? (
         <div className="mt-2 space-y-2">
@@ -533,7 +533,7 @@ function Schedule({
           </div>
         </div>
       ) : rows.length === 0 ? (
-        <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.pay.noTotal")}</p>
+        <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.pay.noTotal")}</p>
       ) : (
         <ul className="mt-2 space-y-1.5">
           {rows.map((r, i) => (

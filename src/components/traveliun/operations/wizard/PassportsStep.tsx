@@ -95,7 +95,7 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
         <span className="text-[13.5px] font-extrabold text-[#185045]">
           {progress ? t("wz.pass.reading", { done: progress.done, of: progress.of }) : t("wz.pass.upload")}
         </span>
-        <span className="text-[11.5px] font-semibold text-[#93aaa3]">{t(canReadMrz ? "wz.pass.uploadHint" : "wz.pass.uploadHintNoMrz")}</span>
+        <span className="text-[11.5px] font-semibold text-tv-text-faint">{t(canReadMrz ? "wz.pass.uploadHint" : "wz.pass.uploadHintNoMrz")}</span>
         <input
           type="file"
           multiple

@@ -341,7 +341,7 @@ export function BasicFileStatus({
 
       {/* ③ the rest, small, under its name */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-dashed border-[#DCE9E5] pt-2">
-        <span className="w-full text-[10.5px] font-extrabold text-[#93aaa3] sm:w-auto">{tx("otherTools")}</span>
+        <span className="w-full text-[10.5px] font-extrabold text-tv-text-faint sm:w-auto">{tx("otherTools")}</span>
         <button
           type="button"
           onClick={() => {
@@ -406,10 +406,10 @@ export function BasicFileStatus({
           <ol className="space-y-0.5">
             {shown.map((e, i) => (
               <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
-                <span className="tv-tnum shrink-0 font-semibold text-[#93aaa3]">{when(e.at, language)}</span>
+                <span className="tv-tnum shrink-0 font-semibold text-tv-text-faint">{when(e.at, language)}</span>
                 <span className="font-bold text-[#185045]">{line(e)}</span>
-                {e.by ? <span className="text-[#7a948f]">— {e.by}</span> : null}
-                {e.note && e.key === "cancelled" ? <span className="text-[#7a948f]">({e.note})</span> : null}
+                {e.by ? <span className="text-tv-text-faint">— {e.by}</span> : null}
+                {e.note && e.key === "cancelled" ? <span className="text-tv-text-faint">({e.note})</span> : null}
               </li>
             ))}
           </ol>
@@ -430,14 +430,14 @@ export function BasicFileStatus({
  */
 function Step({ n, title, hint, status, children }: { n: number; title: string; hint: string; status: "done" | "now" | "next" | "off"; children?: ReactNode }) {
   const badge =
-    status === "done" ? "bg-[#0f7a52] text-white" : status === "now" ? "bg-[#185045] text-white" : "bg-[#eef3f1] text-[#93aaa3]";
+    status === "done" ? "bg-[#0f7a52] text-white" : status === "now" ? "bg-[#185045] text-white" : "bg-[#eef3f1] text-tv-text-faint";
   return (
     <li className={`space-y-2 rounded-[11px] border p-2.5 max-sm:p-2 ${status === "now" ? "border-[#b9d6cb] bg-[#f7fbf9]" : "border-[#edf3f0]"}`}>
       <div className="flex gap-2.5">
         <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[12.5px] font-extrabold ${badge}`}>{status === "done" ? "✓" : n}</span>
         <div className="min-w-0">
-          <p className={`text-[13px] font-extrabold ${status === "next" || status === "off" ? "text-[#7a948f]" : "text-[#103f37]"}`}>{title}</p>
-          <p className="text-[11.5px] font-semibold text-[#7a948f]">{hint}</p>
+          <p className={`text-[13px] font-extrabold ${status === "next" || status === "off" ? "text-tv-text-faint" : "text-[#103f37]"}`}>{title}</p>
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">{hint}</p>
         </div>
       </div>
       {/* the controls take the card's full width — on a phone the review box keeps its room */}

@@ -18,7 +18,7 @@ export function ScopeStage({ data, patch }: StageFormProps) {
   return (
     <section className={sectionClass}>
       <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.scopeTitle")}</h2>
-      <p className="mb-4 mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.scopeStageHint")}</p>
+      <p className="mb-4 mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("pg.scopeStageHint")}</p>
       <ScopeTiles data={data} patch={patch} />
     </section>
   );

@@ -106,7 +106,7 @@ export function TgEntry() {
             >
               <LogIn className="size-4" /> {t("tg.linkButton")}
             </a>
-            <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("tg.linkOnce")}</p>
+            <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("tg.linkOnce")}</p>
           </>
         ) : null}
 

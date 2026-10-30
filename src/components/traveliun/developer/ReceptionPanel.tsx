@@ -43,7 +43,7 @@ export function ReceptionPanel({ data }: { data: ReceptionPanelData }) {
   return (
     <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">مُراد — المستقبل الآلي</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">
         يرحّب بالعميل الجديد باسمه ويحوّله إلى قسمه في Teletel لحظة وصول رسالته. جدول الأقسام والدوام في «رسائل العميل». {data.on ? "" : "متوقف الآن من «خدمات النظام»."}
       </p>
 
@@ -73,7 +73,7 @@ export function ReceptionPanel({ data }: { data: ReceptionPanelData }) {
               <span dir="ltr">{r.phone}</span>
               <span className="font-bold text-[#185045]">{reasonText(r.reason)}</span>
               {r.waitSec != null ? <span>بعد {r.waitSec} ث</span> : null}
-              {r.reply ? <span className="truncate text-[#93aaa3]">«{r.reply}»</span> : null}
+              {r.reply ? <span className="truncate text-tv-text-faint">«{r.reply}»</span> : null}
             </li>
           ))}
         </ul>
@@ -100,7 +100,7 @@ export function ReceptionPanel({ data }: { data: ReceptionPanelData }) {
         ) : (
           <p className="mt-1 text-[12px] font-bold text-[#c22850]">ADMIN_API_SECRET غير مضبوط على الخادم — لا رابط.</p>
         )}
-        <p className="mt-1 text-[11px] font-semibold text-[#93aaa3]">بدونه يعمل احتياطاً من مهمة الدقيقة (حتى دقيقة تأخير).</p>
+        <p className="mt-1 text-[11px] font-semibold text-tv-text-faint">بدونه يعمل احتياطاً من مهمة الدقيقة (حتى دقيقة تأخير).</p>
       </div>
     </section>
   );

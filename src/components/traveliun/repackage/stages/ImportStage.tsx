@@ -197,7 +197,7 @@ export function ImportStage({ draftId, data, patch, flush }: RepackageStageProps
               );
             })}
           </div>
-          <p className="mb-2 text-[12px] text-[#93aaa3]">{t(SOURCES.find((s) => s.key === kind)!.hintKey)}</p>
+          <p className="mb-2 text-[12px] text-tv-text-faint">{t(SOURCES.find((s) => s.key === kind)!.hintKey)}</p>
 
           {/* the keys matter: without them React reconciles the file <input> into the
               url <input> in place, and the same DOM node flips uncontrolled → controlled */}

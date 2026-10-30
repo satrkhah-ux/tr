@@ -570,7 +570,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
                   type="button"
                   title={t(group.labelKey)}
                   className={`relative flex h-[44px] shrink-0 items-center justify-center transition-colors duration-200 ${
-                    active ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "text-[#6f8f88] hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
+                    active ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "text-tv-text-faint hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
                   }`}
                   onClick={() => {
                     setActiveMenu(group.labelKey);
@@ -615,7 +615,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
         </button>
         <div className="hidden min-w-[140px] shrink-0 lg:block">
           <div className="truncate text-lg font-extrabold leading-tight text-[#003c3a]">{displayTitle}</div>
-          <div className="mt-0.5 text-[11.5px] font-semibold text-[#8aa29b]">{t("brand")}</div>
+          <div className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{t("brand")}</div>
         </div>
         {/* phones: compact app-style title; the trial pill shows from lg up. */}
         <div className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] lg:hidden">
@@ -638,11 +638,11 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             type="button"
             onClick={openPalette}
             aria-label={t("quickSearch")}
-            className="flex h-10 w-10 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] text-[13px] sm:w-auto sm:justify-start sm:pe-3 sm:ps-2 font-semibold text-[#6f8f88] transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1] sm:flex"
+            className="flex h-10 w-10 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] text-[13px] sm:w-auto sm:justify-start sm:pe-3 sm:ps-2 font-semibold text-tv-text-faint transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1] sm:flex"
           >
             <Search className="size-[18px]" />
             <span className="hidden lg:inline">{t("quickSearch")}</span>
-            <kbd className="hidden items-center gap-px rounded-md border border-[#dbe6e1] bg-white px-1.5 py-0.5 text-[11px] font-bold text-[#8aa29b] md:inline-flex">
+            <kbd className="hidden items-center gap-px rounded-md border border-[#dbe6e1] bg-white px-1.5 py-0.5 text-[11px] font-bold text-tv-text-faint md:inline-flex">
               ⌘K
             </kbd>
           </button>
@@ -790,7 +790,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
         />
         <PaletteDialog.Popup className="tv-pop fixed left-1/2 top-[calc(12vh/var(--tv-zoom))] z-[170] h-fit w-[min(560px,calc(92vw/var(--tv-zoom)))] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(0,40,36,0.4)] outline-none transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 dark:bg-[#14231f]">
           <div className="flex items-center gap-[11px] border-b border-[#eef2f0] px-[18px] py-[15px] dark:border-[#294039]">
-            <Search className="size-[18px] text-[#93aaa3]" />
+            <Search className="size-[18px] text-tv-text-faint" />
             <input
               autoFocus
               dir="auto"
@@ -799,7 +799,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
               placeholder={t("palettePlaceholder")}
               className="flex-1 bg-transparent text-[15px] text-[#0f3d38] outline-none placeholder:text-[#9cafaa] dark:text-[#eaf3ef]"
             />
-            <kbd className="rounded-md border border-[#e2ebe7] bg-[#f1f5f3] px-2 py-[3px] text-[11px] font-bold text-[#8aa29b] dark:border-[#294039] dark:bg-[#1b2d27]">
+            <kbd className="rounded-md border border-[#e2ebe7] bg-[#f1f5f3] px-2 py-[3px] text-[11px] font-bold text-tv-text-faint dark:border-[#294039] dark:bg-[#1b2d27]">
               ESC
             </kbd>
           </div>
@@ -825,7 +825,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
               );
             })}
             {results.length === 0 ? (
-              <div className="px-3 py-8 text-center text-[13px] text-[#93aaa3]">{t("paletteEmpty")}</div>
+              <div className="px-3 py-8 text-center text-[13px] text-tv-text-faint">{t("paletteEmpty")}</div>
             ) : null}
           </div>
         </PaletteDialog.Popup>
@@ -877,7 +877,7 @@ function SideMenu({
           const hasChildren = Boolean(group.children?.length);
           return (
             <div key={group.labelKey} className="mb-0.5">
-              {caption ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-[#8a9f99]">{t(menuSection(group.labelKey))}</p> : null}
+              {caption ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-tv-text-faint">{t(menuSection(group.labelKey))}</p> : null}
               {hasChildren ? (
                 <button
                   type="button"
@@ -887,7 +887,7 @@ function SideMenu({
                     active ? "bg-[var(--tv-brand)] text-white shadow-sm" : "text-[#365e55] hover:bg-[#edf4f0]"
                   }`}
                 >
-                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-[#6d8e83]"}`} strokeWidth={1.7} />
+                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-tv-text-faint"}`} strokeWidth={1.7} />
                   <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
                   <ChevronDown className={`size-4 transition-transform duration-200 ${expanded ? "" : "rotate-90 rtl:-rotate-90"}`} />
                 </button>
@@ -900,7 +900,7 @@ function SideMenu({
                     active ? "bg-[var(--tv-brand)] text-white shadow-sm" : "text-[#365e55] hover:bg-[#edf4f0]"
                   }`}
                 >
-                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-[#6d8e83]"}`} strokeWidth={1.7} />
+                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-tv-text-faint"}`} strokeWidth={1.7} />
                   <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
 
                 </Link>
@@ -913,7 +913,7 @@ function SideMenu({
                     return (
                       <div key={child.href}>
                       {child.captionKey ? (
-                        <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold uppercase tracking-[0.04em] text-[#9cafaa] first:mt-0">
+                        <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold uppercase tracking-[0.04em] text-tv-text-faint first:mt-0">
                           {t(child.captionKey)}
                         </p>
                       ) : null}
@@ -979,7 +979,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
         {groups.map((group, index) => {
           const Icon = group.icon;
           const caption = !partner && (index === 0 || menuSection(groups[index - 1].labelKey) !== menuSection(group.labelKey))
-            ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-[#8a9f99]">{t(menuSection(group.labelKey))}</p> : null;
+            ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-tv-text-faint">{t(menuSection(group.labelKey))}</p> : null;
           const active = isGroupActive(pathname, group);
           const rowClass = `flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm ${active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"}`;
           const badges = <>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}</>;
@@ -1009,7 +1009,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
                     const here = pathname === pageOf(child.href);
                     return (
                       <div key={child.href}>
-                        {child.captionKey ? <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold text-[#9cafaa]">{t(child.captionKey)}</p> : null}
+                        {child.captionKey ? <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold text-tv-text-faint">{t(child.captionKey)}</p> : null}
                         <Link
                           href={child.href}
                           onClick={close}
@@ -1151,12 +1151,12 @@ function CalculatorPanel() {
               "—"
             )}
             {unitRate != null ? (
-              <p className="tv-tnum mt-1 text-[11px] font-semibold text-[#6f8f88]">
+              <p className="tv-tnum mt-1 text-[11px] font-semibold text-tv-text-faint">
                 <DirText dir="ltr">{`1 ${from} = ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(unitRate)} ${to}`}</DirText>
               </p>
             ) : null}
           </div>
-          <p className="text-[11px] font-semibold text-[#93aaa3]">
+          <p className="text-[11px] font-semibold text-tv-text-faint">
             {source === "live" ? t("calc.live") : t("calc.fallback")}
           </p>
         </div>
@@ -1231,7 +1231,7 @@ function SettingsPanel({
         <Languages className="size-4" />
         {t("settings")}
       </h3>
-      <p className="mb-2 text-xs font-semibold text-[#8ba09b]">{t("language")}</p>
+      <p className="mb-2 text-xs font-semibold text-tv-text-faint">{t("language")}</p>
       <div className="mb-4 grid grid-cols-2 gap-2">
         <button type="button" onClick={() => pickLanguage("en")} className={panelButton(language === "en")}>
           English
@@ -1240,7 +1240,7 @@ function SettingsPanel({
           العربية
         </button>
       </div>
-      <p className="mb-2 text-xs font-semibold text-[#8ba09b]">{t("theme")}</p>
+      <p className="mb-2 text-xs font-semibold text-tv-text-faint">{t("theme")}</p>
       <div className="grid grid-cols-3 gap-2">
         {(["Light", "Dark", "System"] as const).map((item) => (
           <button key={item} type="button" onClick={() => pickTheme(item)} className={panelButton(theme === item)}>
@@ -1298,7 +1298,7 @@ function ProfilePanel({ onChangePassword }: { onChangePassword: () => void }) {
         <div className="min-w-0 flex-1">
           {/* while looking through another role, the label says which */}
           <p className="font-bold text-[var(--tv-brand)]">{t("account")} · {viewAs ? viewAs.name : t(ROLE_LABEL_KEYS[effectiveRole])}</p>
-          <p dir="ltr" className="truncate text-start text-xs text-[#8ba09b]">{email || "—"}</p>
+          <p dir="ltr" className="truncate text-start text-xs text-tv-text-faint">{email || "—"}</p>
         </div>
       </div>
 

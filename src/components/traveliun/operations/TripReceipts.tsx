@@ -25,7 +25,7 @@ export async function TripReceipts({ token }: { token: string }) {
                 <span className="block text-[14px] font-extrabold">
                   <bdi dir="ltr">{`${r.amount.toLocaleString("en-US")} ${r.currency}`}</bdi>
                 </span>
-                <span className="mt-0.5 block text-[11.5px] font-semibold text-[#93aaa3]">
+                <span className="mt-0.5 block text-[11.5px] font-semibold text-tv-text-faint">
                   <bdi dir="ltr">{`${r.receipt_no} · ${r.paid_at}`}</bdi>
                 </span>
               </span>

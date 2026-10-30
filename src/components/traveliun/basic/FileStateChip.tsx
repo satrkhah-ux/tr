@@ -5,7 +5,7 @@ import { useBasicLabels } from "./labels";
 
 /** Each state's colour: waiting on us (amber), with the client (blue), done steps (green), stopped (red). */
 const TONE: Record<FileState, string> = {
-  draft: "bg-[#f2f4f3] text-[#7a8783]",
+  draft: "bg-[#f2f4f3] text-tv-text-faint",
   issued: "bg-[#fff8e8] text-[#a86a10]",
   published: "bg-[#f0f5f3] text-[#557d78]",
   sent: "bg-[#e8f3fb] text-[#1d5f8a]",

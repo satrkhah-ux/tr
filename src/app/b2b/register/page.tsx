@@ -26,7 +26,7 @@ export default function PartnerRegisterPage() {
           </p>
         </header>
         <PartnerRegisterForm />
-        <p className="mt-6 text-center text-[11.5px] font-semibold text-[#93aaa3]">
+        <p className="mt-6 text-center text-[11.5px] font-semibold text-tv-text-faint">
           لن يُنشأ حساب قبل مراجعة الطلب واعتماده من إدارة ترافليون.
         </p>
       </div>

@@ -75,7 +75,7 @@ export function OperationsSnapshot({ summary }: { summary: OpsSummary }) {
             <ClipboardCheck className="size-[19px] text-[#185045]" />
             {t("dash.ops.title")}
           </h2>
-          <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.ops.hint")}</p>
+          <p className="mt-1 text-[11.5px] font-semibold text-tv-text-faint">{t("dash.ops.hint")}</p>
         </div>
         <Link
           href="/operations"
@@ -86,7 +86,7 @@ export function OperationsSnapshot({ summary }: { summary: OpsSummary }) {
       </div>
 
       {summary.liveCases === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">
           {t("ops.noOperationsHint")}
         </p>
       ) : (
@@ -98,7 +98,7 @@ export function OperationsSnapshot({ summary }: { summary: OpsSummary }) {
                 className={`rounded-[13px] border bg-white p-3.5 ${tile.loud ? "border-[#f0c7c7] bg-[#fdf6f7]" : "border-[#e8efeb]"}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11.5px] font-bold leading-tight text-[#6f8f88]">{t(tile.label)}</p>
+                  <p className="text-[11.5px] font-bold leading-tight text-tv-text-faint">{t(tile.label)}</p>
                   <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px]" style={{ color: tile.color, background: `${tile.color}1a` }}>
                     <tile.icon className="size-4" />
                   </span>
@@ -133,7 +133,7 @@ export function OperationsSnapshot({ summary }: { summary: OpsSummary }) {
                       >
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13px] font-extrabold text-[#003c3a]">{c.customer_name || "—"}</span>
-                          <span className="tv-tnum mt-0.5 block truncate text-[11px] font-bold text-[#93aaa3]">
+                          <span className="tv-tnum mt-0.5 block truncate text-[11px] font-bold text-tv-text-faint">
                             <DirText dir="ltr">{c.serial}</DirText>
                             {c.destination ? <span className="ms-2 font-semibold">{c.destination}</span> : null}
                           </span>

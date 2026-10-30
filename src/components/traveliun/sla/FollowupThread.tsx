@@ -72,7 +72,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-[18px] font-extrabold text-[#103f37]">{f.contact_name ?? `#${f.conversation_id}`}</h1>
-            {f.contact_phone ? <DirText className="text-[12.5px] font-semibold text-[#78948f]">{f.contact_phone}</DirText> : null}
+            {f.contact_phone ? <DirText className="text-[12.5px] font-semibold text-tv-text-faint">{f.contact_phone}</DirText> : null}
             <p className="mt-1 text-[12px] font-bold text-[#a86a10]">
               {kind(f.kind)}
               {f.rule_name ? ` · ${f.rule_name}` : ""}
@@ -106,7 +106,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
             {data.messages.map((m) => (
               <li key={m.id} className={`max-w-[85%] rounded-[10px] px-3 py-2 text-[12.5px] ${m.fromClient ? "justify-self-start bg-[#f2f6f4] text-[#103f37]" : m.isPrivate ? "justify-self-end border border-dashed border-[#e0a92a] bg-[#fffbf1] text-[#7a5a10]" : "justify-self-end bg-[#185045] text-white"}`}>
                 <span className="block whitespace-pre-wrap leading-6">{m.text}</span>
-                <span className={`tv-tnum mt-1 block text-[10.5px] ${m.fromClient ? "text-[#78948f]" : m.isPrivate ? "text-[#a8873a]" : "text-white/70"}`}>
+                <span className={`tv-tnum mt-1 block text-[10.5px] ${m.fromClient ? "text-tv-text-faint" : m.isPrivate ? "text-[#a8873a]" : "text-white/70"}`}>
                   {m.fromClient ? (f.contact_name ?? "") : m.isPrivate ? tx("note") : (m.sender ?? tx("you"))} · {fromUnix(m.at)}
                 </span>
               </li>

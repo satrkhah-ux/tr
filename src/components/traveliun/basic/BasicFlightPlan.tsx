@@ -18,7 +18,7 @@ import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
 
 /** Keep field labels visible when the card wraps, regardless of viewport width. */
-const SMALL_CAPTION = "text-[10px] font-bold text-[#7a948f]";
+const SMALL_CAPTION = "text-[10px] font-bold text-tv-text-faint";
 
 type Look = { busy?: boolean; note?: string; hits?: FlightLookupHit[] };
 
@@ -379,7 +379,7 @@ export function BasicFlightPlan({
             onChange={(e) => onChange({ flight_booking: { ...withTypedTotal(booking, "intl", typedNumber(e.target)), intl_currency: booking.intl_currency || "SAR" } })}
             className={`${basicField} tv-tnum w-64 max-w-full text-center`}
           />
-          <span className="text-[11px] font-semibold text-[#7a948f]">{canFetch ? tx("fetchHint") : null}</span>
+          <span className="text-[11px] font-semibold text-tv-text-faint">{canFetch ? tx("fetchHint") : null}</span>
         </div>
         <FlightFare booking={booking} kind="intl" trip={data.trip} field={basicField} onChange={(flight_booking) => onChange({ flight_booking })} />
       </div>

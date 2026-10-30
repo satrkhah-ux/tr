@@ -57,7 +57,7 @@ export function PartnerProfile({ email, terms, team }: { email: string; terms: s
               return (
                 <div key={row.label} className="flex items-center gap-3 px-5 py-3">
                   <Icon className="size-4 shrink-0 text-[var(--tv-brand)]" />
-                  <dt className="w-32 shrink-0 text-[12px] font-bold text-[#93aaa3]">{row.label}</dt>
+                  <dt className="w-32 shrink-0 text-[12px] font-bold text-tv-text-faint">{row.label}</dt>
                   <dd className="text-[13px] font-bold text-[#0f3d38] dark:text-[#d6e5df]">{row.value}</dd>
                 </div>
               );
@@ -84,7 +84,7 @@ export function PartnerProfile({ email, terms, team }: { email: string; terms: s
                   style={{ background: swatch.value }}
                 />
                 <span>
-                  <span className="block text-[11.5px] font-bold text-[#93aaa3]">{swatch.label}</span>
+                  <span className="block text-[11.5px] font-bold text-tv-text-faint">{swatch.label}</span>
                   <span className="block text-[12px] font-extrabold text-[#0f3d38] uppercase dark:text-[#d6e5df]">
                     {swatch.value}
                   </span>

@@ -84,7 +84,7 @@ export function SlaBoard({ initial }: { initial: OkBoard }) {
             <p className="mt-1 text-[12.5px] font-semibold leading-6 text-[#557d78]">{tx("hint")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="tv-tnum text-[11.5px] font-semibold text-[#93aaa3]">{tx("updatedAt", { t: when(board.at) })}</span>
+            <span className="tv-tnum text-[11.5px] font-semibold text-tv-text-faint">{tx("updatedAt", { t: when(board.at) })}</span>
             <button type="button" disabled={loading} onClick={() => reload(true)} className={`${BTN} bg-[#185045] text-white hover:bg-[#0f4439]`}>
               {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
               {tx("refresh")}
@@ -216,7 +216,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
 
       {kind !== "all" ? (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11.5px] font-semibold text-[#78948f]">{tx(`kh_${kind}`)}</span>
+          <span className="text-[11.5px] font-semibold text-tv-text-faint">{tx(`kh_${kind}`)}</span>
           {[{ id: "ontime", name: tx("onTime"), color: "#0f7a52" }, ...kindRules].map((r) => {
             const n = ofKind.filter((x) => (r.id === "ontime" ? !x.tierId : x.tierId === r.id)).length;
             const on = tier === r.id;
@@ -260,13 +260,13 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
           ))}
         </select>
         <label className="relative min-w-40 flex-1">
-          <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-tv-text-faint" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tx("search")} className="h-8 w-full rounded-[8px] border border-[#cfe0d9] bg-white pe-2 ps-7 text-[12px] font-semibold text-[#185045]" />
         </label>
       </div>
 
       {shown.length === 0 ? (
-        <p className="mt-4 text-[12.5px] font-semibold text-[#93aaa3]">{tx("noRows")}</p>
+        <p className="mt-4 text-[12.5px] font-semibold text-tv-text-faint">{tx("noRows")}</p>
       ) : (
         <ul className="mt-3 divide-y divide-[#e6eeea] rounded-[10px] border border-[#e3ece8]">
           {shown.slice(0, limit).map((r) => {
@@ -275,14 +275,14 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
               <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5" style={rule ? { borderInlineStart: `4px solid ${rule.color}` } : undefined}>
                 <span className="min-w-[10rem] flex-1">
                   <span className="block truncate text-[13px] font-bold text-[#103f37]">{r.name}</span>
-                  {r.phone ? <DirText className="block text-[11px] font-semibold text-[#78948f]">{r.phone}</DirText> : null}
+                  {r.phone ? <DirText className="block text-[11px] font-semibold text-tv-text-faint">{r.phone}</DirText> : null}
                 </span>
                 <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${KIND_TONE[r.kind]}`}>{kindText(r.kind)}</span>
                 <span className="tv-tnum w-20 text-[13px] font-extrabold text-[#185045]">{wait(r.minutes)}</span>
                 <TierChip rule={rule} />
                 <span className="w-32 truncate text-[11.5px] font-semibold text-[#557d78]">{[r.assignee ?? tx("noAgent"), r.team].filter(Boolean).join(" · ")}</span>
                 {r.movedTo ? <span className="inline-flex rounded-full border border-[#c9d6ea] bg-[#f2f6fb] px-2 py-0.5 text-[10.5px] font-bold text-[#3d5a80]">{tx("movedTo", { t: r.movedTo })}</span> : null}
-                <span className="min-w-[8rem] flex-1 truncate text-[11.5px] text-[#78948f]" title={r.preview}>{r.preview}</span>
+                <span className="min-w-[8rem] flex-1 truncate text-[11.5px] text-tv-text-faint" title={r.preview}>{r.preview}</span>
                 <span className="ms-auto flex items-center gap-1.5">
                   {r.followupId ? (
                     <Link href={`/followups/${r.followupId}`} className={`${BTN} border border-[#f2c9d4] bg-[#fdf3f6] text-[#8a1f3c]`}>{tx("inFollowup")}</Link>
@@ -368,14 +368,14 @@ function Followups({ board, onChanged }: { board: OkBoard; onChanged: () => void
       </div>
       {note ? <p className="mt-2 text-[12px] font-bold text-[#557d78]">{note}</p> : null}
       {list.length === 0 ? (
-        <p className="mt-4 text-[12.5px] font-semibold text-[#93aaa3]">{tx("fuEmpty")}</p>
+        <p className="mt-4 text-[12.5px] font-semibold text-tv-text-faint">{tx("fuEmpty")}</p>
       ) : (
         <ul className="mt-3 divide-y divide-[#e6eeea] rounded-[10px] border border-[#e3ece8]">
           {list.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5">
               <span className="min-w-[10rem] flex-1">
                 <span className="block truncate text-[13px] font-bold text-[#103f37]">{f.contact_name ?? `#${f.conversation_id}`}</span>
-                {f.contact_phone ? <DirText className="block text-[11px] font-semibold text-[#78948f]">{f.contact_phone}</DirText> : null}
+                {f.contact_phone ? <DirText className="block text-[11px] font-semibold text-tv-text-faint">{f.contact_phone}</DirText> : null}
               </span>
               <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${KIND_TONE[f.kind]}`}>
                 {kindText(f.kind)}
@@ -383,7 +383,7 @@ function Followups({ board, onChanged }: { board: OkBoard; onChanged: () => void
               </span>
               <span className="tv-tnum text-[11.5px] font-semibold text-[#557d78]">
                 {f.waited_minutes != null ? tx("fuWaited", { w: wait(f.waited_minutes) }) : null}
-                <span className="block text-[#93aaa3]">{tx("fuSince", { t: when(f.created_at) })}</span>
+                <span className="block text-tv-text-faint">{tx("fuSince", { t: when(f.created_at) })}</span>
               </span>
               <span className="text-[11.5px] font-semibold text-[#557d78]">{f.teletel_assignee ?? tx("noAgent")}</span>
               {f.status === "open" ? (
@@ -437,7 +437,7 @@ function Rules({ rules, teams, suggestions, onChanged }: { rules: SlaRule[]; tea
           return (
             <div key={k} className="rounded-[10px] border border-[#e3ece8] p-3">
               <h3 className="text-[13px] font-extrabold text-[#185045]">
-                {kindText(k)} <span className="text-[11.5px] font-semibold text-[#78948f]">— {tx(`kh_${k}`)}</span>
+                {kindText(k)} <span className="text-[11.5px] font-semibold text-tv-text-faint">— {tx(`kh_${k}`)}</span>
               </h3>
               <div className="mt-2 grid gap-2">
                 {mine.map((r) => (
@@ -562,7 +562,7 @@ function Suggestions({ suggestions, onChanged }: { suggestions: Suggestion[]; on
               )}
             </div>
             <p className="mt-1.5 text-[12px] font-semibold leading-6 text-[#557d78]">
-              {tx(`sg_${s.key}`, { n: s.hits })} <span className="text-[#93aaa3]">{tx("sgOfKind", { total: s.ofKind })}</span>
+              {tx(`sg_${s.key}`, { n: s.hits })} <span className="text-tv-text-faint">{tx("sgOfKind", { total: s.ofKind })}</span>
             </p>
           </li>
         ))}

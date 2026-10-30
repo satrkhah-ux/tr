@@ -52,10 +52,10 @@ function Row({ row, vault, onChanged }: { row: SecretRow; vault: boolean; onChan
   return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
     <div className="flex flex-wrap items-center gap-2">
       <code dir="ltr" className="text-sm font-bold text-[#185045]">{row.name}</code>
-      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.set ? "bg-emerald-50 text-emerald-800" : "bg-[#f4f6f3] text-[#8ba09b]"}`}>
+      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.set ? "bg-emerald-50 text-emerald-800" : "bg-[#f4f6f3] text-tv-text-faint"}`}>
         {row.set ? `${SOURCE[row.source!]} · …${row.last4 ?? "????"}` : "غير مضبوط"}
       </span>
-      {row.updatedAt && <span className="text-[11px] text-[#8ba09b]">آخر تغيير: {row.updatedBy ?? "—"} · {new Date(row.updatedAt).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" })}</span>}
+      {row.updatedAt && <span className="text-[11px] text-tv-text-faint">آخر تغيير: {row.updatedBy ?? "—"} · {new Date(row.updatedAt).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" })}</span>}
     </div>
     <div className="mt-2 flex flex-wrap items-center gap-2">
       {/* write-only: a password field, never filled from the server, emptied after sending */}
