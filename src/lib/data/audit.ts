@@ -54,6 +54,8 @@ export type AuditAction =
   | "payment.deleted"
   | "payment.proof_viewed"
   | "payment.schedule_set"
+  // «الحسابات»: an internal invoice checked and confirmed by the accounts team (accounts-actions.ts)
+  | "invoice.confirmed"
   | "payment.agreed_total_set"
   | "payment.agreement_set"
   | "payment.agreement_later"

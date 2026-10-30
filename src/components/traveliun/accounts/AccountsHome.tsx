@@ -1,26 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BadgePercent, ClipboardCheck, Landmark, TrendingUp, Truck, Wallet } from "lucide-react";
-import { DirText } from "@/components/DirText";
+import { AlertTriangle, ArrowLeft, BadgePercent, ClipboardCheck, FileText, Landmark, TrendingUp, Truck, Wallet } from "lucide-react";
 import type { AccountsHomeView } from "@/lib/data/accounts";
-import { MONTHS } from "@/lib/finance/model";
 import { TraveliunShell } from "../TraveliunShell";
 import { profitTone } from "../operations/CaseProfitCard";
+import { card, monthName, Num, sar } from "./ui";
 
 /** «الحسابات» — the financial section's home (finance.accounts; the loader checks). Riyals; read-only. */
 
-const card = "tv-card rounded-2xl border p-4 sm:p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
-const sar = (n: number) => `${Math.round(n).toLocaleString("en-US")} ر.س`;
-const Num = ({ children, className = "" }: { children: string; className?: string }) => (
-  <span className={`tv-tnum ${className}`}>
-    <DirText dir="ltr">{children}</DirText>
-  </span>
-);
-const monthName = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
-
 export function AccountsHome({ home }: { home: AccountsHomeView }) {
   const actions: [string, string, typeof Wallet][] = [
+    ["/accounts/invoices", "الفواتير", FileText],
     ["/operations", "الحالات والدفعات", ClipboardCheck],
     ...(home.reports
       ? ([["/operations/cashflow", "التدفق النقدي", Wallet], ["/operations/profitability", "تقرير الربحية", TrendingUp]] as [string, string, typeof Wallet][])
@@ -99,7 +90,7 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
               <ul className="divide-y divide-tv-border-subtle">
                 {home.overdue.invoices.slice(0, 8).map((i) => (
                   <li key={i.id}>
-                    <Link href={`/operations/${i.id}`} className="flex items-center gap-3 py-2.5 hover:bg-tv-surface-sunken">
+                    <Link href={`/accounts/invoices/${i.id}`} className="flex items-center gap-3 py-2.5 hover:bg-tv-surface-sunken">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-bold text-tv-text-strong">{home.clients[i.id] ?? "—"}</span>
                         <span className="text-[11.5px] font-semibold text-tv-text-faint">

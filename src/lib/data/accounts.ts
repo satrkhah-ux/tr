@@ -5,7 +5,8 @@ import { currentCan } from "@/lib/roles/current";
 import { gateManager } from "@/lib/operations/access";
 import { riyadhDate } from "@/lib/operations/payments";
 import { accountsHome, recentMonths, type AccountsHome, type HomePayment, type HomeSupplierLine } from "@/lib/accounts/home";
-import { loadCases } from "./operation-money";
+import { invoiceOf, type InvoiceStatus, type InvoiceView } from "@/lib/accounts/invoice";
+import { loadCases, type LoadedCase } from "./operation-money";
 
 /**
  * «الحسابات» — the financial section's home, for finance.accounts (2026-10-30). Read-only, from the
@@ -76,14 +77,100 @@ export async function getAccountsHome(monthParam?: string): Promise<AccountsHome
 
   const home = accountsHome({ month, today, cases, payments, suppliers });
 
-  const lateIds = home.overdue.invoices.map((i) => i.id);
-  const names = await chunked<{ id: string; offers: unknown }>(lateIds, (part) => db.from("operations").select("id, offers(customers(arabic_name))").in("id", part));
-  const clients: Record<string, string> = {};
-  for (const r of names) {
-    const customer = one(one(r.offers as { customers: unknown } | null)?.customers as { arabic_name: string | null } | null);
-    if (customer?.arabic_name) clients[r.id] = customer.arabic_name;
-  }
+  const clients = await clientNames(db, home.overdue.invoices.map((i) => i.id));
 
   const reports = (await currentCan("pricing.internal")) && !(await gateManager());
   return { ...home, months: recentMonths(thisMonth), clients, reports };
+}
+
+/** the cases' client names, by case id */
+async function clientNames(db: SupabaseClient, ids: string[]): Promise<Record<string, string>> {
+  const rows = await chunked<{ id: string; offers: unknown }>(ids, (part) => db.from("operations").select("id, offers(customers(arabic_name))").in("id", part));
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const customer = one(one(r.offers as { customers: unknown } | null)?.customers as { arabic_name: string | null } | null);
+    if (customer?.arabic_name) out[r.id] = customer.arabic_name;
+  }
+  return out;
+}
+
+// ------------------------------------------------------------- «الفواتير» ----
+// The internal invoice (stage 2, the owner: «الفاتورة داخلية»): a confirmed case of our own read as one
+// (lib/accounts/invoice.ts). A partner's file is billed to the partner (partner_invoices), not here.
+
+const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
+const allowed = async () => Boolean(await getServerUser()) && (await currentCan("finance.accounts"));
+const invoiceable = (c: LoadedCase) => !c.cancelled && !c.facts.partner;
+
+export type InvoiceRow = Pick<InvoiceView, "number" | "status" | "total" | "paid" | "due"> & {
+  id: string; client: string; date: string; currency: string; confirmed: boolean;
+};
+
+export async function listInvoices(): Promise<{ rows: InvoiceRow[]; counts: Record<InvoiceStatus | "all", number> } | null> {
+  if (!(await allowed())) return null;
+  const supabase = db();
+  const today = riyadhDate();
+  const cases = (await loadCases(supabase)).filter(invoiceable);
+  const [clients, { data: confirmations, error }] = await Promise.all([
+    clientNames(supabase, cases.map((c) => c.id)),
+    supabase.from("invoice_confirmations").select("operation_id"),
+  ]);
+  if (error) throw error;
+  const confirmed = new Set(((confirmations ?? []) as { operation_id: string }[]).map((r) => r.operation_id));
+  const rows = cases
+    .map((c) => {
+      const inv = invoiceOf({ ...c, payments: [] }, today);
+      return { id: c.id, number: inv.number, status: inv.status, total: inv.total, paid: inv.paid, due: inv.due, client: clients[c.id] ?? "", date: c.confirmed_on, currency: c.currency, confirmed: confirmed.has(c.id) };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const counts = { all: rows.length, paid: 0, partial: 0, overdue: 0, due: 0 };
+  for (const r of rows) counts[r.status] += 1;
+  return { rows, counts };
+}
+
+export type InvoiceDetail = InvoiceView & {
+  id: string;
+  client: string;
+  date: string;
+  currency: string;
+  /** the offer the case came from — «الطلب المصدر» */
+  source: { serial: string; destination: string | null; travel_start: string | null };
+  /** what the trip holds, by name only — never a buy price */
+  items: { kind: string; title: string; city: string | null; from: string | null; to: string | null }[];
+  receipts: { amount: number; kind: string; method: string | null; on: string | null; receipt_no: string | null }[];
+  confirmation: { at: string; by: string } | null;
+};
+
+export async function getInvoice(operationId: string): Promise<InvoiceDetail | null> {
+  if (!(await allowed()) || !/^[0-9a-f-]{36}$/.test(operationId)) return null;
+  const supabase = db();
+  const [c] = await loadCases(supabase, operationId);
+  if (!c || !invoiceable(c)) return null;
+  const [clients, inst, pays, books, conf] = await Promise.all([
+    clientNames(supabase, [c.id]),
+    supabase.from("operation_installments").select("due_date, amount, note").eq("operation_id", c.id),
+    supabase.from("operation_payments").select("amount, kind, method, paid_at, receipt_no").eq("operation_id", c.id).order("paid_at"),
+    supabase.from("operation_bookings").select("kind, title, city_name, start_date, end_date, status").eq("operation_id", c.id).neq("status", "cancelled").order("start_date"),
+    supabase.from("invoice_confirmations").select("confirmed_at, employees(arabic_name)").eq("operation_id", c.id).maybeSingle(),
+  ]);
+  for (const r of [inst, pays, books, conf]) if (r.error) throw r.error;
+  const receipts = ((pays.data ?? []) as { amount: number | string; kind: string; method: string | null; paid_at: string | null; receipt_no: string | null }[]).map((p) => ({
+    amount: Number(p.amount), kind: p.kind, method: p.method, on: p.paid_at ? riyadhDate(p.paid_at) : null, receipt_no: p.receipt_no,
+  }));
+  const installments = ((inst.data ?? []) as { due_date: string | null; amount: number | string; note: string | null }[]).map((r) => ({ due_date: r.due_date, amount: Number(r.amount), note: r.note }));
+  const inv = invoiceOf({ ...c, installments, payments: receipts }, riyadhDate());
+  const confRow = conf.data as { confirmed_at: string; employees: unknown } | null;
+  return {
+    ...inv,
+    id: c.id,
+    client: clients[c.id] ?? "",
+    date: c.confirmed_on,
+    currency: c.currency,
+    source: { serial: c.serial, destination: c.destination, travel_start: c.travel_start },
+    items: ((books.data ?? []) as { kind: string; title: string; city_name: string | null; start_date: string | null; end_date: string | null }[]).map((b) => ({
+      kind: b.kind, title: b.title, city: b.city_name, from: b.start_date, to: b.end_date,
+    })),
+    receipts,
+    confirmation: confRow ? { at: riyadhDate(confRow.confirmed_at), by: one(confRow.employees as { arabic_name: string | null } | null)?.arabic_name ?? "" } : null,
+  };
 }
