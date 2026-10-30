@@ -134,16 +134,22 @@ export async function getMyCommission(monthIn?: string): Promise<MyCommission | 
   if (!(await currentCan("commissions.view"))) return null;
   const me = await getCurrentEmployeeId();
   if (!me) return null;
-  const month = isMonth(monthIn) ? monthIn : thisMonth();
-  const db = service();
+  return commissionOf(me, isMonth(monthIn) ? monthIn : thisMonth());
+}
 
+/** the month's figures: the frozen snapshot once the month is reviewed, else a live calculation */
+async function monthSnapshot(db: SupabaseClient, month: string) {
   const cycle = await liveCycleOf(db, month);
-  let snap: StoredSnapshot;
-  if (cycle && cycle.status !== "draft" && cycle.snapshot) snap = cycle.snapshot;
-  else {
-    const policy = await activePolicy(db);
-    snap = await calculate(db, month, cycle ? Number(cycle.monthly_cost) : DEFAULT_MONTHLY_COST, policy.doc, cycle ? await adjustmentsOf(db, cycle.id) : []);
-  }
+  if (cycle && cycle.status !== "draft" && cycle.snapshot) return { cycle, snap: cycle.snapshot };
+  const policy = await activePolicy(db);
+  const snap: StoredSnapshot = await calculate(db, month, cycle ? Number(cycle.monthly_cost) : DEFAULT_MONTHLY_COST, policy.doc, cycle ? await adjustmentsOf(db, cycle.id) : []);
+  return { cycle, snap };
+}
+
+/** one employee's month — no permission check here: callers decide who may ask (the page: its own session; the bot: its own member) */
+async function commissionOf(me: string, month: string): Promise<MyCommission> {
+  const db = service();
+  const { cycle, snap } = await monthSnapshot(db, month);
   const mine = snap.calc?.result.employees.find((e) => e.employeeId === me);
 
   const { data: past } = await db.from("commission_cycles").select("month, status, snapshot").in("status", ["review", "approved", "paid"]).order("month", { ascending: false }).limit(24);
@@ -264,9 +270,14 @@ export type MySalesCard = {
 };
 
 export async function getMySalesCard(nowMs = Date.now()): Promise<MySalesCard | null> {
-  const mine = await getMyCommission();
-  const me = mine && (await getCurrentEmployeeId());
-  if (!mine || !me) return null;
+  if (!(await currentCan("commissions.view"))) return null;
+  const me = await getCurrentEmployeeId();
+  return me ? salesCardFor(me, nowMs) : null;
+}
+
+/** the card for one employee — the staff bot's «🎯 هدفي» (its member is already identified); no permission check here */
+export async function salesCardFor(me: string, nowMs = Date.now()): Promise<MySalesCard> {
+  const mine = await commissionOf(me, thisMonth());
   const targets = await readSalesTargets(service(), me);
   const target = targetFor(targets, me, mine.month);
   return {
@@ -313,4 +324,17 @@ export async function getTargetsView(monthIn?: string): Promise<TargetsView | nu
     employees: ((staff.data ?? []) as { id: string; arabic_name: string }[]).map((e) => ({ id: e.id, name: e.arabic_name })),
     targets,
   };
+}
+
+/** «👥 أهداف الفريق» in the staff bot — managers only (the caller checks): every employee with a target, and their month */
+export async function teamSalesTargets(): Promise<{ month: string; rows: { id: string; name: string; target: number; sales: number }[] }> {
+  const db = service();
+  const month = thisMonth();
+  const [targets, { snap }, staff] = await Promise.all([readSalesTargets(db), monthSnapshot(db, month), db.from("employees").select("id, arabic_name").eq("status", "Active")]);
+  const sales = new Map((snap.calc?.result.employees ?? []).map((e) => [e.employeeId, e.grossSales]));
+  const rows = ((staff.data ?? []) as { id: string; arabic_name: string }[]).flatMap((e) => {
+    const target = targetFor(targets, e.id, month);
+    return target ? [{ id: e.id, name: e.arabic_name.trim(), target, sales: sales.get(e.id) ?? 0 }] : [];
+  });
+  return { month, rows: rows.sort((a, b) => b.sales / b.target - a.sales / a.target) };
 }

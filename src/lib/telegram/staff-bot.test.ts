@@ -6,7 +6,7 @@ import { dashboardText, light } from "./staff-screen";
 import { threadText, whenText } from "./staff-replies";
 import { broadcastText } from "./staff-manager";
 import { closedEnough, comparisonLines, delta, letterTips, share, toWithdraw } from "./staff-letter";
-import { bar, matchSellers, planMonth, sellerTargets } from "./staff-target";
+import { bar, targetText } from "./staff-target";
 
 describe("«تنبيهاتي» numbers", () => {
   it("starts the day at 00:00 Riyadh (21:00 UTC the day before)", () => {
@@ -185,49 +185,17 @@ describe("withdrawal after a warned letter 2", () => {
   });
 });
 
-describe("«🎯 هدفي» reads the plan's sellers line", () => {
-  // neutral names and figures: the real plan never enters the repository
-  const focus = "سطر أول\nأهداف البائعين (صافي ربح): سامي نادر 12,000 · فارس 9,500 · القحطاني 7,000 · الخدمات 4,000 = 32,500، والباقي 3,000 = 35,500\nسطر أخير";
-  const people = [
-    { id: "a", name: "سامي نادر" },
-    { id: "b", name: "فارس العتيبي" },
-    { id: "c", name: "خالد علي القحطاني" },
-    { id: "d", name: "سامي الحربي" },
-  ];
-
-  it("takes each name with its amount and drops the totals", () => {
-    expect(sellerTargets(focus)).toEqual([
-      { name: "سامي نادر", profit: 12000 },
-      { name: "فارس", profit: 9500 },
-      { name: "القحطاني", profit: 7000 },
-      { name: "الخدمات", profit: 4000 },
-    ]);
-    expect(sellerTargets("لا سطر للبائعين")).toEqual([]);
-  });
-
-  it("gives a line to the one employee holding all its words, hamza or not, and never guesses", () => {
-    const { matched, unmatched } = matchSellers(sellerTargets(focus.replace("فارس", "فارِس")), people);
-    expect(matched.map((m) => [m.id, m.profit])).toEqual([
-      ["a", 12000],
-      ["b", 9500],
-      ["c", 7000],
-    ]);
-    expect(unmatched).toEqual(["الخدمات"]);
-    expect(matchSellers([{ name: "أحمد", profit: 1 }], [{ id: "x", name: "احمد سالم" }]).matched[0].id).toBe("x");
-    expect(matchSellers([{ name: "سامي", profit: 1 }], people).unmatched).toEqual(["سامي"]);
-  });
-
-  it("shows this month's plan, else the next one, and a bar that stays full past the target", () => {
-    const t = (month: string) => ({ id: month, month, sales: 0, profit: 0, debtBudget: 0, focus: "", payments: "" });
-    const oct24 = Date.parse("2026-10-24T09:00:00Z");
-    expect(planMonth([t("2026-12"), t("2026-11")], oct24)?.month).toBe("2026-11");
-    expect(planMonth([t("2026-10"), t("2026-11")], oct24)?.month).toBe("2026-10");
-    // 31 Oct 22:00 UTC is already 1 November in Riyadh
-    expect(planMonth([t("2026-10"), t("2026-11")], Date.parse("2026-10-31T22:00:00Z"))?.month).toBe("2026-11");
-    expect(planMonth([t("2026-09")], oct24)).toBeNull();
+describe("«🎯 هدفي»", () => {
+  it("a bar that stays full past the target, and the text from the system's own target", () => {
     expect(bar(3800, 10000)).toBe("▓▓▓░░░░░░░ 38%");
     expect(bar(15000, 10000)).toBe("▓▓▓▓▓▓▓▓▓▓ 150%");
     expect(bar(0, 0)).toBe("░░░░░░░░░░ 0%");
+    const card = { month: "2026-10", sales: 3800, clients: 2, commission: 410, frozen: false, target: 10000, progress: { pct: 38, bar: 38, left: 6200 }, daysLeft: 2 };
+    const text = targetText("سامي", card);
+    expect(text).toContain("10,000");
+    expect(text).toContain("الباقي: <b>6,200</b>");
+    expect(text).toContain("عملاء مؤكدون: <b>2</b>");
+    expect(targetText("سامي", { ...card, target: null, progress: null })).toContain("لم تحدد الإدارة لك هدفاً");
   });
 });
 
