@@ -67,7 +67,7 @@ export function arabicDate(iso: string): string {
 }
 
 // a WhatsApp display name is often a phrase, a shop or a dot — never print those as «باسم …»
-const NOT_A_NAME = /الله|سبحان|الحمد|استغفر|اللهم|ماشاء|حساب|مكتب|شركة|مؤسسة|متجر|عميل|تجريبي|sales|shop|store|company|test|official|travel|سياح|سفر/i;
+const NOT_A_NAME = /الله|سبحان|الحمد|استغفر|اللهم|ماشاء|حساب|مكتب|شركة|مؤسسة|متجر|عميل|تجرب|شخص|sales|shop|store|company|test|official|travel|سياح|سفر/i;
 
 /** The client's name as the coupon prints it, or null («عميلنا العزيز»): letters only, two at least, and a person's. */
 export function cleanName(raw: string | null | undefined): string | null {

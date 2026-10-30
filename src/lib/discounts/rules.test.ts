@@ -41,6 +41,8 @@ describe("cleanName", () => {
     expect(cleanName("MARWA FAM SALES 🌷")).toBeNull();
     expect(cleanName(".")).toBeNull();
     expect(cleanName("خ")).toBeNull();
+    expect(cleanName("تجربة النظام بيسك")).toBeNull();
+    expect(cleanName("شخصين")).toBeNull();
     expect(cleanName(null)).toBeNull();
   });
 });
