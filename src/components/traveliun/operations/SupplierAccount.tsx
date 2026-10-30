@@ -21,14 +21,14 @@ import { PaymentList, SupplierPaymentForm, money } from "./SupplierPanel";
 
 const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const back =
-  "inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]";
+  "inline-flex h-9 items-center gap-2 rounded-[9px] border border-tv-border-default bg-tv-surface-raised px-3 text-[12.5px] font-bold text-tv-text-muted hover:bg-tv-surface-sunken";
 
 /** «علينا له» / «عليه لنا» per currency — a positive balance is ours to pay. */
 function BalanceChips({ balances }: { balances: SupplierBalance[] }) {
   const { t } = useTraveliunUI();
   const open = balances.filter((b) => b.balance !== 0);
   if (open.length === 0) {
-    return <span className="rounded-full bg-[#eef4f1] px-2.5 py-0.5 text-[11.5px] font-bold text-[#557d78]">{t("ops.sup.settled")}</span>;
+    return <span className="rounded-full bg-tv-surface-sunken px-2.5 py-0.5 text-[11.5px] font-bold text-tv-text-muted">{t("ops.sup.settled")}</span>;
   }
   return (
     <span className="flex flex-wrap gap-1.5">
@@ -81,7 +81,7 @@ export function SupplierAccountsList({
         </Link>
 
         <section className={card}>
-          <h1 className="flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
+          <h1 className="flex items-center gap-2 text-lg font-extrabold text-tv-text-strong">
             <Wallet className="size-5" />
             {t("ops.sup.accounts")}
           </h1>
@@ -89,7 +89,7 @@ export function SupplierAccountsList({
 
           {canManage ? (
             <div className="mt-3 flex flex-wrap items-end gap-2">
-              <label className="grid gap-1.5 text-[11.5px] font-bold text-[#185045]">
+              <label className="grid gap-1.5 text-[11.5px] font-bold text-tv-text-brand">
                 {t("ops.sup.replyHours")}
                 <input
                   type="number"
@@ -98,7 +98,7 @@ export function SupplierAccountsList({
                   dir="ltr"
                   value={hours}
                   onChange={(e) => setHours(e.target.value)}
-                  className="tv-tnum h-10 w-28 rounded-[10px] border border-[#dbe6e1] px-3 text-center text-[13px]"
+                  className="tv-tnum h-10 w-28 rounded-[10px] border border-tv-border-default px-3 text-center text-[13px]"
                 />
               </label>
               <button
@@ -112,12 +112,12 @@ export function SupplierAccountsList({
                     else router.refresh();
                   })
                 }
-                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-tv-action-primary px-4 text-[12.5px] font-bold text-white hover:bg-tv-action-primary-hover disabled:opacity-60"
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                 {t("save")}
               </button>
-              {error ? <p className="w-full text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
+              {error ? <p className="w-full text-[11.5px] font-bold text-tv-status-danger">{error}</p> : null}
             </div>
           ) : null}
 
@@ -126,10 +126,10 @@ export function SupplierAccountsList({
               <li key={s.id}>
                 <Link
                   href={`${base}/${s.id}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-[#e2ebe7] px-4 py-2.5 hover:bg-[#f8fbf9]"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-tv-border-subtle px-4 py-2.5 hover:bg-tv-surface-sunken"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-extrabold text-[#0f3d38]">{s.name}</span>
+                    <span className="block truncate text-[13px] font-extrabold text-tv-text-strong">{s.name}</span>
                     {s.categories ? <span className="text-[11px] font-bold text-tv-text-faint">{s.categories}</span> : null}
                   </span>
                   <BalanceChips balances={s.balances} />
@@ -164,12 +164,12 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
         <section className={card}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
+              <h1 className="flex items-center gap-2 text-lg font-extrabold text-tv-text-strong">
                 <Store className="size-5" />
                 {supplier.name}
                 {supplier.name_en ? <span className="text-[13px] font-bold text-tv-text-faint">{supplier.name_en}</span> : null}
               </h1>
-              <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-bold text-[#557d78]">
+              <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-bold text-tv-text-muted">
                 {supplier.categories ? <span>{supplier.categories}</span> : null}
                 <span>{t(supplier.lang === "en" ? "ops.sup.lang.en" : "ops.sup.lang.ar")}</span>
                 {supplier.contact_name ? <span>{supplier.contact_name}</span> : null}
@@ -180,7 +180,7 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
             {canOpenPath("/company-suppliers", can) ? (
               <Link
                 href="/company-suppliers"
-                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-tv-border-default px-3 text-[12px] font-bold text-tv-text-brand hover:bg-tv-surface-sunken"
               >
                 <Pencil className="size-3.5" />
                 {t("ops.sup.editContact")}
@@ -193,14 +193,14 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
               <p className="text-[12px] font-bold text-tv-text-faint">{t("ops.sup.settled")}</p>
             ) : (
               balances.map((b) => (
-                <div key={b.currency} className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 text-[12px] font-bold text-[#557d78]">
+                <div key={b.currency} className="rounded-[12px] border border-tv-border-subtle bg-tv-surface-sunken p-3 text-[12px] font-bold text-tv-text-muted">
                   <p className="tv-tnum flex justify-between">
                     {t("ops.sup.owed")} <DirText dir="ltr">{money({ amount: b.owed, currency: b.currency })}</DirText>
                   </p>
                   <p className="tv-tnum mt-1 flex justify-between">
                     {t("ops.sup.paidTotal")} <DirText dir="ltr">{money({ amount: b.paid, currency: b.currency })}</DirText>
                   </p>
-                  <p className="mt-2 border-t border-[#e8efec] pt-2">
+                  <p className="mt-2 border-t border-tv-border-subtle pt-2">
                     <BalanceChips balances={[b]} />
                   </p>
                 </div>
@@ -210,15 +210,15 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
         </section>
 
         <section className={card}>
-          <h2 className="mb-2 text-sm font-extrabold text-[#185045]">{t("ops.sup.bookings")}</h2>
+          <h2 className="mb-2 text-sm font-extrabold text-tv-text-brand">{t("ops.sup.bookings")}</h2>
           {bookings.length === 0 ? (
             <p className="text-[12.5px] font-semibold text-tv-text-faint">{t("ops.sup.noBookings")}</p>
           ) : (
             <ul className="space-y-1.5">
               {bookings.map((b) => (
-                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[#eef3f1] px-3 py-2 text-[12px] font-bold">
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-tv-border-subtle px-3 py-2 text-[12px] font-bold">
                   <span className="min-w-0">
-                    <Link href={`/operations/${b.operation_id}`} className="tv-tnum me-2 text-[#2b57c4] hover:underline">
+                    <Link href={`/operations/${b.operation_id}`} className="tv-tnum me-2 text-tv-text-brand hover:underline">
                       <DirText dir="ltr">{b.serial || "—"}</DirText>
                     </Link>
                     <span className="text-tv-text-strong">{b.title}</span>
@@ -244,13 +244,13 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
                     })()}
                   </span>
                   <span className="flex flex-wrap items-center gap-2">
-                    <span className={b.status === "confirmed" ? "text-[#0f7a52]" : "text-[#a86a10]"}>
+                    <span className={b.status === "confirmed" ? "text-tv-status-success" : "text-tv-status-warning"}>
                       {t(`ops.booking.status.${b.status as "pending" | "prebooked" | "in_flight" | "confirmed" | "failed" | "cancelled"}`)}
                     </span>
                     {b.status === "confirmed" ? (
-                      <span className={b.is_paid ? "text-[#0f7a52]" : "text-[#a86a10]"}>{t(b.is_paid ? "ops.sup.paid" : "ops.sup.unpaid")}</span>
+                      <span className={b.is_paid ? "text-tv-status-success" : "text-tv-status-warning"}>{t(b.is_paid ? "ops.sup.paid" : "ops.sup.unpaid")}</span>
                     ) : null}
-                    <span className="tv-tnum text-[#0f3d38]">
+                    <span className="tv-tnum text-tv-text-strong">
                       {b.cost ? <DirText dir="ltr">{money(b.cost)}</DirText> : t("ops.sup.costNone")}
                     </span>
                   </span>
@@ -262,7 +262,7 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
 
         <section className={card}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.sup.payments")}</h2>
+            <h2 className="text-sm font-extrabold text-tv-text-brand">{t("ops.sup.payments")}</h2>
             <button
               type="button"
               onClick={() => setPaying((v) => !v)}

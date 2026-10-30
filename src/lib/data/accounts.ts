@@ -42,6 +42,8 @@ async function chunked<T>(ids: string[], read: (part: string[]) => PromiseLike<{
 
 export type AccountsHomeView = AccountsHome & {
   months: string[];
+  /** the last six months, oldest first: riyal sales and profit at issue (the home's chart) */
+  trend: { month: string; sales: number; profit: number }[];
   /** the overdue files' client names, by case id */
   clients: Record<string, string>;
   /** «تقرير الربحية» and «التدفق النقدي» open to this account too (pricing.internal, every file) */
@@ -118,7 +120,9 @@ export async function getAccountsHome(monthParam?: string): Promise<AccountsHome
     .flatMap((s) => s.balances)
     .filter((b) => b.currency === "SAR" && b.balance > 0)
     .reduce((sum, b) => sum + b.balance, 0);
-  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100, ownerFixed, alerts, canDecide, status };
+  const byMonth = systemMonths(cases);
+  const trend = recentMonths(thisMonth).reverse().map((mm) => ({ month: mm, sales: Math.round(byMonth.get(mm)?.sales ?? 0), profit: Math.round(byMonth.get(mm)?.profit ?? 0) }));
+  return { ...home, months: recentMonths(thisMonth), trend, clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100, ownerFixed, alerts, canDecide, status };
 }
 
 /** the cases' client names, by case id */
@@ -483,7 +487,8 @@ export async function sendFinanceAlerts(today: string): Promise<number> {
 // ------------------------------------------------------- «حالة الشركة» ----
 
 /** This month's company status: each month's riyal sales and profit at issue from the cases, its logged expenses, and the book. */
-async function statusNow(supabase: SupabaseClient, cases: LoadedCase[], month: string): Promise<CompanyStatus | null> {
+/** each month's riyal sales and profit at issue, over our own live files */
+function systemMonths(cases: LoadedCase[]): Map<string, SystemMonth> {
   const by = new Map<string, SystemMonth>();
   for (const c of cases) {
     if (!invoiceable(c) || c.currency !== "SAR") continue;
@@ -492,6 +497,11 @@ async function statusNow(supabase: SupabaseClient, cases: LoadedCase[], month: s
     t.profit += caseProfit(c.facts).expected.find((l) => l.currency === "SAR")?.profit ?? 0;
     by.set(c.month, t);
   }
+  return by;
+}
+
+async function statusNow(supabase: SupabaseClient, cases: LoadedCase[], month: string): Promise<CompanyStatus | null> {
+  const by = systemMonths(cases);
   // the quarter's months up to this one carry expenses; a plan's month to come has none yet
   for (const mm of quarterOf(month).months.filter((x) => x <= month)) {
     const spent = (await readExpenses(supabase, mm)).filter((e) => e.currency === "SAR").reduce((s, e) => s + e.amount, 0);
