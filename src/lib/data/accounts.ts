@@ -6,6 +6,8 @@ import { gateManager } from "@/lib/operations/access";
 import { riyadhDate } from "@/lib/operations/payments";
 import { accountsHome, recentMonths, type AccountsHome, type HomePayment, type HomeSupplierLine } from "@/lib/accounts/home";
 import { invoiceOf, type InvoiceStatus, type InvoiceView } from "@/lib/accounts/invoice";
+import { expenseTotals, type Expense } from "@/lib/accounts/expenses";
+import { listSupplierAccounts } from "./supplier-work";
 import { loadCases, type LoadedCase } from "./operation-money";
 
 /**
@@ -34,6 +36,11 @@ export type AccountsHomeView = AccountsHome & {
   clients: Record<string, string>;
   /** «تقرير الربحية» and «التدفق النقدي» open to this account too (pricing.internal, every file) */
   reports: boolean;
+  /** the month's «المصروفات» (riyals) and the profit after them */
+  expenses: ReturnType<typeof expenseTotals>;
+  net: number;
+  /** what we owe suppliers today, riyals (their confirmed bookings less what we paid them) */
+  supplierOwed: number;
 };
 
 export async function getAccountsHome(monthParam?: string): Promise<AccountsHomeView | null> {
@@ -79,8 +86,17 @@ export async function getAccountsHome(monthParam?: string): Promise<AccountsHome
 
   const clients = await clientNames(db, home.overdue.invoices.map((i) => i.id));
 
-  const reports = (await currentCan("pricing.internal")) && !(await gateManager());
-  return { ...home, months: recentMonths(thisMonth), clients, reports };
+  const [reports, spent, suppliersList] = await Promise.all([
+    (async () => (await currentCan("pricing.internal")) && !(await gateManager()))(),
+    readExpenses(db, month),
+    listSupplierAccounts(),
+  ]);
+  const expenses = expenseTotals(spent, month);
+  const supplierOwed = (suppliersList?.suppliers ?? [])
+    .flatMap((s) => s.balances)
+    .filter((b) => b.currency === "SAR" && b.balance > 0)
+    .reduce((sum, b) => sum + b.balance, 0);
+  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100 };
 }
 
 /** the cases' client names, by case id */
@@ -173,4 +189,27 @@ export async function getInvoice(operationId: string): Promise<InvoiceDetail | n
     receipts,
     confirmation: confRow ? { at: riyadhDate(confRow.confirmed_at), by: one(confRow.employees as { arabic_name: string | null } | null)?.arabic_name ?? "" } : null,
   };
+}
+
+// ------------------------------------------------------------ «المصروفات» ----
+
+async function readExpenses(supabase: SupabaseClient, month: string): Promise<Expense[]> {
+  const [y, m] = month.split("-").map(Number);
+  const { data, error } = await supabase
+    .from("company_expenses")
+    .select("id, spent_on, category, title, amount, currency, method, note")
+    .gte("spent_on", `${month}-01`)
+    .lt("spent_on", new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10))
+    .order("spent_on", { ascending: false })
+    .limit(2000);
+  if (error) throw error;
+  return ((data ?? []) as (Omit<Expense, "amount"> & { amount: number | string })[]).map((e) => ({ ...e, amount: Number(e.amount) }));
+}
+
+export async function listExpenses(monthParam?: string): Promise<{ month: string; months: string[]; rows: Expense[]; totals: ReturnType<typeof expenseTotals> } | null> {
+  if (!(await allowed())) return null;
+  const thisMonth = riyadhDate().slice(0, 7);
+  const month = isMonth(monthParam) && monthParam <= thisMonth ? monthParam : thisMonth;
+  const rows = await readExpenses(db(), month);
+  return { month, months: recentMonths(thisMonth), rows, totals: expenseTotals(rows, month) };
 }

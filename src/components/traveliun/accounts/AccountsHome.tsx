@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BadgePercent, ClipboardCheck, FileText, Landmark, TrendingUp, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgePercent, ClipboardCheck, FileText, Landmark, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
 import type { AccountsHomeView } from "@/lib/data/accounts";
 import { TraveliunShell } from "../TraveliunShell";
 import { profitTone } from "../operations/CaseProfitCard";
 import { card, monthName, Num, sar } from "./ui";
+import { EXPENSE_CATEGORY_AR } from "@/lib/accounts/expenses";
 
 /** «الحسابات» — the financial section's home (finance.accounts; the loader checks). Riyals; read-only. */
 
 export function AccountsHome({ home }: { home: AccountsHomeView }) {
   const actions: [string, string, typeof Wallet][] = [
     ["/accounts/invoices", "الفواتير", FileText],
+    ["/accounts/expenses", "المصروفات", Receipt],
+    ["/accounts/suppliers", "الموردون", Truck],
     ["/operations", "الحالات والدفعات", ClipboardCheck],
     ...(home.reports
       ? ([["/operations/cashflow", "التدفق النقدي", Wallet], ["/operations/profitability", "تقرير الربحية", TrendingUp]] as [string, string, typeof Wallet][])
@@ -27,16 +30,17 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[13px] font-bold text-tv-text-muted">صافي الربح — {monthName(home.month)}</p>
-              <p className={`mt-1 text-3xl font-extrabold ${profitTone(home.profit)}`}>
-                <Num>{sar(home.profit)}</Num>
+              <p className={`mt-1 text-3xl font-extrabold ${profitTone(home.net)}`}>
+                <Num>{sar(home.net)}</Num>
               </p>
               <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">
-                المتوقع من مبيعات الشهر المؤكدة: سعر البيع ناقص تكلفة الشراء
+                ربح المبيعات المؤكدة <Num>{sar(home.profit)}</Num>
                 {home.margin != null && (
                   <>
-                    {" "}· الهامش <Num>{`${home.margin}%`}</Num>
+                    {" "}(الهامش <Num>{`${home.margin}%`}</Num>)
                   </>
-                )}
+                )}{" "}
+                ناقص المصروفات <Num>{sar(home.expenses.total)}</Num> — الرواتب والإيجارات في «الحسابات المالية»
               </p>
             </div>
             <nav className="flex flex-wrap gap-1.5" aria-label="اختر الشهر">
@@ -62,11 +66,13 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
           </div>
         </section>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Kpi label="صافي المبيعات" value={sar(home.sales)} hint={`${home.count} ملف مؤكد هذا الشهر`} />
           <Kpi label="المحصَّل هذا الشهر" value={sar(home.collected)} hint="دفعات العملاء ناقص الاسترجاع" />
           <Kpi label="المستحق على العملاء" value={sar(home.receivable)} hint="الباقي على كل الملفات القائمة اليوم" />
           <Kpi label="المتأخر" value={sar(home.overdue.amount)} hint={`${home.overdue.invoices.length} ملف`} danger={home.overdue.amount > 0} />
+          <Kpi label="المصروفات هذا الشهر" value={sar(home.expenses.total)} hint={home.expenses.byCategory[0] ? `أكبرها ${EXPENSE_CATEGORY_AR[home.expenses.byCategory[0].category]}` : "لم يُسجَّل مصروف"} />
+          <Kpi label="علينا للموردين" value={sar(home.supplierOwed)} hint="حجوزات مؤكدة لم تُسدَّد بعد" />
         </div>
 
         <section className={card}>

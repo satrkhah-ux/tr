@@ -67,6 +67,16 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 5 * 60;
 const METHODS = ["bank_transfer", "cash", "card", "other"] as const;
 
+/**
+ * The suppliers' accounts across every case: the operations manager with pricing.internal, or «الحسابات»
+ * (finance.accounts — the financial section pays suppliers; the owner, 2026-10-30).
+ */
+async function accountsOrManager(): Promise<TranslationKey | null> {
+  if (!(await getServerUser())) return "err.session";
+  if (await currentCan("finance.accounts")) return null;
+  return (await gateManager()) ?? (await gate("pricing.internal"));
+}
+
 async function replyHours(supabase: SupabaseClient): Promise<number> {
   const { data } = await supabase.from("app_settings").select("value").eq("key", "supplier_reply_hours").maybeSingle();
   const n = Number((data as { value?: string } | null)?.value);
@@ -618,7 +628,8 @@ export async function createSupplierFromInvoice(input: { name: string; category:
  * — the switch the voucher's warning band reads.
  */
 export async function recordSupplierPayment(formData: FormData): Promise<{ ok: true } | Fail> {
-  const denied = await gate("pricing.internal");
+  const accounts = Boolean(await getServerUser()) && (await currentCan("finance.accounts"));
+  const denied = accounts ? null : await gate("pricing.internal");
   if (denied) return { ok: false, error: denied };
 
   const text = (k: string) => String(formData.get(k) ?? "").trim();
@@ -645,7 +656,8 @@ export async function recordSupplierPayment(formData: FormData): Promise<{ ok: t
     // (the accounts page pays across cases, or for none); manage_own only when each is a file
     // the payer issued — the browser's operation_id included
     const cases = [...new Set([operationId, ...covered.map((b) => b.operation_id)].filter((x): x is string => !!x))];
-    const notManager = cases.length > 0 ? await gateManagerRows("operations", cases) : await gateManager();
+    // «الحسابات» pays any supplier for any case
+    const notManager = accounts ? null : cases.length > 0 ? await gateManagerRows("operations", cases) : await gateManager();
     if (notManager) return { ok: false, error: notManager };
 
     const file = formData.get("file");
@@ -696,7 +708,7 @@ export async function recordSupplierPayment(formData: FormData): Promise<{ ok: t
 }
 
 export async function getSupplierReceiptUrl(paymentId: string): Promise<{ ok: true; url: string } | Fail> {
-  const denied = (await gateRow("supplier_payments", paymentId)) ?? (await gate("pricing.internal"));
+  const denied = (await accountsOrManager()) && ((await gateRow("supplier_payments", paymentId)) ?? (await gate("pricing.internal")));
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = service();
@@ -771,7 +783,7 @@ async function accountRows(supabase: SupabaseClient, supplierId: string | null) 
 
 /** Every supplier with its balance — the list a manager settles from — and the reply window. */
 export async function listSupplierAccounts(): Promise<{ suppliers: SupplierAccountSummary[]; replyHours: number } | null> {
-  if ((await gateManager()) || (await gate("pricing.internal"))) return null;
+  if (await accountsOrManager()) return null;
   try {
     const supabase = service();
     const [suppliersRes, { bookings, payments }, hours] = await Promise.all([
@@ -797,7 +809,7 @@ export async function listSupplierAccounts(): Promise<{ suppliers: SupplierAccou
 }
 
 export async function getSupplierAccount(supplierId: string): Promise<SupplierAccount | null> {
-  if ((await gateManager()) || (await gate("pricing.internal"))) return null;
+  if (await accountsOrManager()) return null;
   try {
     const supabase = service();
     const [supRes, { bookings, payments }] = await Promise.all([
