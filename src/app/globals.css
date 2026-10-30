@@ -84,6 +84,89 @@
   --color-tv-warning: #a86a10;
   --color-tv-warning-bg: #fff8e8;
   --color-tv-warning-border: #f2e2b4;
+  /* Design-system semantic tokens (docs/design-system/TOKENS.md) — values live on
+     :root / .dark below, so one utility (text-tv-text-muted …) is right in both themes. */
+  --color-tv-surface-canvas: var(--tv-surface-canvas);
+  --color-tv-surface-raised: var(--tv-surface-raised);
+  --color-tv-surface-sunken: var(--tv-surface-sunken);
+  --color-tv-text-strong: var(--tv-text-strong);
+  --color-tv-text-brand: var(--tv-text-brand);
+  --color-tv-text-muted: var(--tv-text-muted);
+  --color-tv-text-faint: var(--tv-text-faint);
+  --color-tv-border-subtle: var(--tv-border-subtle);
+  --color-tv-border-default: var(--tv-border-default);
+  --color-tv-border-strong: var(--tv-border-strong);
+  --color-tv-action-primary: var(--tv-action-primary);
+  --color-tv-action-on-primary: var(--tv-action-on-primary);
+  --color-tv-action-focus: var(--tv-action-focus);
+  --color-tv-status-success: var(--tv-status-success);
+  --color-tv-status-success-bg: var(--tv-status-success-bg);
+  --color-tv-status-danger: var(--tv-status-danger);
+  --color-tv-status-danger-bg: var(--tv-status-danger-bg);
+  --color-tv-status-warning: var(--tv-status-warning);
+  --color-tv-status-warning-bg: var(--tv-status-warning-bg);
+}
+
+/*
+  Design-system semantic tokens. Every value is a colour the screens ALREADY use
+  (light) and the colour the dark layer already turns it into (dark) — no new
+  colours. Lightning CSS drops a custom property no rule reads, so a token with
+  no consumer yet is simply absent from the build until something uses it.
+*/
+:root {
+  --tv-surface-canvas: #eef3f1;
+  --tv-surface-raised: #ffffff;
+  --tv-surface-sunken: #f4f8f6;
+  --tv-text-strong: #003c3a;
+  --tv-text-brand: #185045;
+  --tv-text-muted: #557d78;
+  --tv-text-faint: #93aaa3;
+  --tv-border-subtle: #e2ebe7;
+  --tv-border-default: #dbe6e1;
+  --tv-border-strong: #cfe0d9;
+  --tv-action-primary: #185045;
+  --tv-action-on-primary: #ffffff;
+  --tv-action-focus: #2aa87a;
+  --tv-status-success: #0f7a52;
+  --tv-status-success-bg: #e9f7f0;
+  --tv-status-danger: #c22850;
+  --tv-status-danger-bg: #fdeef2;
+  --tv-status-warning: #a86a10;
+  --tv-status-warning-bg: #fff8e8;
+}
+.dark {
+  --tv-surface-canvas: #0b1a17;
+  --tv-surface-raised: #14231f;
+  --tv-surface-sunken: #1b2d27;
+  --tv-text-strong: #eaf3ef;
+  --tv-text-brand: #7fd3ba;
+  --tv-text-muted: #9fb3ac;
+  --tv-text-faint: #9fb3ac;
+  --tv-border-subtle: #294039;
+  --tv-border-default: #294039;
+  --tv-border-strong: #294039;
+  --tv-status-success: #86eac4;
+  --tv-status-success-bg: #12352c;
+  --tv-status-danger: #e789a1;
+  --tv-status-danger-bg: #31161f;
+  --tv-status-warning: #eac186;
+  --tv-status-warning-bg: #312811;
+}
+
+/*
+  The shared form field (basicField in basic/styles.ts). A custom utility, not
+  colour utilities: Tailwind sorts it BEFORE every border-[#…]/bg-[#…] class, so
+  a screen's error border still overrides the base colour exactly as it did when
+  the colours were raw hex classes, and :focus (higher specificity) still beats
+  a plain error border while a focus:border-[#…] override still beats it.
+*/
+@utility tv-field {
+  border-color: var(--tv-border-default);
+  background-color: var(--tv-surface-raised);
+  color: var(--tv-text-brand);
+  &:focus {
+    border-color: var(--tv-action-focus);
+  }
 }
 
 :root {

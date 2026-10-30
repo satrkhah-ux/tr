@@ -1914,7 +1914,7 @@ export function BasicEditor({
                             value={(per ? perUnit(item.sell_price, units) : item.sell_price) ?? ""}
                             placeholder="—"
                             onChange={(e) => setItem(i, { sell_price: per ? fromUnit(typedNumber(e.target), units) : typedNumber(e.target) })}
-                            className={`${basicField} tv-tnum text-center ${item.sell_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
+                            className={`${basicField} tv-tnum text-center ${item.sell_price == null ? "border-[#f0b4c2] bg-[#fff5f7] dark:bg-[#31161f]" : ""}`}
                           />
                           <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
                             {currencyOptions(lookups.countries, item.sell_currency || display).map((c) => (
