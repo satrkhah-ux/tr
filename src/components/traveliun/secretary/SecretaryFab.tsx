@@ -30,6 +30,19 @@ export function SecretaryFab() {
   }
 
   const [statusOpen, setStatusOpen] = useState(false);
+  // on a phone the round button steps aside while the page scrolls down (it stood over prices), back on the way up
+  const [tucked, setTucked] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (Math.abs(y - last) < 8) return;
+      setTucked(y > last && y > 80);
+      last = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const clearPending = useCallback(() => setPendingError(null), []);
   const clearQuestion = useCallback(() => setPendingQuestion(null), []);
   // «أرسل الخطأ لمُراد» from anywhere on the page: open the chat with it
@@ -58,7 +71,7 @@ export function SecretaryFab() {
     {!open && <ErrorWatch />}
     {/* a full-height strip on a computer; on a phone a round button over the tab bar, the status buttons one tap
         behind «حالتي» so the page keeps its whole width (the owner, 2026-10-30: «الاستخدام اليسير للموظف على الموبايل») */}
-    <div className="fixed end-2 bottom-[84px] z-[100] flex flex-col-reverse items-center gap-2 lg:end-0 lg:top-[74px] lg:bottom-0 lg:w-10 lg:flex-col lg:justify-center lg:gap-3 lg:border-s lg:border-[#dfe8e4] lg:bg-[#eef3f1]">
+    <div className={`fixed end-2 bottom-[84px] z-[100] flex flex-col-reverse items-center gap-2 transition-[translate,opacity] duration-200 ${tucked && !statusOpen ? "max-lg:pointer-events-none max-lg:translate-y-24 max-lg:opacity-0" : ""} lg:end-0 lg:top-[74px] lg:bottom-0 lg:w-10 lg:flex-col lg:justify-center lg:gap-3 lg:border-s lg:border-[#dfe8e4] lg:bg-[#eef3f1]`}>
       <SheetTrigger aria-label="استدعاء مُراد — سكرتيري الخاص" className="flex size-12 items-center justify-center rounded-full bg-[var(--tv-brand)] text-[12px] font-extrabold text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 lg:h-24 lg:w-10 lg:rounded-none lg:rounded-s-xl lg:text-[13px] lg:shadow-md">
         مُراد
       </SheetTrigger>

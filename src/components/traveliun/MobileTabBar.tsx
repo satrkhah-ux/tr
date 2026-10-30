@@ -38,7 +38,8 @@ type TabDest = { id: string; labelKey: TranslationKey; href: string; icon: Lucid
 
 const DESTINATIONS: TabDest[] = [
   { id: "dashboard", labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
-  { id: "basic", labelKey: "nav.basic", href: "/basic", icon: Zap, perm: "offers.write" },
+  // a phone's most common act: straight into a new file (the owner, 2026-10-30), with a label that fits the tab
+  { id: "basic", labelKey: "nav.newPackage", href: "/basic?new=1", icon: Zap, perm: "offers.write" },
   { id: "mine", labelKey: "nav.myFollowups", href: "/my-followups", icon: UserRound },
   { id: "operations", labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck },
   { id: "kanban", labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
@@ -83,6 +84,7 @@ function loadTabs(): string[] {
 }
 
 function isActive(pathname: string, href: string): boolean {
+  href = href.split("?")[0];
   // a home tab is active on itself only — /b2b/profile is the profile tab, not the portal
   if (href === "/dashboard" || href === "/b2b") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
