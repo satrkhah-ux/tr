@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, BadgePercent, Gavel, Siren, ClipboardCheck, L
 import type { AccountsHomeView } from "@/lib/data/accounts";
 import { profitTone } from "../operations/CaseProfitCard";
 import { card, monthName, Num, sar } from "./ui";
+import { CompanyStatusPanel } from "./Status";
 import { EXPENSE_CATEGORY_AR } from "@/lib/accounts/expenses";
 
 /** «الحسابات» — the financial section's home (finance.accounts; the loader checks). Riyals; read-only. */
@@ -21,6 +22,7 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
   return (
     <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-5xl space-y-4">
+        {home.status && <CompanyStatusPanel s={home.status} receivable={home.receivable} supplierOwed={home.supplierOwed} />}
         {/* the month: its net profit first, as «قائمة» opens */}
         <section className={card}>
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -104,10 +106,11 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Kpi label="صافي المبيعات" value={sar(home.sales)} hint={`${home.count} ملف مؤكد هذا الشهر`} />
           <Kpi label="المحصَّل هذا الشهر" value={sar(home.collected)} hint="دفعات العملاء ناقص الاسترجاع" />
-          <Kpi label="المستحق على العملاء" value={sar(home.receivable)} hint="الباقي على كل الملفات القائمة اليوم" />
+          {!home.status && <Kpi label="المستحق على العملاء" value={sar(home.receivable)} hint="الباقي على كل الملفات القائمة اليوم" />}
           <Kpi label="المتأخر" value={sar(home.overdue.amount)} hint={`${home.overdue.invoices.length} ملف`} danger={home.overdue.amount > 0} />
           <Kpi label="المصروفات هذا الشهر" value={sar(home.expenses.total)} hint={home.expenses.byCategory[0] ? `أكبرها ${EXPENSE_CATEGORY_AR[home.expenses.byCategory[0].category]}` : "لم يُسجَّل مصروف"} />
-          <Kpi label="علينا للموردين" value={sar(home.supplierOwed)} hint="حجوزات مؤكدة لم تُسدَّد بعد" />
+          {/* «حالة الشركة» above already carries what clients and suppliers are owed */}
+          {!home.status && <Kpi label="علينا للموردين" value={sar(home.supplierOwed)} hint="حجوزات مؤكدة لم تُسدَّد بعد" />}
         </div>
 
         <section className={card}>

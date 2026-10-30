@@ -8,7 +8,8 @@ import { accountsHome, recentMonths, type AccountsHome, type HomePayment, type H
 import { invoiceOf, type InvoiceStatus, type InvoiceView } from "@/lib/accounts/invoice";
 import { expenseTotals, type Expense } from "@/lib/accounts/expenses";
 import { listSupplierAccounts } from "./supplier-work";
-import { accountsOpen, financeFixedCost } from "./finance";
+import { accountsCompanyStatus, accountsOpen, financeFixedCost } from "./finance";
+import { quarterOf, type CompanyStatus, type SystemMonth } from "@/lib/accounts/status";
 import { quotesView, type Quote, type QuotesView } from "@/lib/accounts/quotes";
 import { journal } from "@/lib/accounts/journal";
 import { byCurrency, caseProfit } from "@/lib/operations/money";
@@ -54,6 +55,8 @@ export type AccountsHomeView = AccountsHome & {
   alerts: FinanceAlert[];
   /** may open «القرارات الإدارية» with a suggested decision (employees.manage) */
   canDecide: boolean;
+  /** «حالة الشركة» as of this month: the system's figures beside the owner's book; null without a book */
+  status: CompanyStatus | null;
 };
 
 export async function getAccountsHome(monthParam?: string): Promise<AccountsHomeView | null> {
@@ -99,20 +102,21 @@ export async function getAccountsHome(monthParam?: string): Promise<AccountsHome
 
   const clients = await clientNames(db, home.overdue.invoices.map((i) => i.id));
 
-  const [reports, spent, suppliersList, ownerFixed, alerts, canDecide] = await Promise.all([
+  const [reports, spent, suppliersList, ownerFixed, alerts, canDecide, status] = await Promise.all([
     (async () => (await currentCan("pricing.internal")) && !(await gateManager()))(),
     readExpenses(db, month),
     listSupplierAccounts(),
     financeFixedCost(month),
     computeFinanceAlerts(db, today),
     currentCan("employees.manage"),
+    statusNow(db, cases, thisMonth),
   ]);
   const expenses = expenseTotals(spent, month);
   const supplierOwed = (suppliersList?.suppliers ?? [])
     .flatMap((s) => s.balances)
     .filter((b) => b.currency === "SAR" && b.balance > 0)
     .reduce((sum, b) => sum + b.balance, 0);
-  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100, ownerFixed, alerts, canDecide };
+  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100, ownerFixed, alerts, canDecide, status };
 }
 
 /** the cases' client names, by case id */
@@ -472,4 +476,25 @@ export async function sendFinanceAlerts(today: string): Promise<number> {
     sent += 1;
   }
   return sent;
+}
+
+// ------------------------------------------------------- «حالة الشركة» ----
+
+/** This month's company status: each month's riyal sales and profit at issue from the cases, its logged expenses, and the book. */
+async function statusNow(supabase: SupabaseClient, cases: LoadedCase[], month: string): Promise<CompanyStatus | null> {
+  const by = new Map<string, SystemMonth>();
+  for (const c of cases) {
+    if (!invoiceable(c) || c.currency !== "SAR") continue;
+    const t = by.get(c.month) ?? { sales: 0, profit: 0, expenses: 0 };
+    t.sales += c.total ?? 0;
+    t.profit += caseProfit(c.facts).expected.find((l) => l.currency === "SAR")?.profit ?? 0;
+    by.set(c.month, t);
+  }
+  // the quarter's months up to this one carry expenses; a plan's month to come has none yet
+  for (const mm of quarterOf(month).months.filter((x) => x <= month)) {
+    const spent = (await readExpenses(supabase, mm)).filter((e) => e.currency === "SAR").reduce((s, e) => s + e.amount, 0);
+    const t = by.get(mm) ?? { sales: 0, profit: 0, expenses: 0 };
+    by.set(mm, { ...t, expenses: spent });
+  }
+  return accountsCompanyStatus(month, Object.fromEntries(by));
 }

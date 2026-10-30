@@ -9,6 +9,7 @@ import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "./audit";
 import { fixedCostIn, parseBook, type FinanceBook } from "@/lib/finance/model";
 import { IDLE_MS, makeUnlockToken, unlockTokenValid } from "@/lib/finance/lock";
+import { companyStatus, type CompanyStatus, type SystemMonth } from "@/lib/accounts/status";
 
 /**
  * The book is one document; every save appends a version to finance_book_versions (closed table,
@@ -178,4 +179,17 @@ export async function financeFixedCost(month: string): Promise<number | null> {
 /** «قفل الآن» — ends this browser's unlock at once */
 export async function lockFinanceNow(): Promise<void> {
   (await cookies()).delete(COOKIE);
+}
+
+/**
+ * «حالة الشركة» on the accounts home (stage 9), once the section's door is open. Only the status leaves
+ * this file — totals, debts, plans — never the book: an exported function here is callable from a browser,
+ * and the book holds every salary.
+ */
+export async function accountsCompanyStatus(month: string, system: Record<string, SystemMonth>): Promise<CompanyStatus | null> {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !(await accountsOpen())) return null;
+  const book = await latest();
+  if (!book || !book.updatedAt) return null;
+  const zero = { sales: 0, profit: 0, expenses: 0 };
+  return companyStatus({ month, book, system: (mm) => (system && typeof system === "object" && system[mm]) || zero });
 }
