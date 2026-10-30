@@ -7,7 +7,6 @@ import type { InvoiceDetail, InvoiceRow } from "@/lib/data/accounts";
 import { confirmInvoice } from "@/lib/data/accounts-actions";
 import { INVOICE_STATUS_AR, type InvoiceStatus } from "@/lib/accounts/invoice";
 import { KIND_AR } from "@/lib/operations/payments";
-import { TraveliunShell } from "../TraveliunShell";
 import { card, Num, sar } from "./ui";
 
 /** «الفواتير» — the internal invoices (finance.accounts; the loaders check). */
@@ -29,7 +28,7 @@ export function InvoicesList({ rows, counts }: { rows: InvoiceRow[]; counts: Rec
   const [filter, setFilter] = useState<"all" | InvoiceStatus>("all");
   const shown = filter === "all" ? rows : rows.filter((r) => r.status === filter);
   return (
-    <TraveliunShell title="nav.accounts">
+    <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-5xl space-y-4">
         <Link href="/accounts" className={back}><ArrowRight className="size-4" />الحسابات</Link>
         <section className={card}>
@@ -71,7 +70,7 @@ export function InvoicesList({ rows, counts }: { rows: InvoiceRow[]; counts: Rec
           )}
         </section>
       </div>
-    </TraveliunShell>
+    </>
   );
 }
 
@@ -84,7 +83,7 @@ export function InvoicePage({ inv }: { inv: InvoiceDetail }) {
       setError(r.ok ? "" : r.error);
     });
   return (
-    <TraveliunShell title="nav.accounts">
+    <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-2xl space-y-4">
         <div className="flex items-center justify-between gap-2">
           <Link href="/accounts/invoices" className={back}><ArrowRight className="size-4" />الفواتير</Link>
@@ -107,7 +106,7 @@ export function InvoicePage({ inv }: { inv: InvoiceDetail }) {
           {error && <p role="alert" className="mt-2 text-[12.5px] font-bold text-tv-status-danger">{error}</p>}
         </section>
       </div>
-    </TraveliunShell>
+    </>
   );
 }
 

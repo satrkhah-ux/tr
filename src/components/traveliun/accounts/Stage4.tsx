@@ -6,7 +6,6 @@ import type { QuotesView } from "@/lib/accounts/quotes";
 import { ACCOUNTS, journalCsv, type AccountKey, type JournalEntry } from "@/lib/accounts/journal";
 import { canOpenPath } from "@/lib/roles/section-access";
 import { useRole } from "@/lib/roles/RoleContext";
-import { TraveliunShell } from "../TraveliunShell";
 import { card, monthName, Num, sar } from "./ui";
 
 /** «عروض الأسعار» and «القيود اليومية» in «الحسابات» (finance.accounts; the loaders check). */
@@ -28,7 +27,7 @@ function Months({ months, month, path }: { months: string[]; month: string; path
 export function QuotesPage({ q }: { q: QuotesView & { months: string[] } }) {
   const { can } = useRole();
   return (
-    <TraveliunShell title="nav.accounts">
+    <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-4xl space-y-4">
         <div className="flex items-center justify-between gap-2">
           <Link href="/accounts" className={back}><ArrowRight className="size-4" />الحسابات</Link>
@@ -74,7 +73,7 @@ export function QuotesPage({ q }: { q: QuotesView & { months: string[] } }) {
           )}
         </section>
       </div>
-    </TraveliunShell>
+    </>
   );
 }
 
@@ -99,7 +98,7 @@ export function JournalPage({ j }: { j: { month: string; months: string[]; entri
   };
   const amount = (n: number) => (n ? <Num>{Math.round(n).toLocaleString("en-US")}</Num> : null);
   return (
-    <TraveliunShell title="nav.accounts">
+    <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-5xl space-y-4">
         <div className="flex items-center justify-between gap-2">
           <Link href="/accounts" className={back}><ArrowRight className="size-4" />الحسابات</Link>
@@ -163,6 +162,6 @@ export function JournalPage({ j }: { j: { month: string; months: string[]; entri
           )}
         </section>
       </div>
-    </TraveliunShell>
+    </>
   );
 }

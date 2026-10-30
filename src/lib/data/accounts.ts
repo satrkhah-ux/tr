@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { gateManager } from "@/lib/operations/access";
 import { riyadhDate } from "@/lib/operations/payments";
@@ -8,7 +8,7 @@ import { accountsHome, recentMonths, type AccountsHome, type HomePayment, type H
 import { invoiceOf, type InvoiceStatus, type InvoiceView } from "@/lib/accounts/invoice";
 import { expenseTotals, type Expense } from "@/lib/accounts/expenses";
 import { listSupplierAccounts } from "./supplier-work";
-import { financeFixedCost } from "./finance";
+import { accountsOpen, financeFixedCost } from "./finance";
 import { quotesView, type Quote, type QuotesView } from "@/lib/accounts/quotes";
 import { journal } from "@/lib/accounts/journal";
 import { byCurrency, caseProfit } from "@/lib/operations/money";
@@ -57,7 +57,7 @@ export type AccountsHomeView = AccountsHome & {
 };
 
 export async function getAccountsHome(monthParam?: string): Promise<AccountsHomeView | null> {
-  if (!(await getServerUser()) || !(await currentCan("finance.accounts"))) return null;
+  if (!(await accountsOpen())) return null;
   const db = createSupabaseServiceClient() as unknown as SupabaseClient;
   const today = riyadhDate();
   const thisMonth = today.slice(0, 7);
@@ -131,7 +131,8 @@ async function clientNames(db: SupabaseClient, ids: string[]): Promise<Record<st
 // (lib/accounts/invoice.ts). A partner's file is billed to the partner (partner_invoices), not here.
 
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
-const allowed = async () => Boolean(await getServerUser()) && (await currentCan("finance.accounts"));
+/** «الحسابات»: finance.accounts or the book's owner, with the finance password open now (finance.ts) */
+const allowed = () => accountsOpen();
 const invoiceable = (c: LoadedCase) => !c.cancelled && !c.facts.partner;
 
 export type InvoiceRow = Pick<InvoiceView, "number" | "status" | "total" | "paid" | "due"> & {

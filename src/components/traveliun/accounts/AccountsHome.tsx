@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BadgePercent, BarChart3, Gavel, Siren, BookOpen, ClipboardCheck, FileSignature, FileText, Landmark, Lock, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgePercent, Gavel, Siren, ClipboardCheck, Landmark, Lock, TrendingUp, Truck, Wallet } from "lucide-react";
 import type { AccountsHomeView } from "@/lib/data/accounts";
-import { TraveliunShell } from "../TraveliunShell";
 import { profitTone } from "../operations/CaseProfitCard";
 import { card, monthName, Num, sar } from "./ui";
 import { EXPENSE_CATEGORY_AR } from "@/lib/accounts/expenses";
@@ -12,12 +11,6 @@ import { EXPENSE_CATEGORY_AR } from "@/lib/accounts/expenses";
 
 export function AccountsHome({ home }: { home: AccountsHomeView }) {
   const actions: [string, string, typeof Wallet][] = [
-    ["/accounts/reports", "التقارير", BarChart3],
-    ["/accounts/invoices", "الفواتير", FileText],
-    ["/accounts/expenses", "المصروفات", Receipt],
-    ["/accounts/suppliers", "الموردون", Truck],
-    ["/accounts/quotes", "عروض الأسعار", FileSignature],
-    ["/accounts/journal", "القيود اليومية", BookOpen],
     ["/operations", "الحالات والدفعات", ClipboardCheck],
     ...(home.reports
       ? ([["/operations/cashflow", "التدفق النقدي", Wallet], ["/operations/profitability", "تقرير الربحية", TrendingUp]] as [string, string, typeof Wallet][])
@@ -26,7 +19,7 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
     ["/financial-terms", "الشروط المالية", Landmark],
   ];
   return (
-    <TraveliunShell title="nav.accounts">
+    <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-5xl space-y-4">
         {/* the month: its net profit first, as «قائمة» opens */}
         <section className={card}>
@@ -180,7 +173,7 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
           </section>
         </div>
       </div>
-    </TraveliunShell>
+    </>
   );
 }
 

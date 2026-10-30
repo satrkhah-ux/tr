@@ -1,0 +1,69 @@
+/*
+  «الحسابات» looks like a financial system of its own, not like Traveliun (the owner, 2026-10-30: «وضعه
+  مختلف تماماً و تنسيقه مختلف تماماً عن النظام كأنه نظام مالي عالمي»). Every screen in the section is
+  drawn with the system's tv-* tokens, so the section re-points those tokens inside .acc-app — deep navy
+  and slate with a cool blue accent, light and dark — and sets its figures in a monospaced face.
+*/
+.acc-app {
+  --tv-surface-canvas: #eef2f8;
+  --tv-surface-raised: #ffffff;
+  --tv-surface-sunken: #f2f5fa;
+  --tv-text-strong: #0b1b33;
+  --tv-text-brand: #1d3f8c;
+  --tv-text-muted: #45577a;
+  --tv-text-faint: #5a6a86;
+  --tv-border-subtle: #e3e9f2;
+  --tv-border-default: #d6deea;
+  --tv-border-strong: #c3cfe0;
+  --tv-action-primary: #13306b;
+  --tv-action-primary-hover: #0c2352;
+  --tv-action-on-primary: #ffffff;
+  --tv-action-focus: #3b82f6;
+  --tv-status-success: #047857;
+  --tv-status-success-bg: #e7f6ef;
+  --tv-status-danger: #c0263d;
+  --tv-status-danger-bg: #fdecef;
+  --tv-status-warning: #92600a;
+  --tv-status-warning-bg: #fdf5e3;
+  --acc-header: #0b1b33;
+  --acc-header-text: #e7eefb;
+  --acc-header-muted: #9fb2d3;
+  --acc-gold: #c9a227;
+  background-color: var(--tv-surface-canvas);
+  color: var(--tv-text-strong);
+}
+.dark .acc-app {
+  --tv-surface-canvas: #070e1b;
+  --tv-surface-raised: #0e192c;
+  --tv-surface-sunken: #12203a;
+  --tv-text-strong: #e7eefb;
+  --tv-text-brand: #8fb4ff;
+  --tv-text-muted: #a5b6d3;
+  --tv-text-faint: #8fa2c2;
+  --tv-border-subtle: #1b2a45;
+  --tv-border-default: #22355a;
+  --tv-border-strong: #2c4370;
+  --tv-action-primary: #3b6fd8;
+  --tv-action-primary-hover: #4d80e6;
+  --tv-action-on-primary: #ffffff;
+  --tv-action-focus: #60a5fa;
+  --tv-status-success: #4ade9b;
+  --tv-status-success-bg: #0c2a20;
+  --tv-status-danger: #f8798d;
+  --tv-status-danger-bg: #2c1018;
+  --tv-status-warning: #f6c463;
+  --tv-status-warning-bg: #2a2110;
+  --acc-header: #050b16;
+}
+/* figures read like a terminal: fixed-width digits, a monospaced face */
+.acc-app .tv-tnum {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  letter-spacing: -0.01em;
+}
+.acc-app .tv-card {
+  background-color: var(--tv-surface-raised);
+  border-color: var(--tv-border-default);
+}
+@media print {
+  .acc-app { background: #ffffff; }
+}

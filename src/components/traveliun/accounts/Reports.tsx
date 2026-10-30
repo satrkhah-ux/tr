@@ -5,7 +5,6 @@ import { useState } from "react";
 import { ArrowRight, BarChart3, Download } from "lucide-react";
 import type { ReportsView } from "@/lib/data/accounts";
 import { toCsv, type ClientDebt } from "@/lib/accounts/reports";
-import { TraveliunShell } from "../TraveliunShell";
 import { card, monthName, Num, sar } from "./ui";
 
 /** «التقارير المالية» (finance.accounts; the loader checks): who owes, whom we pay most, each employee's results. */
@@ -47,7 +46,7 @@ export function ReportsPage({ r }: { r: ReportsView }) {
   const tag = r.period.label || monthName(r.period.key);
 
   return (
-    <TraveliunShell title="nav.accounts">
+    <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-5xl space-y-4">
         <Link href="/accounts" className={back}><ArrowRight className="size-4" />الحسابات</Link>
         <section className={card}>
@@ -142,7 +141,7 @@ export function ReportsPage({ r }: { r: ReportsView }) {
           </section>
         )}
       </div>
-    </TraveliunShell>
+    </>
   );
 }
 

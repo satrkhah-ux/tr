@@ -1,6 +1,6 @@
 "use server";
 
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -8,16 +8,16 @@ import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/serve
 import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "./audit";
 import { fixedCostIn, parseBook, type FinanceBook } from "@/lib/finance/model";
+import { IDLE_MS, makeUnlockToken, unlockTokenValid } from "@/lib/finance/lock";
 
 /**
  * The book is one document; every save appends a version to finance_book_versions (closed table,
  * migration 20261025090000), so the newest row is the book and the rest its history.
  * developer.access, or the owner's own account (FINANCE_ACCOUNTS) — salaries and the partners' shares are not the staff's screen.
  *
- * A password on top (finance_lock, migration 20261025100000): the owner sets it on his first visit,
- * then it is asked once a browser session — the unlock cookie has no expiry, so closing the browser
- * locks the book again. The cookie is an HMAC keyed by the stored hash: a new password locks every
- * open session, and no one can make the cookie without the hash.
+ * A password on top (finance_lock, migration 20261025100000): the owner sets it on his first visit.
+ * The same password opens «الحسابات» (the owner, 2026-10-30: «الدخول بكلمة سر للادارة»), for its staff
+ * too; an unlock lasts 30 minutes from the last use (lib/finance/lock.ts) — a new password ends them all.
  */
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 /** the owner signs in as the administration's own account (2026-10-24); its role is shared with staff, so the ACCOUNT is named, not the role */
@@ -43,19 +43,28 @@ async function lockHash(): Promise<string | null> {
   if (error) return null;
   return (data?.hash as string | undefined) ?? "";
 }
-const token = (hash: string, userId: string) => createHmac("sha256", hash).update(userId).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 async function unlocked(hash: string): Promise<boolean> {
   const user = await getServerUser();
-  const got = (await cookies()).get(COOKIE)?.value;
-  return !!user && !!got && same(got, token(hash, user.id));
+  return !!user && unlockTokenValid((await cookies()).get(COOKIE)?.value, hash, user.id, Date.now());
 }
 async function grant(hash: string) {
   const user = await getServerUser();
   if (!user) return;
-  (await cookies()).set(COOKIE, token(hash, user.id), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/" });
+  (await cookies()).set(COOKIE, makeUnlockToken(hash, user.id, Date.now()), {
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: Math.floor(IDLE_MS / 1000),
+  });
 }
+
+/** who may type the password: the book's owner, or «الحسابات» (finance.accounts) for its section */
+const mayUnlock = async () => (await allowed()) || (await currentCan("finance.accounts"));
+
+// ponytail: in-process attempt counter (one app container) — five wrong passwords, ten minutes' wait;
+// a shared store if the app ever runs on more than one instance
+const failures = new Map<string, { count: number; until: number }>();
+const MAX_TRIES = 5;
+const WAIT_MS = 10 * 60_000;
 
 export type FinanceState = { book: FinanceBook } | { error: string } | { locked: "set" | "ask" };
 
@@ -85,15 +94,50 @@ export async function setFinancePassword(password: string): Promise<{ ok: boolea
 }
 
 export async function unlockFinance(password: string): Promise<{ ok: boolean; error?: string }> {
-  if (!(await allowed())) return { ok: false, error: "لا صلاحية" };
+  if (!(await mayUnlock())) return { ok: false, error: "لا صلاحية" };
+  const user = await getServerUser();
+  if (!user) return { ok: false, error: "لا صلاحية" };
+  const f = failures.get(user.id);
+  if (f && f.count >= MAX_TRIES && f.until > Date.now()) return { ok: false, error: "محاولات كثيرة خاطئة. انتظر عشر دقائق." };
   const hash = await lockHash();
   if (!hash) return { ok: false, error: "تعذّر التحقق. حدّث الصفحة." };
   const [salt, want] = hash.split(":");
-  // ponytail: no attempt counter — developer accounts only, and scrypt makes each guess slow; add one if the role widens
   const got = (await scryptAsync(typeof password === "string" ? password.slice(0, 200) : "", Buffer.from(salt, "hex"), 32)).toString("hex");
-  if (!same(got, want)) return { ok: false, error: "كلمة السر غير صحيحة." };
+  if (!same(got, want)) {
+    const count = (f && f.until > Date.now() ? f.count : 0) + 1;
+    failures.set(user.id, { count, until: Date.now() + WAIT_MS });
+    if (count >= MAX_TRIES) await logAudit({ action: "finance.saved", entity: "finance_lock", entity_id: "1", meta: { password: "locked_out" } });
+    return { ok: false, error: "كلمة السر غير صحيحة." };
+  }
+  failures.delete(user.id);
   await grant(hash);
   return { ok: true };
+}
+
+/**
+ * «الحسابات»'s door (its layout): who may come in and whether the password is open for them now.
+ * "none" — no password set yet and this person cannot set it (only the book's owner can).
+ */
+export async function accountsGate(): Promise<"forbidden" | "error" | "none" | "set" | "ask" | "open"> {
+  const owner = await allowed();
+  if (!owner && !(await currentCan("finance.accounts"))) return "forbidden";
+  const hash = await lockHash();
+  if (hash === null) return "error";
+  if (!hash) return owner ? "set" : "none";
+  return (await unlocked(hash)) ? "open" : "ask";
+}
+
+/** every «الحسابات» loader and action: allowed in AND unlocked now */
+export async function accountsOpen(): Promise<boolean> {
+  return (await accountsGate()) === "open";
+}
+
+/** use renews the unlock (the section's pages call it while someone works); false = it has already run out */
+export async function touchFinanceUnlock(): Promise<boolean> {
+  const hash = await lockHash();
+  if (!hash || !(await mayUnlock()) || !(await unlocked(hash))) return false;
+  await grant(hash);
+  return true;
 }
 
 export async function saveFinance(next: unknown, base: string): Promise<{ ok: true; updatedAt: string } | { ok: false; error: string }> {
@@ -129,4 +173,9 @@ export async function financeFixedCost(month: string): Promise<number | null> {
   if (!book) return null;
   const [y, m] = month.split("-").map(Number);
   return fixedCostIn(book, y, m);
+}
+
+/** «قفل الآن» — ends this browser's unlock at once */
+export async function lockFinanceNow(): Promise<void> {
+  (await cookies()).delete(COOKIE);
 }

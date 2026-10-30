@@ -49,6 +49,9 @@ function BalanceChips({ balances }: { balances: SupplierBalance[] }) {
 /** Where the suppliers' pages sit: under «العمليات», or under «الحسابات» for the financial section (2026-10-30). */
 export type SupplierBase = "/operations/suppliers" | "/accounts/suppliers";
 const inAccounts = (base: SupplierBase) => base === "/accounts/suppliers";
+/** «الحسابات» draws its own frame (app/accounts/layout.tsx); under «العمليات» the system's shell */
+const Frame = ({ base, children }: { base: SupplierBase; children: React.ReactNode }) =>
+  inAccounts(base) ? <>{children}</> : <TraveliunShell title="nav.operations">{children}</TraveliunShell>;
 
 /** /operations/suppliers (and /accounts/suppliers) — every supplier and where its account stands. */
 export function SupplierAccountsList({
@@ -69,7 +72,7 @@ export function SupplierAccountsList({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <TraveliunShell title={inAccounts(base) ? "nav.accounts" : "nav.operations"}>
+    <Frame base={base}>
       <div className="tv-fade-up space-y-4">
         <Link href={inAccounts(base) ? "/accounts" : "/operations"} className={back}>
           <ArrowRight className="size-4 ltr:rotate-180" />
@@ -135,7 +138,7 @@ export function SupplierAccountsList({
           </ul>
         </section>
       </div>
-    </TraveliunShell>
+    </Frame>
   );
 }
 
@@ -149,7 +152,7 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
   const unpaid = bookings.filter((b) => b.status === "confirmed" && !b.is_paid);
 
   return (
-    <TraveliunShell title={inAccounts(base) ? "nav.accounts" : "nav.operations"}>
+    <Frame base={base}>
       <div className="tv-fade-up space-y-4">
         <Link href={base} className={back}>
           <ArrowRight className="size-4 ltr:rotate-180" />
@@ -269,6 +272,6 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
           )}
         </section>
       </div>
-    </TraveliunShell>
+    </Frame>
   );
 }

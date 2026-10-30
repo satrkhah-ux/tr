@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { currentCan } from "@/lib/roles/current";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "./metrics";
 import { logAudit } from "./audit";
+import { accountsOpen } from "./finance";
 import { riyadhDate } from "@/lib/operations/payments";
 import { expenseError } from "@/lib/accounts/expenses";
 
@@ -14,7 +14,7 @@ import { expenseError } from "@/lib/accounts/expenses";
  * Once per case: a second press keeps the first confirmation (who and when).
  */
 export async function confirmInvoice(operationId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await getServerUser()) || !(await currentCan("finance.accounts"))) return { ok: false, error: "لا صلاحية" };
+  if (!(await accountsOpen())) return { ok: false, error: "انتهت الجلسة أو لا صلاحية. أدخل كلمة السر." };
   if (!/^[0-9a-f-]{36}$/.test(operationId)) return { ok: false, error: "فاتورة غير معروفة" };
   const db = createSupabaseServiceClient() as unknown as SupabaseClient;
   const { error } = await db
@@ -27,7 +27,7 @@ export async function confirmInvoice(operationId: string): Promise<{ ok: true } 
   return { ok: true };
 }
 
-const allowed = async () => Boolean(await getServerUser()) && (await currentCan("finance.accounts"));
+const allowed = () => accountsOpen();
 const service = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 /** «أضف مصروفاً» — one company expense (finance.accounts). The amount stays out of the audit, like a supplier payment's. */

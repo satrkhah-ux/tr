@@ -5,7 +5,6 @@ import { useState, useTransition } from "react";
 import { ArrowRight, Receipt, Trash2 } from "lucide-react";
 import { addExpense, deleteExpense } from "@/lib/data/accounts-actions";
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_AR, EXPENSE_METHODS, EXPENSE_METHOD_AR, type Expense } from "@/lib/accounts/expenses";
-import { TraveliunShell } from "../TraveliunShell";
 import { card, monthName, Num, sar } from "./ui";
 
 /** «المصروفات» — the company's spending outside the trips, by month (finance.accounts; the actions check). */
@@ -34,7 +33,7 @@ export function ExpensesView({ data, today }: { data: { month: string; months: s
   };
 
   return (
-    <TraveliunShell title="nav.accounts">
+    <>
       <div dir="rtl" className="tv-fade-up mx-auto max-w-4xl space-y-4">
         <Link href="/accounts" className={back}><ArrowRight className="size-4" />الحسابات</Link>
         <section className={card}>
@@ -105,6 +104,6 @@ export function ExpensesView({ data, today }: { data: { month: string; months: s
           )}
         </section>
       </div>
-    </TraveliunShell>
+    </>
   );
 }
