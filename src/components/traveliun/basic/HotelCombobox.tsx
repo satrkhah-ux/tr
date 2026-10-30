@@ -182,7 +182,7 @@ export function HotelCombobox({
           aria-label={placeholder}
           placeholder={placeholder}
           onBlur={() => setTyped(null)}
-          className={`h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white ${chosen ? "pe-14" : "pe-8"} ps-2.5 text-[12.5px] font-semibold text-[#185045] outline-none focus:border-[#2aa87a] dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}
+          className={`h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white ${chosen ? "pe-14" : "pe-8"} ps-2.5 text-[12.5px] font-semibold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}
         />
         {adding ? (
           <span className="absolute inset-y-0 start-2 flex items-center text-[#2aa87a]" aria-hidden>
@@ -213,15 +213,15 @@ export function HotelCombobox({
         </Combobox.Trigger>
       </div>
       <Combobox.Portal container={unzoomedRoot()}>
-        <Combobox.Positioner sideOffset={4} className="z-[170] outline-none">
-          <Combobox.Popup className={`${ZOOMED_POPUP} min-w-56 overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}>
+        <Combobox.Positioner sideOffset={4} className="z-[170] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
+          <Combobox.Popup className={`${ZOOMED_POPUP} min-w-56 overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}>
             <Combobox.Empty className="px-2 py-2 text-[12px] text-tv-text-faint empty:hidden">{t("noResults")}</Combobox.Empty>
             <Combobox.List>
               {(h: HotelOption) => (
                 <Combobox.Item
                   key={h.id}
                   value={h}
-                  className="flex cursor-pointer select-none items-center gap-2 rounded-[7px] px-2 py-1.5 text-[12.5px] outline-none data-[highlighted]:bg-[#f2f7f5] dark:data-[highlighted]:bg-[#1b2d27]"
+                  className="flex cursor-pointer select-none items-center gap-2 rounded-[7px] px-2 py-1.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus data-[highlighted]:bg-[#f2f7f5] dark:data-[highlighted]:bg-[#1b2d27]"
                 >
                   <span className="flex size-4 shrink-0 items-center justify-center">
                     <Combobox.ItemIndicator>

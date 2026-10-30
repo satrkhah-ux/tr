@@ -105,7 +105,7 @@ export function SendAllRequests({ operationId }: { operationId: string }) {
                   onChange={(e) => setBodies((prev) => ({ ...prev, [d.supplierId]: e.target.value }))}
                   rows={8}
                   dir="auto"
-                  className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+                  className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
                 />
                 <div className="flex flex-wrap gap-2">
                   <button

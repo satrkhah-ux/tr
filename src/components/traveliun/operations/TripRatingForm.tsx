@@ -50,7 +50,7 @@ export function TripRatingForm({ token, rated }: { token: string; rated: number 
           rows={4}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          className="w-full rounded-[10px] border border-[#dbe6e1] p-3 text-[14px] text-[#185045] outline-none focus:border-[#2aa87a]"
+          className="w-full rounded-[10px] border border-[#dbe6e1] p-3 text-[14px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
         />
       </label>
       {message ? <p className="text-[12.5px] font-bold text-[#c22850]">{message}</p> : null}

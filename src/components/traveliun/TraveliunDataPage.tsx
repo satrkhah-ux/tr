@@ -308,7 +308,7 @@ function SearchBox({ value, onChange }: { value: string; onChange: (value: strin
     <div className="relative h-[46px] w-full max-w-[250px]">
       <Search className="absolute end-3 top-1/2 size-6 -translate-y-1/2 text-tv-text-faint" />
       <input
-        className="h-full w-full rounded-md border border-[#e7ece9] bg-[#edf2ef] pe-[95px] ps-4 text-sm text-[#557d78] outline-none placeholder:text-[#9cafaa] focus:border-[#b7c8c2]"
+        className="h-full w-full rounded-md border border-[#e7ece9] bg-[#edf2ef] pe-[95px] ps-4 text-sm text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus placeholder:text-[#9cafaa] focus:border-[#b7c8c2]"
         placeholder={t("searchPlaceholder")}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -479,7 +479,7 @@ function AddRecordModal({
             <label key={column.key} className="grid gap-2 text-sm font-semibold">
               <span>{columnLabel(t, column.label)}</span>
               <input
-                className="h-11 rounded-md border border-[#d8e3de] bg-[#f8fbf9] px-3 text-sm font-normal text-[#185045] outline-none transition-colors focus:border-[#185045]"
+                className="h-11 rounded-md border border-[#d8e3de] bg-[#f8fbf9] px-3 text-sm font-normal text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]"
                 value={form[column.key] ?? ""}
                 onChange={(event) => setForm((current) => ({ ...current, [column.key]: event.target.value }))}
               />
@@ -657,7 +657,7 @@ function EmployeeModal({
               <span>{t("legacy.permission")}</span>
               <button
                 type="button"
-                className={`flex h-[48px] items-center justify-between rounded-[7px] border bg-white px-4 text-[13px] font-normal outline-none transition-colors ${
+                className={`flex h-[48px] items-center justify-between rounded-[7px] border bg-white px-4 text-[13px] font-normal outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors ${
                   rolesOpen ? "border-[#0478b8] shadow-[0_0_0_1px_#0478b8]" : "border-[#e2d8d4]"
                 }`}
                 onClick={() => setRolesOpen((value) => !value)}
@@ -743,7 +743,7 @@ function EmployeeInput({
       </span>
       <input
         type={type}
-        className="h-[48px] rounded-[7px] border border-[#e2d8d4] bg-white px-4 text-start text-[13px] font-normal text-[#185045] outline-none transition-colors focus:border-[#96d18a]"
+        className="h-[48px] rounded-[7px] border border-[#e2d8d4] bg-white px-4 text-start text-[13px] font-normal text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#96d18a]"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -936,7 +936,7 @@ function RoleInput({
         {required ? <span className="text-[#ff4868]">*</span> : null} {label}
       </span>
       <input
-        className="h-[48px] rounded-[7px] border border-[#e2d8d4] bg-white px-4 text-start text-[13px] font-normal text-[#185045] outline-none transition-colors focus:border-[#96d18a]"
+        className="h-[48px] rounded-[7px] border border-[#e2d8d4] bg-white px-4 text-start text-[13px] font-normal text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#96d18a]"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { confirmViaSupplierLink } from "@/lib/data/public-links";
 
-const field = "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[14px] text-[#185045] outline-none focus:border-[#2aa87a]";
+const field = "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[14px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const label = "grid gap-1.5 text-[12.5px] font-bold text-[#185045]";
 
 /**

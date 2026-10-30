@@ -84,7 +84,7 @@ export function PayLinkTools({ draftId }: { draftId: string }) {
           placeholder={t("pay.link.amount")}
           aria-label={t("pay.link.amount")}
           dir="ltr"
-          className="h-9 min-w-0 flex-1 basis-40 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] outline-none focus:border-[#2aa87a]"
+          className="h-9 min-w-0 flex-1 basis-40 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
         />
         <button type="button" disabled={pending} onClick={copy} className={outline}>
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -108,7 +108,7 @@ export function PayLinkTools({ draftId }: { draftId: string }) {
             onChange={(e) => setBody(e.target.value)}
             rows={4}
             dir="auto"
-            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <button
             type="button"

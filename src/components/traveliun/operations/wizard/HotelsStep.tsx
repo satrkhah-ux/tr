@@ -436,7 +436,7 @@ function HotelEntry({
             dir="auto"
             autoFocus
             placeholder={t("wz.hotels.paste")}
-            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div>
             <button type="button" disabled={pending || text.trim().length <= 10} onClick={() => read(null, text)} className={wzSecondary}>

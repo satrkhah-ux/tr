@@ -177,7 +177,7 @@ export function OfferPreviewToolbar({
           value={brandId ?? "ours"}
           disabled={pending}
           onChange={(e) => void pickBrand(e.target.value)}
-          className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12.5px] font-bold text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60"
+          className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12.5px] font-bold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] disabled:opacity-60"
         >
           <option value="ours">ترافليون</option>
           {resellers.map((r) => (

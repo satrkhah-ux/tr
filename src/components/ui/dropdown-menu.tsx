@@ -38,11 +38,11 @@ function DropdownMenuContent({
 }) {
   return (
     <MenuPrimitive.Portal container={unzoomedRoot()}>
-      <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-[120] outline-none">
+      <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-[120] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            "[zoom:var(--tv-zoom)] min-w-[11rem] w-[max-content] max-w-[min(340px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] rounded-md border border-[#d9e0dc] bg-white p-1.5 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
+            "[zoom:var(--tv-zoom)] min-w-[11rem] w-[max-content] max-w-[min(340px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] rounded-md border border-[#d9e0dc] bg-white p-1.5 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus",
             "transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0",
             "dark:border-[#294039] dark:bg-[#14231f] dark:text-[#eaf3ef]",
             className,
@@ -61,7 +61,7 @@ function DropdownMenuItem({ className, ...props }: React.ComponentProps<typeof M
     <MenuPrimitive.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "flex cursor-pointer select-none items-center gap-2.5 rounded-[7px] px-3 py-2 text-sm font-medium text-[#185045] outline-none transition-colors",
+        "flex cursor-pointer select-none items-center gap-2.5 rounded-[7px] px-3 py-2 text-sm font-medium text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors",
         "data-[highlighted]:bg-[#f2f7f5] data-[highlighted]:text-[#185045] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         "dark:text-[#d6e5df] dark:data-[highlighted]:bg-[#1b2d27]",
         className,
@@ -81,7 +81,7 @@ function DropdownMenuCheckboxItem({
       data-slot="dropdown-menu-checkbox-item"
       closeOnClick={false}
       className={cn(
-        "flex cursor-pointer select-none items-center gap-2.5 rounded-[7px] py-2 pe-3 ps-2 text-sm font-medium text-[#185045] outline-none transition-colors",
+        "flex cursor-pointer select-none items-center gap-2.5 rounded-[7px] py-2 pe-3 ps-2 text-sm font-medium text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors",
         "data-[highlighted]:bg-[#f2f7f5] dark:text-[#d6e5df] dark:data-[highlighted]:bg-[#1b2d27]",
         className,
       )}

@@ -33,7 +33,7 @@ import { useSafeTransition } from "../useSafeTransition";
  */
 
 const field =
-  "h-10 w-full rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "h-10 w-full rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const btn =
   "inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold transition-colors disabled:opacity-60";
 

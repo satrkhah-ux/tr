@@ -9,7 +9,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
 const field =
-  "h-10 w-full min-w-0 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "h-10 w-full min-w-0 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 
 type Row = { no: string; supplier: string; net: string };
 

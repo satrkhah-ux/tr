@@ -152,7 +152,7 @@ export function OfferSend({
             onChange={(e) => setBody(e.target.value)}
             rows={Math.min(Math.max(body.split("\n").length + 1, 6), 14)}
             aria-label={tx("sendTitle")}
-            className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus:border-[#2aa87a]"
+            className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           {blockedText ? (
             <p className="text-[11.5px] font-bold text-[#a86a10]">{blockedText}</p>

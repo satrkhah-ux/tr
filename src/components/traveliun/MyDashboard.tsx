@@ -153,7 +153,7 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
               }}
               placeholder={t("dash.mine.search")}
               aria-label={t("dash.mine.search")}
-              className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] pe-3 ps-9 text-[13px] font-semibold text-[#185045] outline-none focus:border-[#2aa87a]"
+              className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] pe-3 ps-9 text-[13px] font-semibold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </label>
         </div>

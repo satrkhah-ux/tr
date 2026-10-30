@@ -19,7 +19,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
 const field =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 
 /** The option «الكل» stands for — it opens the list, it assigns nobody. */
 const ALL = "__all";
@@ -190,7 +190,7 @@ export function AssignBooking({
             onChange={(e) => setBody(e.target.value)}
             rows={10}
             dir="auto"
-            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div className="flex flex-wrap gap-2">
             <button

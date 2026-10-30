@@ -278,7 +278,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
     ...[...stageBy.keys()].filter((k) => !STAGE_LABEL_KEY.has(k)).map((k) => ({ key: k, label: k, value: stageBy.get(k) ?? 0 })),
   ].filter((d) => d.value > 0).map(({ label, value }) => ({ label, value }));
 
-  const selectClass = "h-10 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm font-semibold text-[#185045] outline-none focus:border-[#2aa87a]";
+  const selectClass = "h-10 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm font-semibold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 
   return (
     <>

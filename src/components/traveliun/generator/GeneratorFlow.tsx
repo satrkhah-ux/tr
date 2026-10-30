@@ -324,7 +324,7 @@ export function GeneratorFlow({
                     <h2
                       data-flow-heading
                       tabIndex={-1}
-                      className="text-[13px] font-extrabold text-[#185045] outline-none"
+                      className="text-[13px] font-extrabold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
                     >
                       {t(meta.labelKey)}
                     </h2>

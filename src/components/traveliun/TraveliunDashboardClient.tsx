@@ -435,7 +435,7 @@ function TeamOperations() {
             value={selected ? selected.name : query}
             onChange={(e) => { setSelected(null); setQuery(e.target.value); }}
             placeholder={t("dash.searchEmployee")}
-            className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus:border-[#2aa87a]"
+            className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           {!selected && options.length > 0 ? (
             <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-[11px] border border-[#e2ebe7] bg-white shadow-lg">
@@ -458,7 +458,7 @@ function TeamOperations() {
         <Popover open={customizing} onOpenChange={setCustomizing}>
           <PopoverTrigger
             render={
-              <button type="button" className="me-auto inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] outline-none hover:bg-[#f4f8f6] data-[popup-open]:border-[#2aa87a]">
+              <button type="button" className="me-auto inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus hover:bg-[#f4f8f6] data-[popup-open]:border-[#2aa87a]">
                 <SlidersHorizontal className="size-4" /> {t("dash.customize")}
               </button>
             }

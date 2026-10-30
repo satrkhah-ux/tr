@@ -350,7 +350,7 @@ export function TraveliunTable({
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={t("searchPlaceholder")}
                 aria-label={t("searchPlaceholder")}
-                className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none transition-colors focus:border-[#2aa87a]"
+                className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]"
               />
             </div>
             <button
@@ -842,7 +842,7 @@ function Footer({
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
           aria-label={t("data.tools.pageSize")}
-          className="h-[34px] rounded-md border border-[#dbe6e1] bg-white px-2 text-sm text-[#185045] outline-none"
+          className="h-[34px] rounded-md border border-[#dbe6e1] bg-white px-2 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
         >
           {PAGE_SIZES.map((size) => (
             <option key={size} value={size}>{size}</option>
@@ -1355,8 +1355,8 @@ function minWidthClass(width?: string): string {
 }
 
 const fieldClass =
-  "flex h-[46px] items-center rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#557d78] outline-none transition-colors focus:border-[#2aa87a]";
+  "flex h-[46px] items-center rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]";
 const formField =
-  "h-11 rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 text-sm font-normal text-[#185045] outline-none transition-colors focus:border-[#185045]";
+  "h-11 rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 text-sm font-normal text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]";
 const formArea =
-  "min-h-[180px] w-full resize-y rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 py-2.5 text-sm font-normal leading-7 text-[#185045] outline-none transition-colors focus:border-[#185045]";
+  "min-h-[180px] w-full resize-y rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 py-2.5 text-sm font-normal leading-7 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]";

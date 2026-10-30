@@ -22,7 +22,7 @@ import { useSafeTransition } from "../../useSafeTransition";
 
 export const wzCard = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 export const wzField =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 export const wzLabel = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 export const wzPrimary =
   "inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-60";
@@ -88,7 +88,7 @@ export function PaperReader({
             disabled={busy}
             rows={4}
             dir="auto"
-            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
         </label>
       )}
@@ -430,7 +430,7 @@ function FlightCard({
                 rows={Math.max(2, travelers)}
                 dir="ltr"
                 placeholder="065-2400000001"
-                className="tv-tnum block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]"
+                className="tv-tnum block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
               />
               <span className="font-semibold text-tv-text-faint">{t("wz.flights.ticketsHint")}</span>
               {travelers > 0 && ticketCount !== travelers ? (

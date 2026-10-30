@@ -266,11 +266,11 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
           <div className="grid gap-2 md:grid-cols-2">
             {services.map((service, index) => (
               <div key={index} className="flex items-center gap-2 rounded-[10px] border border-[#e2ebe7] p-2">
-                <select value={service.kind} onChange={(e) => updateService(index, { kind: e.target.value as "include" | "exclude" })} className="h-10 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-xs font-bold text-[#185045] outline-none">
+                <select value={service.kind} onChange={(e) => updateService(index, { kind: e.target.value as "include" | "exclude" })} className="h-10 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-xs font-bold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
                   <option value="include">{t("builder.include")}</option>
                   <option value="exclude">{t("builder.exclude")}</option>
                 </select>
-                <input value={service.label} onChange={(e) => updateService(index, { label: e.target.value })} placeholder={t("builder.serviceName")} className="h-10 flex-1 rounded-[8px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]" />
+                <input value={service.label} onChange={(e) => updateService(index, { label: e.target.value })} placeholder={t("builder.serviceName")} className="h-10 flex-1 rounded-[8px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]" />
                 <RemoveButton onClick={() => setServices((prev) => prev.filter((_, i) => i !== index))} />
               </div>
             ))}
@@ -278,7 +278,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
         </Panel>
 
         <Panel title={t("builder.terms")} icon={FileText}>
-          <textarea value={terms} onChange={(e) => setTerms(e.target.value)} placeholder={t("builder.termsPlaceholder")} className="h-28 w-full rounded-[11px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#0f3d38] outline-none focus:border-[#2aa87a]" />
+          <textarea value={terms} onChange={(e) => setTerms(e.target.value)} placeholder={t("builder.termsPlaceholder")} className="h-28 w-full rounded-[11px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]" />
         </Panel>
 
         <Panel title={t("builder.finalPrice")}>
@@ -410,5 +410,5 @@ function Empty({ text }: { text: string }) {
   return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">{text}</p>;
 }
 
-const field = "h-[46px] rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#0f3d38] outline-none transition-colors focus:border-[#2aa87a]";
-const fieldSm = "h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#0f3d38] outline-none transition-colors focus:border-[#2aa87a]";
+const field = "h-[46px] rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]";
+const fieldSm = "h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]";

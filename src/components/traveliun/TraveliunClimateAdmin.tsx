@@ -85,9 +85,9 @@ export function TraveliunClimateAdmin({ cities }: { cities: ClimateCity[] }) {
   }
 
   const numField =
-    "tv-tnum h-10 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-center text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
-  const selField = "h-10 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
-  const textField = "h-10 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+    "tv-tnum h-10 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-center text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+  const selField = "h-10 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+  const textField = "h-10 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 
   return (
     <TraveliunShell title="nav.climate">

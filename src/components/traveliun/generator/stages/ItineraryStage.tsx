@@ -393,7 +393,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           }
           rows={4}
           placeholder={t("pg.itin.activitiesPlaceholder")}
-          className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm leading-6 text-[#185045] outline-none transition-colors focus:border-[#2aa87a]"
+          className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]"
         />
       </label>
 

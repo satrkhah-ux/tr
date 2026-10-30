@@ -75,7 +75,7 @@ export function AlmatarThread({
           maxLength={2000}
           rows={2}
           placeholder="اكتب رسالتك…"
-          className="min-h-[44px] flex-1 rounded-[10px] border border-[#d9d9de] bg-white px-3 py-2 text-[13px] outline-none"
+          className="min-h-[44px] flex-1 rounded-[10px] border border-[#d9d9de] bg-white px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
         />
         <button type="submit" disabled={pending || !body.trim()} className={`inline-flex h-11 items-center gap-1.5 rounded-[10px] px-4 text-[13px] font-bold disabled:opacity-50 ${mine}`}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} إرسال

@@ -119,7 +119,7 @@ const cell =
   "relative flex min-h-[64px] min-w-0 items-center gap-2.5 rounded-[13px] border border-[#e0ebe7] bg-white px-3.5 py-2 focus-within:border-[#2aa87a] focus-within:bg-[#f7fbf9]";
 const cellLabel = "block text-[10.5px] font-bold text-tv-text-faint";
 const cellInput =
-  "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[13px] font-bold text-[#123e3a] outline-none placeholder:text-[#9bb0ac]";
+  "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[13px] font-bold text-[#123e3a] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus placeholder:text-[#9bb0ac]";
 
 export function FlightBuilder({
   airports = { home: [], dest: [] },

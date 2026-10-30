@@ -137,7 +137,7 @@ function AgreedPrice({ data, canManage }: Pick<StepProps, "data" | "canManage">)
             value={value}
             onChange={(e) => setValue(e.target.value)}
             aria-label={t("wz.pay.agreed.title")}
-            className="tv-tnum h-10 w-40 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-center text-[14px] font-extrabold text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="tv-tnum h-10 w-40 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-center text-[14px] font-extrabold text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <span className="text-[12px] font-bold text-[#557d78]">{currency}</span>
           {changed ? (

@@ -45,7 +45,7 @@ export function PaymentPriceCalculator() {
         onChange={(e) => setBase(e.target.value)}
         placeholder={t("pay.calc.base")}
         aria-label={t("pay.calc.base")}
-        className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus:border-[var(--tv-brand)]"
+        className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[var(--tv-brand)]"
       />
       {quotes.length > 0 ? (
         <ul className="mt-2 grid gap-1">

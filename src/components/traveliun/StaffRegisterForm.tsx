@@ -18,7 +18,7 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  */
 
 const field =
-  "h-[46px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-sm outline-none transition-colors focus:border-[#185045]";
+  "h-[46px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]";
 const label = "block text-[13px] font-medium text-[#003c3a]";
 
 type Form = {
@@ -102,7 +102,7 @@ export function StaffRegisterForm() {
                   maxLength={500}
                   value={form.note}
                   onChange={set("note")}
-                  className="w-full rounded-[8px] border border-[#ead8d2] p-3 text-sm outline-none transition-colors focus:border-[#185045]"
+                  className="w-full rounded-[8px] border border-[#ead8d2] p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]"
                 />
               </label>
 

@@ -375,7 +375,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
             onChange={(e) => setDesign(e.target.value)}
             placeholder="https://drive.google.com/..."
             dir="ltr"
-            className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus:border-[#2aa87a]"
+            className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div className="flex items-center gap-2">
             <button

@@ -19,7 +19,7 @@ import { loginEmail } from "@/lib/almatar/rules";
  * leaving them on a screen that will not load.
  */
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 
 export function PartnerSignIn() {
   const router = useRouter();

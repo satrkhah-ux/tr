@@ -72,7 +72,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
               value={pct ?? ""}
               placeholder="—"
               onChange={(e) => setPct(e.target.value === "" ? null : Number(e.target.value))}
-              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </label>
           <button
@@ -108,7 +108,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
               dir="ltr"
               value={usd}
               onChange={(e) => setUsd(Number(e.target.value))}
-              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </label>
           <button

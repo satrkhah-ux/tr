@@ -14,7 +14,7 @@ import { TraveliunShell } from "../TraveliunShell";
  */
 type Draft = Partial<Integration> & { name: string; kind: IntegrationKind };
 const EMPTY: Draft = { name: "", kind: "api" };
-const FIELD = "h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+const FIELD = "h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const ERRORS: Record<string, string> = {
   secret_value: "لا تُكتب قيمة السر هنا — اسم المتغير أو مسار الملف فقط",
   duplicate: "يوجد سطر بهذا الاسم",

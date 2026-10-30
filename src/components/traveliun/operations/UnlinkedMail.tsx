@@ -77,7 +77,7 @@ function MailRow({
           }}
           placeholder={t("ops.mail.pickHint")}
           ariaLabel={t("ops.mail.pickHint")}
-          className="h-9 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]"
+          className="h-9 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
         />
       </div>
       <button

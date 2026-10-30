@@ -241,7 +241,7 @@ export function TempPassword({
         aria-label={t("emp.tempPassword")}
         autoComplete="new-password"
         spellCheck={false}
-        className="h-9 w-56 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-start text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]"
+        className="h-9 w-56 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-start text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
       />
       <button
         type="button"

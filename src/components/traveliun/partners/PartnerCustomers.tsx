@@ -32,7 +32,7 @@ export function PartnerCustomers({ customers }: { customers: PartnerCustomer[] }
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="ابحث بالاسم أو الجوال أو العرض"
-              className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white ps-9 pe-3 text-[13px] font-semibold text-[#185045] outline-none focus:border-[var(--tv-brand)] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]"
+              className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white ps-9 pe-3 text-[13px] font-semibold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[var(--tv-brand)] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]"
             />
           </label>
         </header>

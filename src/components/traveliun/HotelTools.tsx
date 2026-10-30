@@ -236,7 +236,7 @@ export function HotelMergeDialog({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("data.tools.merge.searchTarget")}
             aria-label={t("data.tools.merge.searchTarget")}
-            className="h-10 w-full rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] pe-9 ps-3 text-sm outline-none focus:border-[#185045]"
+            className="h-10 w-full rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] pe-9 ps-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#185045]"
           />
         </div>
         {query.trim().length >= 2 && found.length > 0 ? (

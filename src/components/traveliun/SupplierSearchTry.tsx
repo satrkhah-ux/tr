@@ -19,7 +19,7 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
 import { TraveliunShell } from "./TraveliunShell";
 
 const fieldClass =
-  "h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#0f3d38] outline-none focus:border-[#2aa87a] disabled:opacity-60";
+  "h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] disabled:opacity-60";
 const labelClass = "grid gap-1 text-[12px] font-bold text-[#185045]";
 
 const NATIONALITIES = [

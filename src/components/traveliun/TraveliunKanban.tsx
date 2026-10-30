@@ -114,7 +114,7 @@ export function TraveliunKanban() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("searchPlaceholder")}
-              className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus:border-[#2aa87a]"
+              className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </div>
           {savingId ? (

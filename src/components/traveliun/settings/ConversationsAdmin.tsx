@@ -13,7 +13,7 @@ import { TraveliunShell } from "../TraveliunShell";
  * Teletel conversations nobody answers, and the closings themselves — who
  * closed each one and where it went when the client wrote again.
  */
-const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const CARD = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const H = "text-[14px] font-extrabold text-[#0f3d38]";
 const BTN = "inline-flex h-9 items-center gap-1.5 rounded-[8px] px-3 text-[12.5px] font-bold disabled:opacity-50";

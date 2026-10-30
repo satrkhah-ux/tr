@@ -788,7 +788,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
           className="fixed inset-0 z-[160] backdrop-blur-[2px] transition-opacity duration-150 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
           style={{ background: "rgba(4,30,27,0.42)" }}
         />
-        <PaletteDialog.Popup className="tv-pop fixed left-1/2 top-[calc(12vh/var(--tv-zoom))] z-[170] h-fit w-[min(560px,calc(92vw/var(--tv-zoom)))] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(0,40,36,0.4)] outline-none transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 dark:bg-[#14231f]">
+        <PaletteDialog.Popup className="tv-pop fixed left-1/2 top-[calc(12vh/var(--tv-zoom))] z-[170] h-fit w-[min(560px,calc(92vw/var(--tv-zoom)))] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(0,40,36,0.4)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 dark:bg-[#14231f]">
           <div className="flex items-center gap-[11px] border-b border-[#eef2f0] px-[18px] py-[15px] dark:border-[#294039]">
             <Search className="size-[18px] text-tv-text-faint" />
             <input
@@ -797,7 +797,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("palettePlaceholder")}
-              className="flex-1 bg-transparent text-[15px] text-[#0f3d38] outline-none placeholder:text-[#9cafaa] dark:text-[#eaf3ef]"
+              className="flex-1 bg-transparent text-[15px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus placeholder:text-[#9cafaa] dark:text-[#eaf3ef]"
             />
             <kbd className="rounded-md border border-[#e2ebe7] bg-[#f1f5f3] px-2 py-[3px] text-[11px] font-bold text-tv-text-faint dark:border-[#294039] dark:bg-[#1b2d27]">
               ESC
@@ -1124,10 +1124,10 @@ function CalculatorPanel() {
             dir="ltr"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus:border-[var(--tv-brand)]"
+            className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[var(--tv-brand)]"
           />
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <select value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none">
+            <select value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
               {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
             <button
@@ -1138,7 +1138,7 @@ function CalculatorPanel() {
             >
               ⇄
             </button>
-            <select value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none">
+            <select value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
               {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
           </div>

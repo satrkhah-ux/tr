@@ -29,7 +29,7 @@ import { ClientPassportReview, useClientPassports } from "./ClientPassportReview
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 const smallBtn =
   "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
@@ -458,7 +458,7 @@ function TravelerRow({
             const status = e.target.value as VisaStatus;
             call(() => setTravelerVisa(traveler.id, status), () => router.refresh());
           }}
-          className="h-8 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60"
+          className="h-8 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] disabled:opacity-60"
         >
           {VISA_STATUSES.map((s) => (
             <option key={s} value={s}>

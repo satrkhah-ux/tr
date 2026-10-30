@@ -12,7 +12,7 @@ import { TraveliunShell } from "../TraveliunShell";
  * their ads, their links — and a monitor that shows every screen live, side by
  * side like security cameras, in the order they hang on the wall.
  */
-const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const CARD = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const H = "text-[14px] font-extrabold text-[#0f3d38]";
 

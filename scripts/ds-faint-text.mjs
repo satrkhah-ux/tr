@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const OKX = /^src[\\/](app[\\/](wallet|trade|markets|p2p|login|signup|support)|components[\\/][^\\/]+\.tsx$)/;
+const OKX = /^src[\\/](app[\\/](wallet|trade|markets|p2p|login|signup|support|admin|about|affiliate|app|careers|contact|copy-trading|forgot-password|kyc|law-enforcement)|components[\\/][^\\/]+\.tsx$)/;
 const lum = (h) => { const c = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const onWhite = (h) => 1.05 / (lum(h) + 0.05);
 function hs(hex) {

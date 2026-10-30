@@ -137,7 +137,7 @@ export function ChangePasswordDialog({
                 onChange={(event) => setPassword(event.target.value)}
                 disabled={loading}
                 autoComplete="new-password"
-                className="h-11 rounded-[10px] border border-[#d9e3df] bg-white px-3 text-start text-sm font-normal outline-none transition-colors focus:border-[#2aa87a]"
+                className="h-11 rounded-[10px] border border-[#d9e3df] bg-white px-3 text-start text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]"
               />
             </label>
             <label className="grid gap-2 text-[13px] font-bold">
@@ -149,7 +149,7 @@ export function ChangePasswordDialog({
                 onChange={(event) => setConfirm(event.target.value)}
                 disabled={loading}
                 autoComplete="new-password"
-                className="h-11 rounded-[10px] border border-[#d9e3df] bg-white px-3 text-start text-sm font-normal outline-none transition-colors focus:border-[#2aa87a]"
+                className="h-11 rounded-[10px] border border-[#d9e3df] bg-white px-3 text-start text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]"
               />
             </label>
 

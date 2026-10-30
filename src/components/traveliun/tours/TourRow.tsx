@@ -365,7 +365,7 @@ export function TourRow({
               disabled={pick.free}
               onChange={(e) => onChange({ text: e.target.value })}
               rows={2}
-              className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none transition-colors focus:border-[#2aa87a] disabled:bg-[#f4f7f6]"
+              className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a] disabled:bg-[#f4f7f6]"
             />,
             true,
           )
@@ -392,7 +392,7 @@ export function TourRow({
               value={pick.text}
               onChange={(e) => onChange({ text: e.target.value })}
               rows={3}
-              className="mt-1 w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[12.5px] leading-6 text-[#185045] outline-none focus:border-[#2aa87a]"
+              className="mt-1 w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[12.5px] leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           ) : null}
         </div>

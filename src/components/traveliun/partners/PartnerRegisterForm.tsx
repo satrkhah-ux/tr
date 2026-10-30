@@ -16,7 +16,7 @@ import { DOCUMENT_KINDS, DOCUMENT_LABEL, PARTNER_TERMS } from "@/lib/partners/re
  */
 
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 export function PartnerRegisterForm() {
@@ -157,7 +157,7 @@ export function PartnerRegisterForm() {
           rows={3}
           value={form.note}
           onChange={set("note")}
-          className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+          className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
         />
       </label>
 

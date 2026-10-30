@@ -21,7 +21,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
-const field = "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+const field = "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 const chip = (on: boolean) =>
   `inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-[#e9f7f0] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"}`;

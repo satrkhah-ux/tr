@@ -27,7 +27,7 @@ const cell =
   "relative flex min-h-[70px] min-w-0 items-center gap-2.5 border-e border-[#e0ebe7] px-4 py-2.5 transition-colors last:border-e-0 focus-within:rounded-[13px] focus-within:bg-[#f7fbf9]";
 const cellLabel = "block text-[9.5px] font-bold text-tv-text-faint whitespace-nowrap";
 const cellInput =
-  "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[12px] font-bold text-[#123e3a] outline-none placeholder:text-[#9bb0ac]";
+  "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[12px] font-bold text-[#123e3a] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus placeholder:text-[#9bb0ac]";
 
 export function HotelSearchBar({
   cityName,

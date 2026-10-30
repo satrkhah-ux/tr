@@ -40,12 +40,12 @@ function PopoverContent({
         side={side}
         align={align}
         sideOffset={sideOffset}
-        className="z-[120] outline-none"
+        className="z-[120] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
       >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "[zoom:var(--tv-zoom)] max-h-[calc(var(--available-height)/var(--tv-zoom))] w-[min(360px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-4 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
+            "[zoom:var(--tv-zoom)] max-h-[calc(var(--available-height)/var(--tv-zoom))] w-[min(360px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-4 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus",
             "transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0",
             "dark:border-[#294039] dark:bg-[#14231f] dark:text-[#eaf3ef]",
             className,
