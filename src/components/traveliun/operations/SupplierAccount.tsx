@@ -240,7 +240,7 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
             <button
               type="button"
               onClick={() => setPaying((v) => !v)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold max-sm:min-h-10"
             >
               <Wallet className="size-3.5" />
               {t("ops.sup.pay")}

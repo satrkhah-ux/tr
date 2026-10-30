@@ -116,7 +116,7 @@ export function ImportStage({ draftId, data, patch, flush }: RepackageStageProps
             <button
               type="button"
               onClick={() => router.push(stageHref(draftId, "review"))}
-              className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold transition-colors max-sm:min-h-10"
             >
               {t("rp.stage.review")}
             </button>
@@ -161,7 +161,7 @@ export function ImportStage({ draftId, data, patch, flush }: RepackageStageProps
                 key={s.id}
                 type="button"
                 onClick={() => setSupplier(s.name)}
-                className="rounded-full border border-dashed border-[#b7d0c7] px-2.5 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                className="rounded-full border border-dashed border-[#b7d0c7] px-2.5 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
               >
                 {s.name}
               </button>
@@ -244,7 +244,7 @@ export function ImportStage({ draftId, data, patch, flush }: RepackageStageProps
           type="button"
           onClick={submit}
           disabled={!ready || loading}
-          className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : imported ? <RefreshCw className="size-4" /> : <FileUp className="size-4" />}
           {loading ? t("rp.import.uploading") : imported ? t("rp.import.reimport") : t("rp.import.upload")}

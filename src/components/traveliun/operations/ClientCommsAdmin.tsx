@@ -127,7 +127,7 @@ function TemplateRow({ template, waStatus }: { template: MessageTemplate; waStat
         className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-[13px] text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]"
       />
       <div className="mt-2 flex items-center gap-2">
-        <button type="button" disabled={pending} onClick={() => save({ body, enabled })} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60">
+        <button type="button" disabled={pending} onClick={() => save({ body, enabled })} className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10">
           {pending ? <Loader2 className="size-4 animate-spin" /> : null}
           حفظ النص
         </button>

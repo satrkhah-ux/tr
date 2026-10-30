@@ -142,7 +142,7 @@ export function OfferPreviewToolbar({
           type="button"
           onClick={() => void onPublish()}
           disabled={publishing}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold transition-colors disabled:opacity-60"
         >
           {publishing ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           {publishedVersion != null ? "إعادة النشر" : "نشر وإرسال"}

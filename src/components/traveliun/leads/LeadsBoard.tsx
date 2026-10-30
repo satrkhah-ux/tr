@@ -511,7 +511,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11.5px] font-bold text-tv-text-faint">المدة:</span>
             {RANGES.map(([r, label]) => (
-              <button key={r} type="button" onClick={() => setRange(r)} className={`h-7 rounded-full px-3 text-[11.5px] font-bold ${range === r ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045]"}`}>
+              <button key={r} type="button" onClick={() => setRange(r)} className={`h-7 rounded-full px-3 text-[11.5px] font-bold max-sm:min-h-10 ${range === r ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045]"}`}>
                 {label}
               </button>
             ))}
@@ -557,18 +557,18 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               العملاء والمحادثات
             </h1>
             <div className="flex items-center gap-1.5">
-              <button type="button" aria-label="اليوم السابق" onClick={() => setDay(shiftDay(day, -1))} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6]">
+              <button type="button" aria-label="اليوم السابق" onClick={() => setDay(shiftDay(day, -1))} className="tv-btn-secondary inline-flex size-8 items-center justify-center rounded-[8px] border max-sm:min-h-10 max-sm:min-w-10">
                 <ChevronRight className="size-4" />
               </button>
               <input type="date" value={day} max={today} onChange={(e) => e.target.value && setDay(e.target.value)} className={`${CELL} w-36`} />
-              <button type="button" aria-label="اليوم التالي" disabled={day >= today} onClick={() => setDay(shiftDay(day, 1))} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-40">
+              <button type="button" aria-label="اليوم التالي" disabled={day >= today} onClick={() => setDay(shiftDay(day, 1))} className="tv-btn-secondary inline-flex size-8 items-center justify-center rounded-[8px] border disabled:opacity-40 max-sm:min-h-10 max-sm:min-w-10">
                 <ChevronLeft className="size-4" />
               </button>
               <button
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void run("pull", pullLeadsNow)}
-                className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[8px] border border-[#cfe0d9] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+                className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
               >
                 {busy === "pull" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {live ? "تحديث الآن" : "تحديث من الشيت"}
@@ -878,7 +878,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               {INQUIRIES.map((i) => <option key={i.label}>{i.label}</option>)}
             </select>
             <input placeholder={HEADERS.destination} value={draft.destination} onChange={(e) => setDraft({ ...draft, destination: e.target.value })} className={CELL} />
-            <button type="submit" disabled={busy !== null} className="inline-flex h-8 items-center justify-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
+            <button type="submit" disabled={busy !== null} className="tv-btn-primary inline-flex h-8 items-center justify-center gap-1 rounded-[8px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10">
               {busy === "add" ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
               تسجيل محادثة
             </button>
@@ -891,7 +891,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                 key={k}
                 type="button"
                 onClick={() => setTab(k)}
-                className={`h-8 rounded-full px-3 text-[12px] font-bold ${tab === k ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6]"}`}
+                className={`h-8 rounded-full px-3 text-[12px] font-bold max-sm:min-h-10 ${tab === k ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6]"}`}
               >
                 {label} <span className="tv-tnum opacity-70">{count(k)}</span>
               </button>
@@ -1022,7 +1022,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                           type="button"
                           disabled={busy !== null}
                           onClick={() => save(l, { status: l.status === "open" ? "closed" : "open" })}
-                          className={`h-8 w-full rounded-[8px] text-[11.5px] font-bold ${l.status === "open" ? "bg-[#2f7fc0] text-white hover:bg-[#256aa3]" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
+                          className={`h-8 w-full rounded-[8px] text-[11.5px] font-bold max-sm:min-h-10 ${l.status === "open" ? "bg-[#2f7fc0] text-white hover:bg-[#256aa3]" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
                         >
                           {l.status === "open" ? "مفتوحة · أغلق" : "مغلقة · افتح"}
                         </button>
@@ -1036,7 +1036,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                           type="button"
                           disabled={busy !== null}
                           onClick={() => void open(l)}
-                          className={`inline-flex h-8 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold ${l.file ? "border border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#185045] text-white hover:bg-[#0f4439]"}`}
+                          className={`inline-flex h-8 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold max-sm:min-h-10 ${l.file ? "border border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#185045] text-white hover:bg-[#0f4439]"}`}
                         >
                           {busy === `p-${l.id}` ? <Loader2 className="size-3.5 animate-spin" /> : null}
                           {l.file ? l.file.destination || "فتح البرنامج" : "ابدأ برنامج"}
@@ -1056,10 +1056,10 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
             </span>
             {pages > 1 ? (
               <span className="ms-auto inline-flex items-center gap-1">
-                <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40">
+                <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40 max-sm:min-h-10">
                   السابق
                 </button>
-                <button type="button" disabled={page >= pages - 1} onClick={() => goPage(page + 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40">
+                <button type="button" disabled={page >= pages - 1} onClick={() => goPage(page + 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40 max-sm:min-h-10">
                   التالي
                 </button>
               </span>

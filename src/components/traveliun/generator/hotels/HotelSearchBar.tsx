@@ -149,7 +149,7 @@ export function HotelSearchBar({
               type="button"
               onClick={() => onNights(nights + 1)}
               aria-label="زيادة الليالي"
-              className="grid size-7 place-items-center rounded-[8px] border border-[#c9dcd6] text-[#0e5b52]"
+              className="grid size-7 place-items-center rounded-[8px] border border-[#c9dcd6] text-[#0e5b52] max-sm:min-h-10 max-sm:min-w-10"
             >
               <Plus className="size-3.5" />
             </button>

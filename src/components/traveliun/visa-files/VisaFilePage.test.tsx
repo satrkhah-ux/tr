@@ -54,7 +54,7 @@ describe("the status bar", () => {
     expect(html).toContain("رجوع إلى «جمع المستندات»");
     expect(html).toContain("إلغاء الملف");
     expect(html).not.toContain("صدرت التأشيرة");
-    expect(html.match(/bg-\[#185045\]/g)?.length).toBe(1);
+    expect(html.match(/tv-btn-primary/g)?.length).toBe(1);
     for (const status of VISA_STATUSES) expect(bar(status).match(/<button/g)?.length ?? 0).toBe(NEXT_STATUS[status].length);
   });
 

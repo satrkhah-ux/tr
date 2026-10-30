@@ -75,7 +75,7 @@ export function SecretaryFab() {
       <SheetTrigger aria-label="استدعاء مُراد — سكرتيري الخاص" className="flex size-12 items-center justify-center rounded-full bg-[var(--tv-brand)] text-[12px] font-extrabold text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 lg:h-24 lg:w-10 lg:rounded-none lg:rounded-s-xl lg:text-[13px] lg:shadow-md">
         مُراد
       </SheetTrigger>
-      <button type="button" onClick={() => setStatusOpen((v) => !v)} aria-expanded={statusOpen} className="rounded-full border border-[#dfe8e4] bg-white px-2.5 py-1.5 text-[11px] font-extrabold text-[var(--tv-brand)] shadow-md lg:hidden">
+      <button type="button" onClick={() => setStatusOpen((v) => !v)} aria-expanded={statusOpen} className="rounded-full border border-[#dfe8e4] bg-white px-2.5 py-1.5 text-[11px] font-extrabold text-[var(--tv-brand)] shadow-md lg:hidden max-sm:min-h-10">
         حالتي
       </button>
       {/* the status buttons (presence, 2026-10-29): in مُراد's own strip, so they never stand over a button or a field;

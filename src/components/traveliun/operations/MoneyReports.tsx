@@ -87,7 +87,7 @@ export function ProfitabilityReport({ report }: { report: ProfitReport }) {
           {t("ops.money.to")}
           <input type="month" name="to" defaultValue={report.to} dir="ltr" className={field} />
         </label>
-        <button type="submit" className="inline-flex h-10 items-center rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]">
+        <button type="submit" className="tv-btn-primary inline-flex h-10 items-center rounded-[10px] px-4 text-[12.5px] font-bold">
           {t("ops.money.show")}
         </button>
         <span className="ms-auto text-[12px] font-bold text-tv-text-faint">

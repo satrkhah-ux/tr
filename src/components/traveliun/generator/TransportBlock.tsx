@@ -69,7 +69,7 @@ function LegCard({
           type="button"
           onClick={() => onChange({ enabled: !leg.enabled })}
           aria-pressed={leg.enabled}
-          className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
+          className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] transition-colors max-sm:min-h-10 max-sm:min-w-10 ${
             leg.enabled ? "bg-[#185045] text-white" : "bg-[#eef4f1] text-tv-text-faint"
           }`}
           aria-label={title}

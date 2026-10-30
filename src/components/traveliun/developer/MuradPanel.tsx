@@ -8,6 +8,7 @@ import { whenText } from "@/lib/developer/health";
 import { setMuradAutoPhones } from "@/lib/data/app-settings";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «مُراد» on /developer: which model answers, today's calls against the cap,
  * the numbers he may answer himself, and what he did last. His two switches
@@ -20,7 +21,7 @@ const onChip = "bg-[#e3f6ee] text-[#0f7a52] dark:bg-[#123a2c] dark:text-[#6fe0b0
 const offChip = "bg-[#fdeaef] text-[#c22850] dark:bg-[#3d1621] dark:text-[#f68aa5]";
 const warnChip = "bg-[#fdf3e1] text-[#a86a10] dark:bg-[#3a2c10] dark:text-[#f2c46b]";
 const button =
-  "inline-flex h-8 items-center rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center rounded-[9px] border px-2.5 text-[11.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 
 export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { suggest: boolean; auto: boolean } }) {
   const { t } = useTraveliunUI();

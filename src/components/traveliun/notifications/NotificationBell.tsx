@@ -133,14 +133,14 @@ export function NotificationBell() {
           <button type="button" onClick={toggleMute} aria-label={isMuted ? "شغّل الصوت" : "اكتم الصوت"} title={isMuted ? "شغّل الصوت" : "اكتم الصوت"} className="rounded p-1 text-[#557d78] hover:bg-[#f4f8f6]">
             {isMuted ? <BellOff className="size-4" /> : <Bell className="size-4" />}
           </button>
-          <button type="button" disabled={busy || !data.unread} onClick={() => void markAll()} className="inline-flex items-center gap-1 rounded border border-[#dbe6e1] px-2 py-1 text-xs font-bold text-[#185045] disabled:opacity-50">
+          <button type="button" disabled={busy || !data.unread} onClick={() => void markAll()} className="inline-flex items-center gap-1 rounded border border-[#dbe6e1] px-2 py-1 text-xs font-bold text-[#185045] disabled:opacity-50 max-sm:min-h-10">
             {busy ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />} تعليم الكل مقروءاً
           </button>
         </div>
         {!data.withinHours && <p className="mb-2 rounded bg-[#f4f8f6] p-1.5 text-[11px] text-[#557d78]">خارج ساعات الدوام — الإشعارات تصل بلا صوت.</p>}
         {kinds.length > 1 && <div className="mb-2 flex flex-wrap gap-1">
-          <button type="button" onClick={() => setFilter(null)} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${filter === null ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white" : "border-[#dbe6e1] text-[#557d78]"}`}>الكل</button>
-          {kinds.map((k) => <button key={k} type="button" onClick={() => setFilter(filter === k ? null : k)} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${filter === k ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white" : "border-[#dbe6e1] text-[#557d78]"}`}>{kindLabel(k)}</button>)}
+          <button type="button" onClick={() => setFilter(null)} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold max-sm:min-h-10 ${filter === null ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white" : "border-[#dbe6e1] text-[#557d78]"}`}>الكل</button>
+          {kinds.map((k) => <button key={k} type="button" onClick={() => setFilter(filter === k ? null : k)} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold max-sm:min-h-10 ${filter === k ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white" : "border-[#dbe6e1] text-[#557d78]"}`}>{kindLabel(k)}</button>)}
         </div>}
         {!rows.length && <p className="p-3 text-sm text-[#557d78]">لا إشعارات في آخر ٣٠ يوماً.</p>}
         <div className="space-y-1.5">

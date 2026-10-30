@@ -57,7 +57,7 @@ export function TripRatingForm({ token, rated }: { token: string; rated: number 
       <button
         type="submit"
         disabled={pending || score === 0}
-        className="inline-flex h-11 items-center justify-center rounded-[10px] bg-[#185045] px-6 text-[14px] font-bold text-white disabled:opacity-50"
+        className="tv-btn-primary inline-flex h-11 items-center justify-center rounded-[10px] px-6 text-[14px] font-bold disabled:opacity-50"
       >
         إرسال التقييم
       </button>

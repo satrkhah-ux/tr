@@ -71,7 +71,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
               key={name}
               type="button"
               onClick={() => applyDestination(name)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0f7a52] px-3 text-[12px] font-bold text-white hover:bg-[#0c6543]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0f7a52] px-3 text-[12px] font-bold text-white hover:bg-[#0c6543] max-sm:min-h-10"
             >
               <MapPin className="size-3.5" /> {t("tl.addDestination", { name })}
             </button>

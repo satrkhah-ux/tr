@@ -64,7 +64,7 @@ function HotelVerify({ id, row }: { id: string; row: DataRow }) {
           type="button"
           onClick={toggle}
           disabled={pending || blocked}
-          className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#d8e3de] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:cursor-not-allowed disabled:opacity-50"
+          className="tv-btn-secondary ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
         >
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
           {state.verified ? t("data.quality.verify.undo") : t("data.quality.verify.button")}

@@ -27,12 +27,13 @@ import { useSafeTransition, useSessionField } from "../useSafeTransition";
 import { acceptClientPassport, type PendingClientPassport } from "@/lib/data/client-passports";
 import { ClientPassportReview, useClientPassports } from "./ClientPassportReview";
 
+import { buttonTone } from "@/components/ui/button-variants";
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 const smallBtn =
-  "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10`;
 const dashedBtn =
   "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]";
 
@@ -114,7 +115,7 @@ export function TravelersPanel({
           <button
             type="button"
             onClick={() => setAdding((v) => !v)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
           >
             <Plus className="size-3.5" />
             {t("ops.traveler.add")}
@@ -170,7 +171,7 @@ export function TravelersPanel({
             type="button"
             disabled={pending}
             onClick={() => run(() => seedTravelersFromOffer(operationId))}
-            className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60"
           >
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Users className="size-4" />}
             {t("ops.trav.seed")}
@@ -499,7 +500,7 @@ function TravelerRow({
             type="button"
             disabled={pending}
             onClick={() => call(() => deleteTraveler(traveler.id), () => router.refresh())}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c43d3d] px-3 text-[11.5px] font-bold text-white hover:bg-[#a83232] disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c43d3d] px-3 text-[11.5px] font-bold text-white hover:bg-[#a83232] disabled:opacity-60 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
             {t("ops.trav.deleteYes")}
@@ -530,13 +531,13 @@ function TravelerRow({
               <button
                 type="button"
                 onClick={() => set({ display_name: form.full_name.trim() })}
-                className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc]"
+                className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc] max-sm:min-h-10"
               >
                 {t("ops.trav.usePassportName")}
               </button>
             ) : null}
             {mrz?.arabic_name && !sameName(mrz.arabic_name, form.display_name) ? (
-              <button type="button" title={t("ops.trav.useName")} onClick={() => set({ display_name: mrz.arabic_name })} className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc]">
+              <button type="button" title={t("ops.trav.useName")} onClick={() => set({ display_name: mrz.arabic_name })} className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc] max-sm:min-h-10">
                 {t("ops.trav.arabicName", { name: mrz.arabic_name })}
               </button>
             ) : null}
@@ -567,7 +568,7 @@ function TravelerRow({
             </label>
             {/* the MRZ's name stops at 39 characters — the page prints it whole */}
             {mrz?.printed_name && !sameName(mrz.printed_name, form.full_name) ? (
-              <button type="button" title={t("ops.trav.useName")} onClick={() => set({ full_name: mrz.printed_name })} className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc]">
+              <button type="button" title={t("ops.trav.useName")} onClick={() => set({ full_name: mrz.printed_name })} className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc] max-sm:min-h-10">
                 {t("ops.trav.printedName", { name: mrz.printed_name })}
               </button>
             ) : null}
@@ -627,7 +628,7 @@ function TravelerRow({
               type="button"
               disabled={pending}
               onClick={save}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60"
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Lock className="size-4" />}
               {t("save")}

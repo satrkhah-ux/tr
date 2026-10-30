@@ -33,7 +33,7 @@ export function FinanceLock({ mode }: { mode: "set" | "ask" }) {
     {mode === "set" && <input type="password" autoComplete="new-password" aria-label="أعد كلمة السر" placeholder="أعد كلمة السر"
       value={again} onChange={(e) => setAgain(e.target.value)} className={field} />}
     {error && <p role="alert" className="text-sm text-[#b42318]">{error}</p>}
-    <button type="submit" disabled={busy || !password} className="min-h-10 w-full rounded-lg bg-[#185045] text-sm font-bold text-white disabled:opacity-40">
+    <button type="submit" disabled={busy || !password} className="tv-btn-primary min-h-10 w-full rounded-lg text-sm font-bold disabled:opacity-40">
       {busy ? "لحظة…" : mode === "set" ? "احفظ كلمة السر وافتح" : "افتح"}
     </button>
   </form>;

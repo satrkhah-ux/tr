@@ -119,7 +119,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
             {data.canReply ? (
               <>
                 <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={tx("reply")} className="tv-field w-full rounded-[10px] border p-2.5 text-[13px]" />
-                <button type="button" disabled={busy !== null || !text.trim()} onClick={send} className="inline-flex h-9 items-center justify-center gap-1.5 justify-self-start rounded-[8px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
+                <button type="button" disabled={busy !== null || !text.trim()} onClick={send} className="tv-btn-primary inline-flex h-9 items-center justify-center gap-1.5 justify-self-start rounded-[8px] px-4 text-[12.5px] font-bold disabled:opacity-60 max-sm:min-h-10">
                   {busy === "send" ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
                   {tx("send")}
                 </button>
@@ -129,7 +129,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#e6eeea] pt-3">
               <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tx("closeNote")} className="tv-field h-9 min-w-48 flex-1 rounded-[8px] border px-2.5 text-[12.5px]" />
-              <button type="button" disabled={busy !== null} onClick={close} className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-4 text-[12.5px] font-bold text-white hover:bg-[#0b6140] disabled:opacity-60">
+              <button type="button" disabled={busy !== null} onClick={close} className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-4 text-[12.5px] font-bold text-white hover:bg-[#0b6140] disabled:opacity-60 max-sm:min-h-10">
                 {busy === "close" ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 {tx("close")}
               </button>

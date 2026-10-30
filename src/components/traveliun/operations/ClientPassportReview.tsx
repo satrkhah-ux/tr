@@ -14,8 +14,9 @@ import { trustedFields, type MrzPassport } from "@/lib/operations/mrz";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
+import { buttonTone } from "@/components/ui/button-variants";
 const smallBtn =
-  "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10`;
 
 /**
  * The case's pending client uploads, per traveller. Re-read whenever the
@@ -116,7 +117,7 @@ export function ClientPassportReview({
               type="button"
               disabled={pending}
               onClick={reject}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c43d3d] px-3 text-[11.5px] font-bold text-white hover:bg-[#a83232] disabled:opacity-60"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c43d3d] px-3 text-[11.5px] font-bold text-white hover:bg-[#a83232] disabled:opacity-60 max-sm:min-h-10"
             >
               {t("ops.cpass.reject")}
             </button>

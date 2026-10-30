@@ -542,7 +542,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
       >
         <button
           type="button"
-          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[var(--tv-brand)] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6]"
+          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[var(--tv-brand)] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
           aria-expanded={menuOpen}
           title={menuOpen ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
           aria-label={menuOpen ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
@@ -607,7 +607,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
       >
         <button
           type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-md text-[#557d78] lg:hidden"
+          className="flex size-9 shrink-0 items-center justify-center rounded-md text-[#557d78] lg:hidden max-sm:min-h-10 max-sm:min-w-10"
           onClick={() => setMobileOpen(true)}
           aria-label={t("aria.openMenu")}
         >
@@ -622,7 +622,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           {displayTitle}
         </div>
         {onDeveloperPage ? (
-          <button type="button" onClick={openFinance} aria-label="قفل" className="flex size-9 shrink-0 touch-manipulation select-none items-center justify-center rounded-md text-[#557d78] hover:bg-[#eef4f1]">
+          <button type="button" onClick={openFinance} aria-label="قفل" className="flex size-9 shrink-0 touch-manipulation select-none items-center justify-center rounded-md text-[#557d78] hover:bg-[#eef4f1] max-sm:min-h-10 max-sm:min-w-10">
             <Lock className="size-5" />
           </button>
         ) : null}
@@ -966,7 +966,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
         )}
         <button
           type="button"
-          className="flex size-9 items-center justify-center rounded-md text-[var(--tv-brand)]"
+          className="flex size-9 items-center justify-center rounded-md text-[var(--tv-brand)] max-sm:min-h-10 max-sm:min-w-10"
           onClick={close}
           aria-label={t("aria.closeMenu")}
         >
@@ -1133,7 +1133,7 @@ function CalculatorPanel() {
             <button
               type="button"
               onClick={() => { setFrom(to); setTo(from); }}
-              className="flex size-8 items-center justify-center rounded-md border border-[#ddd4d3] text-[var(--tv-brand)] hover:bg-[#f4f8f6]"
+              className="flex size-8 items-center justify-center rounded-md border border-[#ddd4d3] text-[var(--tv-brand)] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
               aria-label={t("aria.swap")}
             >
               ⇄
@@ -1346,7 +1346,7 @@ function ServerLostBanner() {
   return (
     <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-[12px] border border-[#f2d39a] bg-[#fff8e8] px-3 py-2 text-[12.5px] font-bold text-[#8a5a0c]">
       <span className="min-w-0 flex-1">{t("shell.serverLost")}</span>
-      <button type="button" onClick={() => window.location.reload()} className="inline-flex h-8 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white">
+      <button type="button" onClick={() => window.location.reload()} className="inline-flex h-8 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white max-sm:min-h-10">
         {t("shell.reload")}
       </button>
     </div>

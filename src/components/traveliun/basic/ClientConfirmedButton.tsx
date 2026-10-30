@@ -69,7 +69,7 @@ export function ClientConfirmedButton({
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className={`inline-flex h-8 items-center justify-center gap-1 rounded-[8px] text-[11.5px] font-bold ${secondary ? "border border-[#0f7a52] bg-white text-[#0f7a52] hover:bg-[#e9f7f0]" : "bg-[#0f7a52] text-white hover:bg-[#0b6140]"} ${className}`}
+        className={`inline-flex h-8 items-center justify-center gap-1 rounded-[8px] text-[11.5px] font-bold max-sm:min-h-10 ${secondary ? "border border-[#0f7a52] bg-white text-[#0f7a52] hover:bg-[#e9f7f0]" : "bg-[#0f7a52] text-white hover:bg-[#0b6140]"} ${className}`}
       >
         <CheckCircle2 className="size-3.5" />
         {tx("clientConfirmedBtn")}
@@ -100,7 +100,7 @@ export function ClientConfirmedButton({
         <span className="text-[10.5px] font-semibold text-tv-text-faint">{tx("confirmGoesToBookings")}</span>
         {error ? <span className="text-[11px] font-bold text-[#c22850]">{error}</span> : null}
       </span>
-      <button type="button" onClick={() => setAsking(false)} className={`inline-flex h-8 items-center justify-center gap-1 rounded-[8px] bg-[#0b6140] text-[11.5px] font-bold text-white ${className}`}>
+      <button type="button" onClick={() => setAsking(false)} className={`inline-flex h-8 items-center justify-center gap-1 rounded-[8px] bg-[#0b6140] text-[11.5px] font-bold text-white max-sm:min-h-10 ${className}`}>
         <CheckCircle2 className="size-3.5" />
         {tx("clientConfirmedBtn")}
       </button>

@@ -89,7 +89,7 @@ export function DataTransfer() {
               type="button"
               onClick={doExport}
               disabled={pending}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-[#185045] px-4 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-12 items-center justify-center gap-2 rounded-[12px] px-4 text-sm font-bold transition-colors disabled:opacity-50"
             >
               {busy === "export" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
               {busy === "export" ? t("data.exporting") : t("data.exportBtn")}
@@ -99,7 +99,7 @@ export function DataTransfer() {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={pending}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] border border-[#b7d0c7] bg-white px-4 text-sm font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-50"
+              className="tv-btn-secondary inline-flex h-12 items-center justify-center gap-2 rounded-[12px] border px-4 text-sm font-bold transition-colors disabled:opacity-50"
             >
               {busy === "import" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
               {busy === "import" ? t("data.importing") : t("data.importBtn")}

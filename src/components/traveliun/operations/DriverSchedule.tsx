@@ -102,7 +102,7 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
                 type="button"
                 onClick={copy}
                 disabled={shown.length === 0}
-                className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50"
+                className="tv-btn-secondary inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3 text-[12.5px] font-bold disabled:opacity-50"
               >
                 <Copy className="size-4" />
                 {copied ? t("copied") : t("ops.drv.copy")}
@@ -111,7 +111,7 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
                 type="button"
                 onClick={() => window.print()}
                 disabled={shown.length === 0}
-                className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-3.5 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-3.5 text-[12.5px] font-bold disabled:opacity-50"
               >
                 <Printer className="size-4" />
                 {t("ops.drv.print")}

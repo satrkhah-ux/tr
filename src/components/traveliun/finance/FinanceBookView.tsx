@@ -53,7 +53,7 @@ export function FinanceBookView({ initial }: { initial: FinanceBook }) {
       <nav className="flex flex-wrap gap-1" aria-label="أقسام الحسابات">{tabs.map(([k, label]) =>
         <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`min-h-10 rounded-lg px-3 text-sm font-semibold ${tab === k ? "bg-[#185045] text-white" : "text-[#185045] hover:bg-[#eef4f1]"}`}>{label}</button>)}</nav>
       <span className="ms-auto text-sm" role="status">{message || (dirty ? "تغييرات غير محفوظة" : "")}</span>
-      <button onClick={() => void save()} disabled={busy || !dirty} className="min-h-10 rounded-lg bg-[#185045] px-5 text-sm font-bold text-white disabled:opacity-40">{busy ? "جارٍ الحفظ…" : "حفظ"}</button>
+      <button onClick={() => void save()} disabled={busy || !dirty} className="tv-btn-primary min-h-10 rounded-lg px-5 text-sm font-bold disabled:opacity-40">{busy ? "جارٍ الحفظ…" : "حفظ"}</button>
     </div>
     {tab === "summary" && <Summary book={book} />}
     {tab === "plan" && <PlanTab book={book} set={set} />}
@@ -209,7 +209,7 @@ function DebtRow({ d, open, toggle, patch, remove }: { d: Debt; open: boolean; t
         <label className="text-xs">التاريخ<input aria-label="تاريخ الدفعة" type="date" value={pay.date} onChange={(e) => setPay({ ...pay, date: e.target.value })} className={field} /></label>
         <label className="text-xs">المبلغ<input aria-label="مبلغ الدفعة" type="number" min={0} inputMode="decimal" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} className={`${field} w-32`} /></label>
         <label className="min-w-40 flex-1 text-xs">ملاحظة<input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} className={field} /></label>
-        <button className="min-h-9 rounded-lg bg-[#185045] px-4 text-sm font-bold text-white">سجّل الدفعة</button>
+        <button className="tv-btn-primary min-h-9 rounded-lg px-4 text-sm font-bold">سجّل الدفعة</button>
       </form>
     </td></tr>}
   </>;

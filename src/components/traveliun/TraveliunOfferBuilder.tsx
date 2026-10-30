@@ -137,7 +137,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
             <a href={`/offer/${savedSerial}/image`} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#d8e3de] px-5 text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]">
               {t("builder.downloadImage")}
             </a>
-            <button type="button" onClick={() => setSavedSerial(null)} className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#d8e3de] px-5 text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]">
+            <button type="button" onClick={() => setSavedSerial(null)} className="tv-btn-secondary inline-flex h-11 items-center gap-2 rounded-[11px] border px-5 text-sm font-bold">
               {t("builder.newOffer")}
             </button>
           </div>
@@ -152,7 +152,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h1 className="text-[22px] font-extrabold text-[#003c3a]">{t("builder.newTitle")}</h1>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={save} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-70">
+            <button type="button" onClick={save} disabled={saving} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-sm font-bold disabled:opacity-70">
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               {saving ? t("saving") : t("builder.saveDb")}
             </button>
@@ -393,7 +393,7 @@ function LabeledDate({ label, value, onChange }: { label: string; value: string;
 }
 function AddButton({ label, icon: Icon = Plus, onClick }: { label: string; icon?: typeof Plus; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#cfe0d9] bg-white px-3 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6]">
+    <button type="button" onClick={onClick} className="tv-btn-secondary inline-flex h-9 items-center gap-2 rounded-[9px] border px-3 text-xs font-bold max-sm:min-h-10">
       <Icon className="size-4" /> {label}
     </button>
   );

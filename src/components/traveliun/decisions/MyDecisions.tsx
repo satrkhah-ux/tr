@@ -7,6 +7,7 @@ import {
   type MyDecision,
 } from "@/lib/data/admin-decisions";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «قراراتي وخطاباتي» — every decision and official letter that reached this employee, newest first: when it reached
  * them, when they pressed «استلمت», the text and the PDF. A decision is acknowledged here or in «تنبيهاتي»; a sales
@@ -16,9 +17,9 @@ import {
 const card =
   "rounded-2xl border border-[#E3E8E4] bg-white p-4 dark:border-[#294039] dark:bg-[#14231f]";
 const primary =
-  "inline-flex min-h-10 items-center justify-center rounded-xl bg-[#185045] px-4 text-sm font-bold text-white disabled:opacity-40";
+  `${buttonTone({ variant: "default" })} inline-flex min-h-10 items-center justify-center rounded-xl px-4 text-sm font-bold disabled:opacity-40`;
 const btn =
-  "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#D5DED9] bg-white px-3 text-sm font-bold text-[#185045] hover:bg-[#F4F6F3] dark:bg-[#0f1c19] dark:text-[#eaf3ef]";
+  `${buttonTone({ variant: "secondary" })} inline-flex min-h-10 items-center justify-center rounded-xl border px-3 text-sm font-bold`;
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-GB", {
     timeZone: "Asia/Riyadh",

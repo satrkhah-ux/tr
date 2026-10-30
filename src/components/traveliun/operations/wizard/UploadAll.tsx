@@ -491,7 +491,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
           <h2 className="text-[14px] font-extrabold text-[#185045]">{t("wz.up.title")}</h2>
           <p className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{t("wz.up.hint")}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label={t("wz.up.close")} className="inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#557d78] hover:bg-[#f0f5f3]">
+        <button type="button" onClick={onClose} aria-label={t("wz.up.close")} className="inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#557d78] hover:bg-[#f0f5f3] max-sm:min-h-10 max-sm:min-w-10">
           <X className="size-4" />
         </button>
       </div>
@@ -720,7 +720,7 @@ function Line({
             <p className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#a86a10] sm:col-span-2">
               {t("wz.up.otherHotel", { name: item.stay.hotel_name })}
               {[item.stay.check_in, item.stay.check_out].filter(Boolean).length ? <DirText className="tv-tnum">{`${item.stay.check_in || "—"} → ${item.stay.check_out || "—"}`}</DirText> : null}
-              <button type="button" disabled={working} onClick={onAddHotel} className="inline-flex h-8 items-center rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">
+              <button type="button" disabled={working} onClick={onAddHotel} className="tv-btn-secondary inline-flex h-8 items-center rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10">
                 {t("wz.up.addHotel")}
               </button>
             </p>
@@ -729,7 +729,7 @@ function Line({
             // a ticket of flights the file does not have (a domestic hop booked apart): said, with its flights above
             <p className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#a86a10] sm:col-span-2">
               {t("wz.up.otherFlights")}
-              <button type="button" disabled={working} onClick={onAddFlight} className="inline-flex h-8 items-center rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">
+              <button type="button" disabled={working} onClick={onAddFlight} className="tv-btn-secondary inline-flex h-8 items-center rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10">
                 {t("wz.up.addFlight")}
               </button>
             </p>

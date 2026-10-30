@@ -167,7 +167,7 @@ export function HotelPicker({
           <button
             type="button"
             onClick={() => setShowOptions((v) => !v)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold transition-colors ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold transition-colors max-sm:min-h-10 ${
               showOptions ? "border-[#185045] bg-[#f0f7f4] text-[#185045]" : "border-[#dbe6e1] text-[#557d78]"
             }`}
           >
@@ -264,7 +264,7 @@ export function HotelPicker({
                   <button
                     type="button"
                     onClick={() => setShown((n) => n + PAGE)}
-                    className="tv-tnum w-full rounded-[9px] border border-[#cfe0d9] py-2 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                    className="tv-btn-secondary tv-tnum w-full rounded-[9px] border py-2 text-[11.5px] font-bold"
                   >
                     عرض المزيد ({visible.length - shown})
                   </button>

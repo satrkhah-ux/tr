@@ -174,7 +174,7 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
           <button
             type="button"
             onClick={() => setLimit((n) => n + PAGE)}
-            className="mt-3 w-full rounded-[10px] border border-[#dbe6e1] py-2 text-[13px] font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6] dark:hover:bg-[#1b2d27]"
+            className="tv-btn-secondary mt-3 w-full rounded-[10px] border py-2 text-[13px] font-bold transition-colors"
           >
             {t("dash.mine.more")}
           </button>

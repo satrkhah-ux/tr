@@ -122,7 +122,7 @@ export function BasicHome({
             type="button"
             onClick={() => void onCreate()}
             disabled={creating}
-            className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-[13.5px] font-extrabold text-white disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-[13.5px] font-extrabold disabled:opacity-60"
           >
             {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
             {tx("newFile")}
@@ -132,7 +132,7 @@ export function BasicHome({
               type="button"
               onClick={() => setShowReady((v) => !v)}
               aria-expanded={showReady}
-              className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#185045] px-5 text-[13.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+              className="tv-btn-secondary inline-flex h-11 items-center gap-2 rounded-[11px] border px-5 text-[13.5px] font-extrabold"
             >
               <Package className="size-4" />
               {tx("fromReady")}
@@ -175,7 +175,7 @@ export function BasicHome({
                       type="button"
                       disabled={busy !== null}
                       onClick={() => void openNew(`r-${o.id}`, () => startDraftFromReadyOffer(o.id))}
-                      className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+                      className="tv-btn-primary inline-flex h-8 items-center gap-1 rounded-[8px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
                     >
                       {busy === `r-${o.id}` ? <Loader2 className="size-3.5 animate-spin" /> : null}
                       {tx("startReady")}

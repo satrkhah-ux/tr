@@ -84,7 +84,7 @@ function MailRow({
         type="button"
         disabled={disabled}
         onClick={onDismiss}
-        className="h-9 shrink-0 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#8a6100] hover:bg-[#fdf8e6] disabled:opacity-50"
+        className="h-9 shrink-0 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#8a6100] hover:bg-[#fdf8e6] disabled:opacity-50 max-sm:min-h-10"
       >
         {t("ops.mail.dismiss")}
       </button>

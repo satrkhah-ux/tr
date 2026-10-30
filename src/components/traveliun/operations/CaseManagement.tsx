@@ -163,7 +163,7 @@ export function CaseManagement({
               type="button"
               disabled={pending}
               onClick={() => run(() => saveClientInfo(operationId, info), () => setSavedInfo(true))}
-              className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+              className="tv-btn-primary mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
             >
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {savedInfo ? t("ops.list.saved") : t("save")}
@@ -187,7 +187,7 @@ export function CaseManagement({
             type="button"
             disabled={pending || !note.trim()}
             onClick={() => run(() => addCaseNote(operationId, note), forgetNote)}
-            className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+            className="tv-btn-secondary mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <MessageSquarePlus className="size-3.5" />}
             {t("ops.list.addNote")}

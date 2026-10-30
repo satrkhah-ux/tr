@@ -189,13 +189,13 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
                 type="button"
                 onClick={() => void send("whatsapp")}
                 disabled={busy !== null || !body.trim()}
-                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold disabled:opacity-60"
               >
                 {busy === "whatsapp" ? <Loader2 className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
                 {busy === "whatsapp" ? t("rp.order.sending") : t("rp.order.sendWhatsapp")}
               </button>
             ) : null}
-            <button type="button" onClick={() => void copy()} className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-4 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
+            <button type="button" onClick={() => void copy()} className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-4 text-[13px] font-bold">
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               {copied ? t("rp.order.copied") : t("rp.order.copy")}
             </button>
@@ -209,7 +209,7 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
               type="button"
               onClick={() => void send("manual")}
               disabled={busy !== null || !body.trim()}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#185045] bg-white px-4 text-[13px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+              className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-4 text-[13px] font-bold disabled:opacity-60"
             >
               {busy === "manual" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               {t("rp.order.manual")}

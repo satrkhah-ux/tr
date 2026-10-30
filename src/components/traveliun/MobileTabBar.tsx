@@ -177,7 +177,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
             <button
               type="button"
               onClick={() => persist(DEFAULT_TABS)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-bold text-[#557d78] hover:text-[#185045]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-bold text-[#557d78] hover:text-[#185045] max-sm:min-h-10"
             >
               <RotateCcw className="size-3.5" /> {t("dash.resetDefault")}
             </button>
@@ -217,7 +217,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
             <button
               type="button"
               onClick={() => setCustomizing(false)}
-              className="h-11 w-full rounded-[11px] bg-[#185045] text-sm font-bold text-white transition-colors hover:bg-[#0f4439]"
+              className="tv-btn-primary h-11 w-full rounded-[11px] text-sm font-bold transition-colors"
             >
               {t("done")}
             </button>

@@ -569,7 +569,7 @@ function PricingCard({
             <button
               type="button"
               onClick={() => onChange({ profit_pct: null, profit_amount: null })}
-              className="h-9 rounded-[9px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+              className="h-9 rounded-[9px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10"
             >
               إلغاء الربح اليدوي
             </button>

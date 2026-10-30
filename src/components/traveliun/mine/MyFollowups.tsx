@@ -66,7 +66,7 @@ export function MyFollowups({ view }: { view: MyFollowupsView }) {
               <button
                 key={k}
                 onClick={() => setFilter(filter === k ? null : k)}
-                className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${KIND_TONE[k]} ${filter === k ? "ring-2 ring-[#185045]" : ""} ${counts[k] ? "" : "opacity-40"}`}
+                className={`rounded-full px-3 py-1.5 text-xs font-extrabold max-sm:min-h-10 ${KIND_TONE[k]} ${filter === k ? "ring-2 ring-[#185045]" : ""} ${counts[k] ? "" : "opacity-40"}`}
               >
                 {KIND_LABEL[k]} · {counts[k]}
               </button>

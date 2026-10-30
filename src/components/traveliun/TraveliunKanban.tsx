@@ -251,7 +251,7 @@ function ConfirmToOperations({ offerId }: { offerId: string }) {
         type="button"
         disabled={busy}
         onClick={() => void run()}
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] bg-[#185045] text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] text-sm font-bold disabled:opacity-60"
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
         {busy ? t("ops.confirming") : t("ops.confirm")}

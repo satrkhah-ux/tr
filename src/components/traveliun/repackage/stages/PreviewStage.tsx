@@ -92,7 +92,7 @@ export function PreviewStage({ draftId, data, replace, flush }: RepackageStagePr
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <button type="button" onClick={produce} disabled={producing || !validation.ok} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-60">
+              <button type="button" onClick={produce} disabled={producing || !validation.ok} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-6 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                 {producing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 {producing ? t("rp.preview.producing") : t("rp.preview.produce")}
               </button>

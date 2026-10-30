@@ -85,7 +85,7 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
                 type="button"
                 onClick={() => void onCreate()}
                 disabled={creating}
-                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
+                className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-5 text-[13px] font-bold transition-colors disabled:opacity-70"
               >
                 {creating ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
                 {creating ? t("pg.creating") : hasCustomer(customer) ? t("rp.start.go") : t("rp.start.goNoClient")}

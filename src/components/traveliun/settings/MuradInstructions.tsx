@@ -32,7 +32,7 @@ export function MuradInstructions({ data }: { data: { instructions: InstructionR
       <p className="mt-2 text-sm leading-6 text-tv-text-faint dark:text-[#9db8ae]">اكتب قراراً أو معلومة يعتمدها مُراد. تُطبّق عند الضغط على «نفّذ»، ويظهر لك ما تغيّر.</p></div>
     <textarea aria-label="تعليمات الإدارة لمُراد" rows={3} maxLength={2000} className={field} value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب التعليمات هنا…" disabled={busy} />
     <div className="flex flex-wrap gap-3">
-      <button disabled={busy || !text.trim()} onClick={() => send(text)} className="rounded-lg bg-[#185045] px-6 py-3 font-bold text-white disabled:opacity-50">{busy ? "مُراد يقرأ…" : "نفّذ"}</button>
+      <button disabled={busy || !text.trim()} onClick={() => send(text)} className="tv-btn-primary rounded-lg px-6 py-3 font-bold disabled:opacity-50">{busy ? "مُراد يقرأ…" : "نفّذ"}</button>
       <button disabled={busy} onClick={() => send("تراجع")} className="rounded-lg border border-[#185045] px-5 py-3 font-bold">تراجع عن آخر قرار</button>
     </div>
     {reply ? <p role="status" className={`whitespace-pre-line rounded-xl p-4 text-sm font-bold ${reply.ok ? "bg-[#e5f4e4]" : "bg-[#fdf3e2] text-[#8a5a00]"}`}>{reply.text}</p> : null}
@@ -57,7 +57,7 @@ export function MuradInstructions({ data }: { data: { instructions: InstructionR
       <p className="text-sm">يقرؤها مُراد مع سياسات الشركة وأسئلة التأشيرات في كل رد. أوقف درساً لا تريده. تعلّم أيضاً {data.learned.toLocaleString("en-US")} درساً من {data.read.toLocaleString("en-US")} محادثة قرأها{data.left ? `، وبقي نحو ${data.left.toLocaleString("en-US")}` : ""}.</p>
       {data.lessons.length ? <ul className="space-y-2">{data.lessons.map((l) => <li key={l.id} className={`flex items-start justify-between gap-3 rounded-xl p-3 text-sm ${l.active ? "bg-[#f0f7f4]" : "bg-[#f6f6f4] text-[#8a958f]"}`}>
         <div className="min-w-0 break-words">{l.question ? <p><strong>إذا:</strong> {l.question}</p> : null}<p><strong>يرد:</strong> {l.answer}</p></div>
-        <button onClick={() => toggle(l)} className="shrink-0 rounded-lg border px-3 py-1 text-xs font-bold">{l.active ? "إيقاف" : "تشغيل"}</button>
+        <button onClick={() => toggle(l)} className="shrink-0 rounded-lg border px-3 py-1 text-xs font-bold max-sm:min-h-10">{l.active ? "إيقاف" : "تشغيل"}</button>
       </li>)}</ul> : <p className="text-sm">لم تُعلّمه شيئاً بعد.</p>}
     </details>
   </section>;

@@ -99,7 +99,7 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
       })}
 
       <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#dbe6e1] bg-white p-3 lg:bottom-0 dark:bg-[#12241f]">
-        <button type="button" onClick={save} disabled={saving} className="min-h-11 rounded-xl bg-[#185045] px-4 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
+        <button type="button" onClick={save} disabled={saving} className="tv-btn-primary min-h-11 rounded-xl px-4 text-sm font-bold disabled:opacity-60">
           حفظ العروض الآلية
         </button>
         {note === "saved" ? <span className="text-[12px] font-bold text-[#0f7a52]">حُفظ.</span> : null}

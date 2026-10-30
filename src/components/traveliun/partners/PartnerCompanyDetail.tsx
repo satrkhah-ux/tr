@@ -211,7 +211,7 @@ function SuspendControl({ id, suspended }: { id: string; suspended: boolean }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className={`mt-3 inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold ${
+        className={`mt-3 inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold max-sm:min-h-10 ${
           suspended ? "border-[#b7d0c7] text-[#185045]" : "border-[#f0c7c7] text-[#c22850]"
         }`}
       >
@@ -256,7 +256,7 @@ function SuspendControl({ id, suspended }: { id: string; suspended: boolean }) {
         type="button"
         disabled={pending}
         onClick={() => setAsking(false)}
-        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#557d78]"
+        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#557d78] max-sm:min-h-10"
       >
         تراجع
       </button>

@@ -14,6 +14,7 @@ import { TABS } from "@/lib/ready-offers/parse";
 import { SyncDialog } from "../ready-offers/ReadyOffersCatalog";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «العروض الجاهزة» on /developer (the owner, 2026-10-18): the sheet the sync
  * reads — changed here without a deploy — a check of it, its preview and sync,
@@ -21,7 +22,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  */
 
 const button =
-  "inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-9 items-center rounded-[9px] border px-3 text-[12px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
 
 export function ReadyOffersSheetPanel({ data }: { data: ReadyOffersPanelData }) {

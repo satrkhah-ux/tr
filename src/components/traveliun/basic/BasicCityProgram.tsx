@@ -131,7 +131,7 @@ export function BasicCityProgram({
                     <button
                       type="button"
                       onClick={onTours}
-                      className="inline-flex items-center gap-1 rounded-full border border-[#cfe0d9] px-2 py-0.5 text-[#185045] hover:bg-[#f0f7f4]"
+                      className="tv-btn-secondary inline-flex items-center gap-1 rounded-full border px-2 py-0.5 max-sm:min-h-10"
                     >
                       <Camera className="size-3" />
                       {tx("changeTour")}

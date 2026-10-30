@@ -25,14 +25,15 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 import { OpsLinkButton } from "./OpsLinkButton";
 
+import { buttonTone } from "@/components/ui/button-variants";
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 const chipBtn =
-  "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10`;
 const primary =
-  "inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60";
+  `${buttonTone({ variant: "default" })} inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60`;
 
 type Fail = { ok: false; error: TranslationKey };
 

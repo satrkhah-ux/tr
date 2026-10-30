@@ -165,7 +165,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
                 {shownCountries.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
               </select>
             </label>
-            <button type="button" onClick={() => void addCountry()} className="mb-0.5 inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#2aa87a] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#eef7f3]">
+            <button type="button" onClick={() => void addCountry()} className="mb-0.5 inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#2aa87a] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#eef7f3] max-sm:min-h-10">
               <Plus className="size-3.5" /> {t("tp.addCountry")}
             </button>
             {loading ? <Loader2 className="mb-2 size-4 animate-spin text-[#2aa87a]" aria-hidden /> : null}
@@ -183,7 +183,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
                       {kindsAvailable.map((k) => (
                         <button key={k} type="button" role="radio" aria-checked={kind === k}
                           onClick={() => { setKind(k); setId(""); }}
-                          className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold ${kind === k ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint"}`}>
+                          className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold max-sm:min-h-10 ${kind === k ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint"}`}>
                           {KIND_LABEL[k]}
                         </button>
                       ))}
@@ -203,7 +203,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
                         <option value="">{t("chooseOption")}</option>
                         {placesOf(kind).map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                       </select>
-                      <button type="button" onClick={() => void addPlace(kind)} title={t("tp.addPlace")} className="inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#2aa87a] px-2.5 text-[12px] font-bold text-[#185045] hover:bg-[#eef7f3]">
+                      <button type="button" onClick={() => void addPlace(kind)} title={t("tp.addPlace")} className="inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#2aa87a] px-2.5 text-[12px] font-bold text-[#185045] hover:bg-[#eef7f3] max-sm:min-h-10">
                         <Plus className="size-3.5" />
                       </button>
                     </span>
@@ -234,7 +234,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
                     ))}
                   </div>
                   <div className="mt-4 flex items-center gap-3">
-                    <button type="button" disabled={saving} onClick={() => void save()} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-70">
+                    <button type="button" disabled={saving} onClick={() => void save()} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-6 text-sm font-bold disabled:opacity-70">
                       {saving ? <Loader2 className="size-4 animate-spin" /> : null}
                       {t("tp.save")}
                     </button>

@@ -6,6 +6,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { checkSecret, clearSecret, listSecrets, saveSecret, type SecretRow } from "@/lib/secrets/actions";
 import type { CheckResult } from "@/lib/developer/health";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «المفاتيح والتوكنات» (the owner, 2026-10-29: «مكان لاضافة التوكن او الـAPI
  * الجديد عند انشائه»): per allowed name — set or not, from where, the last
@@ -16,7 +17,7 @@ import type { CheckResult } from "@/lib/developer/health";
 
 type Data = NonNullable<Awaited<ReturnType<typeof listSecrets>>>;
 const field = "tv-field rounded-lg border p-2 text-sm";
-const btn = "rounded-lg border border-[#dbe6e1] px-2.5 py-1.5 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50";
+const btn = `${buttonTone({ variant: "secondary" })} rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 max-sm:min-h-10`;
 const SOURCE = { vault: "محفوظ هنا", env: "من الخادم" } as const;
 const TONE: Record<string, string> = { ok: "text-emerald-700", warn: "text-amber-700", down: "text-red-700", idle: "text-[#557d78]", unconfigured: "text-[#557d78]" };
 

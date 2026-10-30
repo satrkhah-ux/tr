@@ -6,6 +6,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { checkStaffBot, registerStaffBotWebhook, saveStaffBotToken, type StaffBotCheck, type StaffBotPanelData } from "@/lib/data/staff-bot-admin";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «بوت الموظفين» on /developer (the owner, 2026-10-22). This is the bot's
  * @username and token: replace the token here and nothing else changes. The new
@@ -15,7 +16,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  */
 
 const button =
-  "inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-9 items-center rounded-[9px] border px-3 text-[12px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 
 export function StaffBotPanel({ data }: { data: StaffBotPanelData }) {
   const { t } = useTraveliunUI();

@@ -47,7 +47,7 @@ export function MuradPolicies({ initial, setting = "murad_policies" }: { initial
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="inline-flex h-9 items-center rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-9 items-center rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10"
         >
           {t("murad.policies.save")}
         </button>

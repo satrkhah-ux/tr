@@ -194,7 +194,7 @@ export function DocumentsPanel({
             <button
               type="button"
               onClick={() => setAdding((v) => !v)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
             >
               <Plus className="size-3.5" />
               {t("ops.booking.add")}
@@ -204,7 +204,7 @@ export function DocumentsPanel({
                 type="button"
                 onClick={() => setConfirmingAll((v) => !v)}
                 aria-expanded={confirmingAll}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                className="tv-btn-secondary inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold max-sm:min-h-10"
               >
                 <ListChecks className="size-3.5" />
                 {t("ops.confirmAll")}
@@ -758,7 +758,7 @@ function BookingRow({
               type="button"
               onClick={() => setRooming((v) => !v)}
               aria-expanded={rooming}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
             >
               <BedDouble className="size-3.5" />
               {t("ops.room.details")}
@@ -771,7 +771,7 @@ function BookingRow({
             type="button"
             onClick={() => setEditing((v) => !v)}
             aria-label={t("edit")}
-            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
           >
             <Pencil className="size-3.5" />
           </button>
@@ -799,7 +799,7 @@ function BookingRow({
           <button
             type="button"
             onClick={() => setConfirming((v) => !v)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
           >
             {t("ops.booking.manual")}
           </button>

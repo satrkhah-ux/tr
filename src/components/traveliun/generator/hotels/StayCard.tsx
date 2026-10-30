@@ -147,7 +147,7 @@ export function StayCard({
             type="button"
             onClick={onRemove}
             aria-label={t("delete")}
-            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1]"
+            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1] max-sm:min-h-10 max-sm:min-w-10"
           >
             <Trash2 className="size-3.5" />
           </button>
@@ -272,7 +272,7 @@ export function StayCard({
               <button
                 type="button"
                 onClick={onDone}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+                className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold max-sm:min-h-10"
               >
                 {t("pg.stayDone")}
               </button>

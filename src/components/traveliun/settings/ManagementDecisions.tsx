@@ -41,7 +41,7 @@ export function ManagementDecisions({ initial }: { initial: Data }) {
         {sourceKey && <p className="md:col-span-2 text-sm">مرتبط بمؤشر من شاشة المدير. <button type="button" onClick={() => setSource("")} className="underline">إلغاء الربط</button></p>}
         <label>المسؤول<select required value={ownerId} onChange={(e) => setOwner(e.target.value)} className={field}><option value="">اختر الموظف</option>{data.employees.map((e) => <option key={e.id} value={e.id}>{e.arabic_name}</option>)}</select></label>
         <label>موعد التنفيذ<input required type="date" value={dueOn} onChange={(e) => setDue(e.target.value)} className={field} /></label>
-        <button className="rounded-lg bg-[#185045] p-3 font-bold text-white">{busy ? "جارٍ الحفظ…" : "تسجيل القرار"}</button>
+        <button className="tv-btn-primary rounded-lg p-3 font-bold">{busy ? "جارٍ الحفظ…" : "تسجيل القرار"}</button>
       </fieldset>
     </form>
     <p role="status">{message}</p>

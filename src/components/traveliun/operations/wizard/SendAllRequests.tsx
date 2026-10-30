@@ -63,7 +63,7 @@ export function SendAllRequests({ operationId }: { operationId: string }) {
           type="button"
           disabled={pending}
           onClick={prepare}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#185045] bg-white px-4 text-[13px] font-extrabold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+          className="tv-btn-secondary inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border px-4 text-[13px] font-extrabold disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           {t("wz.sendAll.button")}

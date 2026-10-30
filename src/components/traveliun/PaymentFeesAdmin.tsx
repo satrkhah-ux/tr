@@ -111,7 +111,7 @@ export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees
           type="button"
           disabled={state === "saving"}
           onClick={() => void save()}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60"
         >
           {state === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
           {t("save")}

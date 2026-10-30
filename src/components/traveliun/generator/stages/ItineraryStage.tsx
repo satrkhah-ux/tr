@@ -336,7 +336,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           <button
             type="button"
             onClick={() => setAsked(current)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-[#b7d0c7] bg-white px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-[#b7d0c7] bg-white px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
           >
             <Plus className="size-3.5" />
             {t(onDay.departure ? "pg.itin.tourBeforeDeparture" : "pg.itin.tourAfterArrival")}
@@ -411,7 +411,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           <button
             type="button"
             onClick={() => select(current + 1)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439]"
+            className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold transition-colors"
           >
             {t("pg.itin.nextDay")}
             <ChevronLeft className="size-4 ltr:rotate-180 rtl:rotate-0" />
@@ -431,7 +431,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
               type="button"
               onClick={() => fillFromPrograms()}
               disabled={days.length === 0}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#185045] bg-white px-3.5 text-[12.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-50"
+              className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[12.5px] font-bold transition-colors disabled:opacity-50"
             >
               <BookOpen className="size-4" />
               {t("pg.itin.fillFromPrograms")}
@@ -442,7 +442,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
               type="button"
               onClick={() => runAssistant("ai")}
               disabled={pending || days.length === 0}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-3.5 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f3d38] disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-3.5 text-[12.5px] font-bold transition-colors hover:bg-[#0f3d38] disabled:opacity-50"
             >
               {busy === "ai" ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
               {t("pg.itin.generate")}
@@ -452,7 +452,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
             type="button"
             onClick={() => runAssistant("weather")}
             disabled={pending || days.length === 0}
-            className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-3.5 text-[12.5px] font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6] disabled:opacity-50"
+            className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[12.5px] font-bold transition-colors disabled:opacity-50"
           >
             {busy === "weather" ? <Loader2 className="size-4 animate-spin" /> : <CloudSun className="size-4" />}
             {t("pg.itin.refreshWeather")}
@@ -541,7 +541,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
                       <button
                         type="button"
                         onClick={() => fillFromPrograms(g.city)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                        className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
                       >
                         <BookOpen className="size-3.5" />
                         {t("pg.itin.fillCity")}

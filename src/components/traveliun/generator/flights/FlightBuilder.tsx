@@ -215,7 +215,7 @@ export function FlightBuilder({
             <button
               type="button"
               onClick={() => setMulti([...multi, { from: multi[multi.length - 1]?.to ?? "", to: "", date: "" }])}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
             >
               <Plus className="size-3.5" />
               {t("pg.fb.addSegment")}

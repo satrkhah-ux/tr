@@ -533,7 +533,7 @@ export function BasicCityCard({
               type="button"
               onClick={collapsed ? onExpand : onFold}
               aria-expanded={!collapsed}
-              className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#557d78] hover:border-[#165749] hover:text-[#185045]"
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#557d78] hover:border-[#165749] hover:text-[#185045] max-sm:min-h-10"
             >
               {collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
               {collapsed ? tx("expand") : tx("fold")}
@@ -581,7 +581,7 @@ export function BasicCityCard({
             <CheckCircle2 className="size-3.5" />
             {tx("saveCity")}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="inline-flex h-9 items-center px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045]">
+          <button type="button" onClick={() => setEditing(false)} className="inline-flex h-9 items-center px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] max-sm:min-h-10">
             {tx("cancelEdit")}
           </button>
           <p className="basis-full text-[11px] font-semibold text-tv-text-faint">{tx("editCityHint")}</p>
@@ -628,7 +628,7 @@ export function BasicCityCard({
               type="button"
               onClick={onDone}
               disabled={missing.length > 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-8 items-center gap-1.5 rounded-[8px] px-4 text-[12px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
             >
               <CheckCircle2 className="size-3.5" />
               {tx("cityDone", { city: city.city_name })}
@@ -893,7 +893,7 @@ export function HotelPanel({
                       type="button"
                       onClick={() => follow(line, (l) => withRooms(l, l.rooms.filter((_, k) => k !== j)))}
                       aria-label={tx("removeRoom")}
-                      className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1]"
+                      className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1] max-sm:min-h-10 max-sm:min-w-10"
                     >
                       <X className="size-4" />
                     </button>
@@ -938,7 +938,7 @@ export function HotelPanel({
                 type="button"
                 // a new room starts as the one before it — type, board and price — and is changed if it differs
                 onClick={() => follow(line, (l) => withRooms(l, [...l.rooms, { ...(l.rooms[l.rooms.length - 1] ?? emptyRoomSpec()) }]))}
-                className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
               >
                 <Plus className="size-3.5" />
                 {tx("addRoom")}
@@ -974,7 +974,7 @@ export function HotelPanel({
           type="button"
           onClick={() => setMore((v) => !v)}
           aria-expanded={more}
-          className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045]"
+          className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045] max-sm:min-h-10"
         >
           {tx("moreInfo")}
           <ChevronDown className={`size-3.5 transition-transform ${more ? "rotate-180" : ""}`} />
@@ -1277,7 +1277,7 @@ function TboStayPrice({
             type="button"
             onClick={ask}
             disabled={state === "loading" || !checkIn || !checkOut}
-            className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#2b5bb5] bg-white px-2.5 text-[11.5px] font-bold text-[#2b5bb5] hover:bg-[#eef4ff] disabled:opacity-50"
+            className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#2b5bb5] bg-white px-2.5 text-[11.5px] font-bold text-[#2b5bb5] hover:bg-[#eef4ff] disabled:opacity-50 max-sm:min-h-10"
           >
             {state === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : null}
             {tx("tboPrice")}
@@ -1300,7 +1300,7 @@ function TboStayPrice({
                   type="button"
                   onClick={() => apply(r)}
                   disabled={r.total_line == null}
-                  className="rounded-[7px] bg-[#185045] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                  className="tv-btn-primary rounded-[7px] px-2.5 py-1 text-[11px] font-bold disabled:opacity-50 max-sm:min-h-10"
                 >
                   {tx("tboUse")}
                 </button>
@@ -1512,7 +1512,7 @@ function ServicesPanel({
     <button
       type="button"
       onClick={() => addOn(date)}
-      className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+      className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
     >
       <Plus className="size-3.5" />
       {label}
@@ -1615,7 +1615,7 @@ function ServicesPanel({
         <button
           type="button"
           onClick={() => (transportOn ? onSlice({ cities: addService(cities, index, "transfer", city.check_in) }) : addOn(null))}
-          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
         >
           <Plus className="size-3.5" />
           {tx("addService")}
@@ -1774,7 +1774,7 @@ function DayLines({
           <button
             type="button"
             onClick={() => onChange([...shown, ""])}
-            className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2 text-[11px] text-[#185045] hover:bg-[#f0f7f4]"
+            className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2 text-[11px] text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
           >
             <Plus className="size-3.5" />
             {tx("addLine")}
@@ -1783,7 +1783,7 @@ function DayLines({
             <button
               type="button"
               onClick={() => onChange(undefined)}
-              className="inline-flex h-7 items-center gap-1 rounded-[7px] px-2 text-[11px] text-[#557d78] hover:text-[#185045]"
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] px-2 text-[11px] text-[#557d78] hover:text-[#185045] max-sm:min-h-10"
             >
               <RotateCcw className="size-3.5" />
               {tx("defaultText")}

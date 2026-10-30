@@ -138,7 +138,7 @@ export function LedgerControls({ partnerId, limit }: { partnerId: string; limit:
             المرجع
             <input id={`pay-ref-${partnerId}`} dir="ltr" value={pay.reference} onChange={(e) => setPay({ ...pay, reference: e.target.value })} className={field} />
           </label>
-          <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={pending} className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10">
             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
             سجّل
           </button>
@@ -169,7 +169,7 @@ export function LedgerControls({ partnerId, limit }: { partnerId: string; limit:
             العملة
             <input id={`cap-currency-${partnerId}`} dir="ltr" value={cap.currency} onChange={(e) => setCap({ ...cap, currency: e.target.value.toUpperCase() })} className={`${field} w-20`} />
           </label>
-          <button type="submit" disabled={pending} className="inline-flex h-9 items-center rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] disabled:opacity-60">
+          <button type="submit" disabled={pending} className="inline-flex h-9 items-center rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] disabled:opacity-60 max-sm:min-h-10">
             حفظ
           </button>
         </div>

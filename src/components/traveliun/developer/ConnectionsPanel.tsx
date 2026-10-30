@@ -9,6 +9,7 @@ import { recheckAllConnections, recheckConnection, testFlightLookupApi } from "@
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «الارتباطات الخارجية» — one card per connection, as the server last saw it.
  * The page streams the first round in; each card re-checks on its own, and the
@@ -33,7 +34,7 @@ const TONES: Record<CheckStatus, { label: TranslationKey; badge: string; dot: st
 const sectionClass = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const cardClass = "flex min-w-0 flex-col gap-1.5 rounded-[12px] border border-[#e2ebe7] bg-[#f7faf8] p-3.5";
 const smallButton =
-  "inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center gap-1.5 rounded-[9px] border px-2.5 text-[11.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 
 function StatusBadge({ status }: { status: CheckStatus }) {
   const { t } = useTraveliunUI();

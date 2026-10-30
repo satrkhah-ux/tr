@@ -9,6 +9,7 @@ import {
 } from "@/lib/followups/supervision/actions";
 import { LEVEL_LABEL, PRIORITY_LABEL, PROOF_LABEL, type Priority } from "@/lib/followups/supervision/core";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «إشراف المتابعة» — the cases, the neediest first (at the management, then the
  * supervisor; high priority; the longest delay), with filters and the
@@ -17,7 +18,7 @@ import { LEVEL_LABEL, PRIORITY_LABEL, PROOF_LABEL, type Priority } from "@/lib/f
  */
 
 const field = "tv-field rounded-lg border p-2 text-sm";
-const btn = "rounded-lg border border-[#dbe6e1] px-2.5 py-1 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50";
+const btn = `${buttonTone({ variant: "secondary" })} rounded-lg border px-2.5 py-1 text-xs font-bold disabled:opacity-50 max-sm:min-h-10`;
 const LEVEL_TONE = { manager: "bg-red-100 text-red-800", supervisor: "bg-amber-100 text-amber-800", employee: "bg-[#eef3f1] text-[#185045]" } as const;
 const PRIO_TONE = { high: "text-red-700", normal: "text-[#185045]", low: "text-tv-text-faint" } as const;
 

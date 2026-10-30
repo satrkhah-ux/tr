@@ -130,7 +130,7 @@ export function TgEntry() {
             <button
               type="button"
               onClick={() => void start()}
-              className="mt-3 inline-flex h-10 items-center justify-center rounded-[10px] border border-[#dbe6e1] px-4 text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]"
+              className="tv-btn-secondary mt-3 inline-flex h-10 items-center justify-center rounded-[10px] border px-4 text-sm font-bold"
             >
               {t("exec.retry")}
             </button>

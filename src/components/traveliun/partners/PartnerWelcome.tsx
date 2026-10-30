@@ -220,7 +220,7 @@ export function PartnerWelcome({ home = "/b2b", homeLabel = "العودة لبو
       <button
         type="submit"
         disabled={saving}
-        className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#185045] text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-[13px] font-bold disabled:opacity-60"
       >
         {saving ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
         حفظ والدخول

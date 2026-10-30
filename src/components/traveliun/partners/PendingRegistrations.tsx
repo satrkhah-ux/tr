@@ -264,7 +264,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
             {company.has_account || made ? "تعيين كلمة المرور" : "إصدار الحساب بكلمة المرور"}
           </button>
-          <button type="button" onClick={() => setTemp(null)} className="h-9 px-2 text-[12px] font-bold text-[#557d78]">
+          <button type="button" onClick={() => setTemp(null)} className="h-9 px-2 text-[12px] font-bold text-[#557d78] max-sm:min-h-10">
             إلغاء
           </button>
           {temp && weak ? <span className="basis-full text-[11px] font-bold text-[#a86a10]">{weak}</span> : null}

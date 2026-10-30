@@ -374,7 +374,7 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
                 type="button"
                 disabled={pending}
                 onClick={confirm}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-3 text-[12px] font-bold text-white disabled:opacity-60 max-sm:min-h-10"
               >
                 {pending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 نعم، أكّد
@@ -383,7 +383,7 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
                 type="button"
                 disabled={pending}
                 onClick={() => setAsking(false)}
-                className="inline-flex h-8 items-center rounded-[8px] border border-[#d8e4df] px-3 text-[12px] font-bold text-[#557d78]"
+                className="inline-flex h-8 items-center rounded-[8px] border border-[#d8e4df] px-3 text-[12px] font-bold text-[#557d78] max-sm:min-h-10"
               >
                 تراجع
               </button>
@@ -392,7 +392,7 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
             <button
               type="button"
               onClick={() => setAsking(true)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white hover:opacity-90"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white hover:opacity-90 max-sm:min-h-10"
             >
               <CheckCircle2 className="size-3.5" />
               العميل أكّد
@@ -440,7 +440,7 @@ function RequestDocuments({ request }: { request: PartnerRequest }) {
         <button
           type="button"
           onClick={() => copy(`/trip/${token}`)}
-          className="inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#eef4f1] px-2.5 text-[11.5px] font-bold text-[var(--tv-brand)] dark:bg-[#17302a]"
+          className="inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#eef4f1] px-2.5 text-[11.5px] font-bold text-[var(--tv-brand)] dark:bg-[#17302a] max-sm:min-h-10"
         >
           <Copy className="size-3.5" />
           نسخ رابط العميل

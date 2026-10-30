@@ -151,7 +151,7 @@ export function ExecutiveOverview() {
       ) : error || !data ? (
         <section className="rounded-2xl border border-[#f4c9d4] bg-[#fdeef2] p-6 text-center">
           <p className="mb-3 text-sm font-bold text-[#c22850]">{t("exec.loadError")}</p>
-          <button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md bg-[#185045] px-4 py-2 text-sm font-bold text-white hover:bg-[#0f4439]">
+          <button type="button" onClick={load} className="tv-btn-primary inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold">
             <RotateCcw className="size-4" /> {t("exec.retry")}
           </button>
         </section>
@@ -314,7 +314,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
               {months.map((m) => <option key={m} value={m}>{monthLabel(m, language)}</option>)}
             </select>
           </Field>
-          <button type="button" onClick={reset} className="ms-auto inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]">
+          <button type="button" onClick={reset} className="tv-btn-secondary ms-auto inline-flex h-10 items-center gap-2 rounded-[10px] border px-4 text-sm font-bold">
             <RotateCcw className="size-4" /> {t("exec.reset")}
           </button>
         </div>

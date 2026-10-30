@@ -320,7 +320,7 @@ export function BasicFileStatus({
                 type="button"
                 onClick={() => void confirm()}
                 disabled={busy !== null}
-                className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:flex-1 ${
+                className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:flex-1 max-sm:min-h-10 ${
                   sentOnce && !view.stale ? "bg-[#185045] text-white hover:bg-[#0f4439]" : "border border-[#185045] bg-white text-[#185045] hover:bg-[#f0f7f4]"
                 }`}
               >
@@ -388,7 +388,7 @@ export function BasicFileStatus({
             type="button"
             onClick={() => void cancel()}
             disabled={busy !== null || !reason.trim()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c22850] px-3 text-[12px] font-bold text-white disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c22850] px-3 text-[12px] font-bold text-white disabled:opacity-50 max-sm:min-h-10"
           >
             {busy === "cancel" ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
             {tx("cancelDo")}

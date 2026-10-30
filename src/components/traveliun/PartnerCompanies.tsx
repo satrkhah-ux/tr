@@ -126,7 +126,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
             <button
               type="button"
               onClick={() => { setError(null); setDraft(toDraft()); }}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold"
             >
               <Plus className="size-4" />
               {t("partner.add")}
@@ -154,7 +154,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+                className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
                 aria-label={t("close")}
               >
                 <X className="size-4" />
@@ -285,7 +285,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
                 type="button"
                 onClick={save}
                 disabled={pending}
-                className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-[13px] font-bold disabled:opacity-60"
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                 {t("save")}
@@ -293,7 +293,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="inline-flex h-11 items-center rounded-[10px] border border-[#d8e3de] px-5 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+                className="tv-btn-secondary inline-flex h-11 items-center rounded-[10px] border px-5 text-[13px] font-bold"
               >
                 {t("cancel")}
               </button>
@@ -397,7 +397,7 @@ function LogoUpload({ partnerId }: { partnerId: string }) {
         type="button"
         disabled={busy}
         onClick={() => input.current?.click()}
-        className="mt-2 inline-flex h-10 items-center gap-2 rounded-[9px] border border-[#dbe6e1] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+        className="tv-btn-secondary mt-2 inline-flex h-10 items-center gap-2 rounded-[9px] border px-3 text-[12.5px] font-bold disabled:opacity-60"
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <ImageUp className="size-4" />}
         {t("partner.uploadLogo")}
@@ -453,7 +453,7 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
           <button
             type="button"
             onClick={onEdit}
-            className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+            className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
             aria-label={t("edit")}
           >
             <Pencil className="size-4" />

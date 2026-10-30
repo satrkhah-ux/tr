@@ -145,7 +145,7 @@ export function ConversationsAdmin({ initial }: { initial: Data }) {
               {list.map((o) => {
                 const on = (exempt[k] as (string | number)[]).includes(o.id);
                 return (
-                  <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(k, o.id as never)} className={`h-7 rounded-full border px-2.5 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-[#e8f6ef] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]"}`}>
+                  <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(k, o.id as never)} className={`h-7 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10 ${on ? "border-[#2aa87a] bg-[#e8f6ef] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]"}`}>
                     {o.name}
                   </button>
                 );

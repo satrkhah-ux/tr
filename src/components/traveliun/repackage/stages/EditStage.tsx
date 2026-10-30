@@ -186,7 +186,7 @@ export function EditStage({ draftId, data, patch }: RepackageStageProps) {
       </div>
 
       <div className="flex justify-end">
-        <button type="button" onClick={() => router.push(stageHref(draftId, "preview"))} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]">
+        <button type="button" onClick={() => router.push(stageHref(draftId, "preview"))} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-bold transition-colors">
           {t("rp.stage.preview")}
         </button>
       </div>
@@ -219,7 +219,7 @@ function ListEditor({ label, items, presets, onChange, addLabel, placeholder }: 
       {remaining.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {remaining.map((p) => (
-            <button key={p} type="button" onClick={() => add(p)} className="rounded-full border border-dashed border-[#b7d0c7] px-2.5 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">＋ {p}</button>
+            <button key={p} type="button" onClick={() => add(p)} className="rounded-full border border-dashed border-[#b7d0c7] px-2.5 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10">＋ {p}</button>
           ))}
         </div>
       ) : null}

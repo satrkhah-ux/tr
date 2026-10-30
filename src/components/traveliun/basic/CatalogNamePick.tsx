@@ -97,17 +97,17 @@ export function CatalogTextAdd({
       </span>
       {text.trim() ? (
         hint.kind === "new" ? (
-          <button type="button" disabled={busy} onClick={() => void addNew()} className="inline-flex items-center gap-1 rounded-[8px] border border-dashed border-[#2aa87a] px-2 py-1 text-start text-[11.5px] font-bold text-[#0f7a52] disabled:opacity-60">
+          <button type="button" disabled={busy} onClick={() => void addNew()} className="inline-flex items-center gap-1 rounded-[8px] border border-dashed border-[#2aa87a] px-2 py-1 text-start text-[11.5px] font-bold text-[#0f7a52] disabled:opacity-60 max-sm:min-h-10">
             <Check className="size-3.5" /> أضف «{text.trim()}» — يُرسل لقسم البيانات للمراجعة
           </button>
         ) : (
           <span className="flex flex-wrap items-center gap-1 text-[11.5px] font-bold text-[#185045]">
             {hint.kind === "close" ? <span className="text-tv-text-faint">هل تقصد:</span> : null}
-            <button type="button" onClick={() => onDone(hint.name, true)} className="rounded-[8px] bg-[#e3efe9] px-2 py-1 text-[#0f7a52]">
+            <button type="button" onClick={() => onDone(hint.name, true)} className="rounded-[8px] bg-[#e3efe9] px-2 py-1 text-[#0f7a52] max-sm:min-h-10">
               {hint.name}
             </button>
             {hint.kind === "close" ? (
-              <button type="button" disabled={busy} onClick={() => void addNew()} className="rounded-[8px] px-2 py-1 text-[#557d78] underline disabled:opacity-60">
+              <button type="button" disabled={busy} onClick={() => void addNew()} className="rounded-[8px] px-2 py-1 text-[#557d78] underline disabled:opacity-60 max-sm:min-h-10">
                 لا، أضف «{text.trim()}»
               </button>
             ) : null}

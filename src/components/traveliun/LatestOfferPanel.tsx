@@ -131,7 +131,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                 </div>
                 <div className="rounded-md border border-[#dce7e2] bg-[#f7faf8] p-3 text-left text-sm font-semibold text-[#185045]" dir="ltr">{clientLink}</div>
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <button type="button" onClick={copyClientLink} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#c9d8d3] bg-white text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]">
+                  <button type="button" onClick={copyClientLink} className="tv-btn-secondary inline-flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-bold">
                     <Copy className="size-4" /> {copied ? t("copied") : t("copy")}
                   </button>
                   <Link href={`/client-offer/${offer.serial}`} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#2aa87a] text-sm font-bold text-white hover:bg-[#248d68]">

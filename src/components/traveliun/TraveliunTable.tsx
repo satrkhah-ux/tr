@@ -391,7 +391,7 @@ export function TraveliunTable({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="me-auto inline-flex h-[46px] items-center gap-2 rounded-[11px] bg-[#185045] px-6 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]"
+              className="tv-btn-primary me-auto inline-flex h-[46px] items-center gap-2 rounded-[11px] px-6 text-sm font-bold transition-colors"
             >
               <Plus className="size-4" aria-hidden />
               {t("add")}
@@ -629,7 +629,7 @@ function CardsView({
             <button
               type="button"
               onClick={() => onAction(row)}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#e2ebe7] text-tv-text-faint transition-colors hover:bg-[#e8f1ed] hover:text-[#185045]"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#e2ebe7] text-tv-text-faint transition-colors hover:bg-[#e8f1ed] hover:text-[#185045] max-sm:min-h-10 max-sm:min-w-10"
               aria-label={actionsLabel}
             >
               <Settings className="size-4" />
@@ -1043,8 +1043,8 @@ export function RecordForm({
         ) : null}
 
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-10 rounded-[10px] border border-[#d8e3de] px-5 text-sm font-semibold text-[#185045] hover:bg-[#f4f8f6]">{t("cancel")}</button>
-          <button type="submit" disabled={saving} className="flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-70">
+          <button type="button" onClick={onClose} className="tv-btn-secondary h-10 rounded-[10px] border px-5 text-sm font-semibold">{t("cancel")}</button>
+          <button type="submit" disabled={saving} className="tv-btn-primary flex h-10 items-center gap-2 rounded-[10px] px-6 text-sm font-bold disabled:opacity-70">
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
             {saving ? t("saving") : t("save")}
           </button>
@@ -1201,7 +1201,7 @@ function FieldInput({ column, countryId, value, required, onChange }: { column: 
             <button
               type="button"
               onClick={() => onChange(splitNumbered(value))}
-              className="rounded-lg border border-[#2aa87a] px-3 py-1 text-xs font-bold text-[#185045] hover:bg-[#eef7f3]"
+              className="rounded-lg border border-[#2aa87a] px-3 py-1 text-xs font-bold text-[#185045] hover:bg-[#eef7f3] max-sm:min-h-10"
             >
               {t("data.form.splitItems")}
             </button>
@@ -1307,7 +1307,7 @@ function RowActionModal({
           </div>
         ) : (
           <div className={`grid gap-2 ${onMerge ? "sm:grid-cols-4" : onDelete ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-            <button type="button" onClick={onEdit} className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#185045] text-sm font-bold text-white hover:bg-[#0f4439]">
+            <button type="button" onClick={onEdit} className="tv-btn-primary flex h-10 items-center justify-center gap-2 rounded-[10px] text-sm font-bold">
               <Eye className="size-4" /> {t("edit")}
             </button>
             <button type="button" disabled={busy} onClick={() => start(onCopy)} className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#d8e3de] text-sm font-bold hover:bg-[#f4f8f6] disabled:opacity-70">

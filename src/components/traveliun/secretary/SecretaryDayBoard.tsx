@@ -72,14 +72,14 @@ function Row({ item, index, nowMs, readOnly, onDone, busyKey }: {
       {item.followupId && <a href={`/followups/${item.followupId}`} className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045]">ملف المتابعة</a>}
       {item.draft && <button type="button" onClick={() => void copyDraft()} className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045]"><Copy size={13} /> {copied ? "نُسخ ✓" : "انسخ الرد المقترح"}</button>}
       {!readOnly && <>
-        <button type="button" disabled={busy} onClick={() => onDone(item.key)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-600 px-3 py-1.5 text-xs font-bold text-emerald-700">
+        <button type="button" disabled={busy} onClick={() => onDone(item.key)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-600 px-3 py-1.5 text-xs font-bold text-emerald-700 max-sm:min-h-10">
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} تمّت
         </button>
         <div className="relative">
           <button type="button" disabled={remindBusy} onClick={() => setRemindOpen((v) => !v)} className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045]"><Clock size={13} /> ذكّرني</button>
           {remindOpen && <div className="absolute z-10 mt-1 flex gap-1 rounded-lg border border-[#dbe6e1] bg-white p-1 shadow">
             {[["ساعة", 1], ["غداً", 24], ["3 أيام", 72]].map(([label, h]) => <button key={label as string} type="button" disabled={remindBusy}
-              onClick={() => void remind(h as number)} className="rounded px-2 py-1 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6]">{label as string}</button>)}
+              onClick={() => void remind(h as number)} className="rounded px-2 py-1 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6] max-sm:min-h-10">{label as string}</button>)}
           </div>}
         </div>
       </>}

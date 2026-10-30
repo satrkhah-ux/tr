@@ -273,7 +273,7 @@ function NextButton({ missing, onNext, tools }: { missing: string[]; onNext: () 
         type="button"
         onClick={onNext}
         disabled={missing.length > 0}
-        className="inline-flex h-9 items-center rounded-[9px] bg-[#185045] px-5 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+        className="tv-btn-primary inline-flex h-9 items-center rounded-[9px] px-5 text-[12.5px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
       >
         {tx("next")}
       </button>
@@ -1089,7 +1089,7 @@ export function BasicEditor({
           <span className="min-w-0 flex-1">
             {tx("datesFitAsk", { a: dayMonth(dateFit.arrival_date), b: dayMonth(dateFit.departure_date), c: dayMonth(trip.arrival_date), d: dayMonth(trip.departure_date) })}
           </span>
-          <button type="button" onClick={adoptFlightDates} className="h-8 max-sm:h-10 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white">
+          <button type="button" onClick={adoptFlightDates} className="tv-btn-primary h-8 max-sm:h-10 rounded-[8px] px-3 text-[12px] font-bold">
             {tx("datesFitYes")}
           </button>
           <button type="button" onClick={() => setKeptDates(dateFitKey)} className="text-[11.5px] font-bold text-[#185045] underline">
@@ -1446,7 +1446,7 @@ export function BasicEditor({
         type="button"
         onClick={() => void calculate()}
         disabled={pricingBusy}
-        className="inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+        className="tv-btn-secondary inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold disabled:opacity-60"
       >
         {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
         {pricingBusy ? tx("calcBusy") : tx("calc")}
@@ -1947,7 +1947,7 @@ export function BasicEditor({
                           type="button"
                           onClick={() => void saveGroup(g.key, !bad)}
                           disabled={saveState === "saving"}
-                          className="inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                          className="tv-btn-primary inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] px-4 text-[12px] font-extrabold disabled:opacity-60"
                         >
                           {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
                           {tx("saveCard")}

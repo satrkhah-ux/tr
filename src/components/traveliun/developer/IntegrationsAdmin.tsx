@@ -88,7 +88,7 @@ function Editor({ value, onDone }: { value: Draft; onDone: () => void }) {
           {busy ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
           حفظ
         </button>
-        <button type="button" onClick={onDone} className="h-9 rounded-[9px] border border-[#cfe0d9] px-3 text-[12.5px] font-bold text-[#185045]">
+        <button type="button" onClick={onDone} className="h-9 rounded-[9px] border border-[#cfe0d9] px-3 text-[12.5px] font-bold text-[#185045] max-sm:min-h-10">
           إلغاء
         </button>
         {error ? <span className="text-[12px] font-bold text-[#c22850]">{error}</span> : null}
@@ -131,7 +131,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                 {checking ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
                 افحص الآن
               </button>
-              <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12.5px] font-extrabold text-white">
+              <button type="button" onClick={() => setEditing("new")} className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12.5px] font-extrabold max-sm:min-h-10">
                 <Plus className="size-4" />
                 إضافة
               </button>

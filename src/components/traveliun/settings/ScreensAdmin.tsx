@@ -117,7 +117,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               type="button"
               disabled={busy !== null}
               onClick={() => save({ ...cfg, order })}
-              className="inline-flex h-9 items-center gap-2 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-bold text-white disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[9px] px-4 text-[12.5px] font-bold disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
               حفظ
@@ -210,7 +210,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {demoOn ? (
-              <button type="button" disabled={busy !== null} onClick={() => save({ ...cfg, demoUntil: new Date(openedAt - 1000).toISOString() }, "أُوقفت التجربة")} className="h-9 rounded-[9px] border border-[#f0c9d2] px-3 text-[12.5px] font-bold text-[#a3263f] hover:bg-[#fdecef] disabled:opacity-50">
+              <button type="button" disabled={busy !== null} onClick={() => save({ ...cfg, demoUntil: new Date(openedAt - 1000).toISOString() }, "أُوقفت التجربة")} className="h-9 rounded-[9px] border border-[#f0c9d2] px-3 text-[12.5px] font-bold text-[#a3263f] hover:bg-[#fdecef] disabled:opacity-50 max-sm:min-h-10">
                 إيقاف التجربة
               </button>
             ) : null}
@@ -218,7 +218,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               type="button"
               disabled={busy !== null}
               onClick={() => save({ ...cfg, demoUntil: new Date(Math.max(Date.now(), Date.parse(cfg.demoUntil)) + 86_400_000).toISOString() }, "مُدّدت التجربة يوماً")}
-              className="h-9 rounded-[9px] border border-[#2aa87a] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50"
+              className="tv-btn-secondary h-9 rounded-[9px] border px-3 text-[12.5px] font-bold disabled:opacity-50 max-sm:min-h-10"
             >
               تمديد يوماً
             </button>
@@ -236,7 +236,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               type="button"
               disabled={busy !== null}
               onClick={() => run("test", () => sendScreensTest(testDest), "أُرسل — يظهر على كل الشاشات بعد ثوانٍ، مكتوباً عليه «تجربة»")}
-              className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#2aa87a] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50"
+              className="tv-btn-secondary inline-flex h-9 items-center gap-2 rounded-[9px] border px-3 text-[12.5px] font-bold disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "test" ? <Loader2 className="size-4 animate-spin" /> : <Bell className="size-4" />}
               أرسل تجربة

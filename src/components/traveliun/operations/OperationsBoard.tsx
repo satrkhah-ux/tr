@@ -360,7 +360,7 @@ function UploadPicker({ operations }: { operations: OperationCard[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439]"
+        className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-extrabold"
       >
         <FileUp className="size-4" />
         {t("wz.up.pick")}

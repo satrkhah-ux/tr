@@ -191,7 +191,7 @@ export function SupplierSearchTry({ code, countries }: { code: string; countries
             type="button"
             onClick={() => void search()}
             disabled={busy || !country || !city || checkOut <= checkIn}
-            className="mt-4 inline-flex h-10 items-center gap-2 rounded-[9px] bg-[#185045] px-5 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50"
+            className="tv-btn-primary mt-4 inline-flex h-10 items-center gap-2 rounded-[9px] px-5 text-[13px] font-bold transition-colors disabled:opacity-50"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             {busy ? t("settings.supplierTry.searching") : t("settings.supplierTry.search")}

@@ -228,7 +228,7 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
       </div>
 
       <div className="flex justify-end">
-        <button type="button" onClick={() => router.push(stageHref(draftId, "edit"))} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]">
+        <button type="button" onClick={() => router.push(stageHref(draftId, "edit"))} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-bold transition-colors">
           {t("rp.stage.edit")}
         </button>
       </div>
@@ -246,7 +246,7 @@ function FieldHead({ label, confident, confirmLabel, onConfirm }: { label: strin
           {confident ? t("rp.review.confident") : t("rp.review.uncertain")}
         </span>
         {!confident ? (
-          <button type="button" onClick={onConfirm} className="inline-flex items-center gap-1 rounded-md bg-[#f0f7f4] px-2 py-0.5 text-[10.5px] font-extrabold text-[#185045] hover:bg-[#e2ede9]">
+          <button type="button" onClick={onConfirm} className="inline-flex items-center gap-1 rounded-md bg-[#f0f7f4] px-2 py-0.5 text-[10.5px] font-extrabold text-[#185045] hover:bg-[#e2ede9] max-sm:min-h-10">
             <CheckCircle2 className="size-3" />{confirmLabel}
           </button>
         ) : null}

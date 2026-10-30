@@ -57,7 +57,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="flex-1 text-xl font-extrabold">قواعد مراد بين الموظفين</h2>
         <span className="text-sm tabular-nums text-[#5b7a71]">نفّذ <b>{counts.approve}</b> · لا تنفّذ <b>{counts.reject}</b> · تعديل <b>{counts.edit}</b> · بلا قرار <b>{undecided}</b></span>
-        <button onClick={() => setOpen(!open)} className="rounded-lg bg-[#185045] px-5 py-2 text-sm font-bold text-white">
+        <button onClick={() => setOpen(!open)} className="tv-btn-primary rounded-lg px-5 py-2 text-sm font-bold">
           {open ? "أخفِ القواعد" : "اعرض القواعد"}
         </button>
       </div>
@@ -82,14 +82,14 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
             <p className="my-2 text-sm leading-7">{r.desc}</p>
             <div className="flex flex-wrap gap-2">
               {CHOICE_LABELS.map(([c, label]) => <button key={c} disabled={busy} onClick={() => decide(r.id, c)}
-                className={`rounded-lg border px-4 py-1.5 text-sm font-bold ${dec?.choice === c ? CHOICE_STYLE[c] : "bg-white"}`}>{label}</button>)}
+                className={`rounded-lg border px-4 py-1.5 text-sm font-bold max-sm:min-h-10 ${dec?.choice === c ? CHOICE_STYLE[c] : "bg-white"}`}>{label}</button>)}
             </div>
             {dec?.choice === "edit" && <div className="mt-3 space-y-2">
               <label className="block text-xs">اكتب القاعدة كما تريدها (وقت، صياغة، استثناء…):
                 <textarea value={drafts[r.id] ?? dec.text ?? r.desc} onChange={(e) => setDrafts({ ...drafts, [r.id]: e.target.value })}
                   maxLength={2000} className="tv-field mt-1 w-full rounded-lg border p-3 text-sm" rows={3} />
               </label>
-              <button disabled={busy} onClick={() => saveEdit(r.id)} className="rounded-lg bg-[#185045] px-4 py-1.5 text-sm font-bold text-white">احفظ التعديل</button>
+              <button disabled={busy} onClick={() => saveEdit(r.id)} className="tv-btn-primary rounded-lg px-4 py-1.5 text-sm font-bold max-sm:min-h-10">احفظ التعديل</button>
               {dec.text && <p className="rounded-lg bg-amber-50 p-2 text-xs leading-6">التعديل المحفوظ: {dec.text}</p>}
             </div>}
           </article>;
@@ -109,7 +109,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
       <div className="mt-3 flex flex-col gap-2">
         <textarea value={addText} onChange={(e) => setAddText(e.target.value)} maxLength={1000} rows={2}
           placeholder="مثال: السحب لا يشمل عملاء كباراً محددين بقائمة…" className="tv-field w-full rounded-lg border p-3 text-sm" />
-        <button disabled={busy || !addText.trim()} onClick={addRule} className="self-start rounded-lg bg-[#185045] px-4 py-2 text-sm font-bold text-white">أضف القاعدة</button>
+        <button disabled={busy || !addText.trim()} onClick={addRule} className="tv-btn-primary self-start rounded-lg px-4 py-2 text-sm font-bold">أضف القاعدة</button>
       </div>
     </div>
 
@@ -118,7 +118,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
         <span className="flex-1 tabular-nums">نفّذ <b>{counts.approve}</b> · لا تنفّذ <b>{counts.reject}</b> · تعديل <b>{counts.edit}</b> · بلا قرار <b>{undecided}</b></span>
         {doc.approvedAt && <span className="font-bold text-emerald-700">اعتُمدت في {new Date(doc.approvedAt).toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" })}</span>}
         <button disabled={busy} onClick={() => void save({ ...doc, approvedAt: new Date().toISOString() })}
-          className="rounded-lg bg-[#185045] px-5 py-2 font-bold text-white">{doc.approvedAt ? "حدّث الاعتماد" : "اعتمد القرارات"}</button>
+          className="tv-btn-primary rounded-lg px-5 py-2 font-bold">{doc.approvedAt ? "حدّث الاعتماد" : "اعتمد القرارات"}</button>
       </div>
       <p role="status" className="mt-1 text-sm text-red-700">{message}</p>
     </div>

@@ -124,7 +124,7 @@ function PendingRow({
             type="button"
             disabled={pending || !roleId}
             onClick={() => run(() => approveRegistration(request.id, roleId), "team.pending.approved")}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <BadgeCheck className="size-3.5" />}
             {t("team.pending.approve")}
@@ -133,7 +133,7 @@ function PendingRow({
             type="button"
             disabled={pending}
             onClick={() => setRejecting((v) => !v)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#f2c7c7] px-3 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#f2c7c7] px-3 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
           >
             <XCircle className="size-3.5" />
             {t("team.pending.reject")}
@@ -161,7 +161,7 @@ function PendingRow({
             type="button"
             disabled={pending || reason.trim().length < 3}
             onClick={() => run(() => rejectRegistration(request.id, reason), "team.pending.rejected")}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c43d3d] px-3 text-[12px] font-bold text-white hover:bg-[#a83232] disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c43d3d] px-3 text-[12px] font-bold text-white hover:bg-[#a83232] disabled:opacity-60 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <XCircle className="size-3.5" />}
             {t("team.pending.confirmReject")}

@@ -291,7 +291,7 @@ function TableToolbar({
       {page.addLabel ? (
         <button
           type="button"
-          className="me-auto inline-flex h-[46px] items-center gap-2 rounded-[7px] bg-[#185045] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#0f4439]"
+          className="tv-btn-primary me-auto inline-flex h-[46px] items-center gap-2 rounded-[7px] px-6 text-sm font-semibold transition-colors"
           onClick={onAdd}
         >
           <Plus className="size-4" />
@@ -422,7 +422,7 @@ function TableFooter({ showPages = false }: { showPages?: boolean }) {
             <button
               key={pageNumber}
               type="button"
-              className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm ${
+              className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm max-sm:min-h-10 ${
                 pageNumber === 1 ? "border-[#185045] bg-[#185045] text-white" : "border-[#dfe8e4] bg-white text-[#185045]"
               }`}
             >
@@ -491,7 +491,7 @@ function AddRecordModal({
           <button type="button" onClick={onClose} className="h-10 rounded-md border border-[#d8e3de] px-5 text-sm font-semibold text-[#185045]">
             {t("cancel")}
           </button>
-          <button type="submit" className="h-10 rounded-md bg-[#185045] px-6 text-sm font-bold text-white hover:bg-[#0f4439]">
+          <button type="submit" className="tv-btn-primary h-10 rounded-md px-6 text-sm font-bold">
             {t("save")}
           </button>
         </div>
@@ -556,7 +556,7 @@ function RowActionModal({
         </div>
 
         <div className="grid gap-2 sm:grid-cols-3">
-          <button type="button" className="flex h-10 items-center justify-center gap-2 rounded-md bg-[#185045] text-sm font-bold text-white">
+          <button type="button" className="tv-btn-primary flex h-10 items-center justify-center gap-2 rounded-md text-sm font-bold">
             <Eye className="size-4" />
             {t("legacy.viewAction")}
           </button>
@@ -689,7 +689,7 @@ function EmployeeModal({
         </div>
 
         <div className="border-t border-[#cfd9d5] px-8 py-6 text-center">
-          <button type="submit" className="h-[48px] rounded-[6px] bg-[#185045] px-7 text-[16px] font-bold text-white hover:bg-[#0f4439]">
+          <button type="submit" className="tv-btn-primary h-[48px] rounded-[6px] px-7 text-[16px] font-bold">
             {t("save")}
           </button>
         </div>
@@ -910,7 +910,7 @@ function RolePermissionModal({
         </div>
 
         <div className="border-t border-[#cfd9d5] px-8 py-5 text-center">
-          <button type="submit" className="h-[48px] rounded-[6px] bg-[#185045] px-7 text-[16px] font-bold text-white hover:bg-[#0f4439]">
+          <button type="submit" className="tv-btn-primary h-[48px] rounded-[6px] px-7 text-[16px] font-bold">
             {t("save")}
           </button>
         </div>
@@ -1144,7 +1144,7 @@ function PagerButton({
   return (
     <button
       type="button"
-      className={`flex h-9 w-9 items-center justify-center rounded-md border border-[#dfe8e4] bg-white ${
+      className={`flex h-9 w-9 items-center justify-center rounded-md border border-[#dfe8e4] bg-white max-sm:min-h-10 ${
         muted ? "text-tv-text-faint" : "text-tv-text-faint"
       }`}
     >

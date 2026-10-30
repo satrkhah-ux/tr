@@ -264,7 +264,7 @@ export function GeneratorFlow({
               <button
                 type="button"
                 onClick={() => setPreviewOpen((v) => !v)}
-                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex"
+                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex max-sm:min-h-10"
               >
                 {previewOpen ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 {previewOpen ? t("pg.hidePreview") : t("pg.showPreview")}
@@ -375,7 +375,7 @@ export function GeneratorFlow({
                         type="button"
                         onClick={() => next && blockers.length === 0 && open(next.key)}
                         disabled={blockers.length > 0}
-                        className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {nextLabel}
                         <ChevronLeft className="size-4 ltr:rotate-180 rtl:rotate-0" />

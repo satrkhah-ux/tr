@@ -78,7 +78,7 @@ export function ReadyOffersCatalog({
             <button
               type="button"
               onClick={() => setSyncOpen(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold"
             >
               <RefreshCw className="size-4" /> {t("ro.sync")}
             </button>
@@ -564,7 +564,7 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
                 type="button"
                 onClick={apply}
                 disabled={state === "applying"}
-                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold disabled:opacity-50"
               >
                 {state === "applying" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 {t("ro.syncApply")}

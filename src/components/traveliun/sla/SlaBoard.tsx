@@ -225,7 +225,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
                 key={r.id}
                 type="button"
                 onClick={() => setTier(on ? "" : r.id)}
-                className="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-bold"
+                className="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
                 style={{ color: r.color, borderColor: on ? r.color : `${r.color}55`, background: on ? `${r.color}22` : `${r.color}0d` }}
               >
                 {r.name}
@@ -244,7 +244,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
               key={name || "__none"}
               type="button"
               onClick={() => setAgent(agent === (name || "__none") ? "" : name || "__none")}
-              className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-bold ${agent === (name || "__none") ? "border-[#c22850] bg-[#fdf3f6] text-[#c22850]" : "border-[#f2c9d4] bg-white text-[#8a1f3c]"}`}
+              className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10 ${agent === (name || "__none") ? "border-[#c22850] bg-[#fdf3f6] text-[#c22850]" : "border-[#f2c9d4] bg-white text-[#8a1f3c]"}`}
             >
               {name || tx("noAgent")} <span className="tv-tnum">{n}</span>
             </button>
@@ -353,7 +353,7 @@ function Followups({ board, onChanged }: { board: OkBoard; onChanged: () => void
             key={s}
             type="button"
             onClick={() => setStatus(s)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${status === s ? "bg-[#185045] text-white" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold max-sm:min-h-10 ${status === s ? "bg-[#185045] text-white" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
           >
             {tx(s === "open" ? "fuOpen" : "fuDone")}
             <span className="tv-tnum">{board.followups.filter((f) => f.status === s).length}</span>
@@ -640,7 +640,7 @@ function RuleRow({ initial, teams, onChanged, onDiscard }: { initial: Draft; tea
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
         {tx("save")}
       </button>
-      <button type="button" disabled={busy} onClick={remove} title={tx("delete")} aria-label={tx("delete")} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c9d4] bg-white text-[#c22850] hover:bg-[#fdf3f6]">
+      <button type="button" disabled={busy} onClick={remove} title={tx("delete")} aria-label={tx("delete")} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c9d4] bg-white text-[#c22850] hover:bg-[#fdf3f6] max-sm:min-h-10 max-sm:min-w-10">
         <Trash2 className="size-3.5" />
       </button>
       {msg ? <span className="text-[11.5px] font-bold text-[#557d78]">{msg}</span> : null}

@@ -36,14 +36,14 @@ export function TiersEditor({ partnerId, initial, title, hint }: { partnerId: st
               النسبة %
               <input id={`tier-pct-${key}-${i}`} type="number" min={0} max={100} step="0.5" dir="ltr" value={r.pct} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, pct: e.target.value } : x)))} className={`${field} tv-tnum w-24`} />
             </label>
-            <button type="button" aria-label="حذف الدرجة" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="flex size-9 items-center justify-center rounded-[8px] border border-[#f0c7c7] text-[#c22850]">
+            <button type="button" aria-label="حذف الدرجة" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="flex size-9 items-center justify-center rounded-[8px] border border-[#f0c7c7] text-[#c22850] max-sm:min-h-10 max-sm:min-w-10">
               <X className="size-4" />
             </button>
           </div>
         ))}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setRows([...rows, { min: "", pct: "" }])} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045]">
+        <button type="button" onClick={() => setRows([...rows, { min: "", pct: "" }])} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] max-sm:min-h-10">
           <Plus className="size-4" />
           درجة
         </button>

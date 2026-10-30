@@ -114,7 +114,7 @@ export function TraveliunSignIn() {
             <button
               type="submit"
               disabled={loading}
-              className="flex h-[50px] w-full items-center justify-center gap-2 rounded-[8px] bg-[#185045] text-[15px] font-semibold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-70"
+              className="tv-btn-primary flex h-[50px] w-full items-center justify-center gap-2 rounded-[8px] text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70"
             >
               {loading ? (
                 <>

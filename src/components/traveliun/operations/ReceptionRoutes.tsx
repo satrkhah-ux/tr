@@ -105,7 +105,7 @@ export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <button type="button" onClick={save} disabled={saving} className="h-9 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
+        <button type="button" onClick={save} disabled={saving} className="tv-btn-primary h-9 rounded-[9px] px-4 text-[12.5px] font-bold disabled:opacity-60 max-sm:min-h-10">
           حفظ
         </button>
         {note === "saved" ? <span className="text-[12px] font-bold text-[#0f7a52]">حُفظ.</span> : null}

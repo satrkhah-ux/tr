@@ -190,7 +190,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
         <button
           type="button"
           onClick={() => setGroups([...groups, { id: newId(), beds: [{ bed_type_id: "double", quantity: 1 }] }])}
-          className="inline-flex h-8 items-center gap-1.5 justify-self-start rounded-[8px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+          className="inline-flex h-8 items-center gap-1.5 justify-self-start rounded-[8px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
         >
           <Plus className="size-3.5" />
           {t("ops.room.addOption")}
@@ -313,7 +313,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
         type="button"
         disabled={pending}
         onClick={save}
-        className="inline-flex h-10 items-center gap-2 justify-self-start rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary inline-flex h-10 items-center gap-2 justify-self-start rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60"
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
         {t("save")}

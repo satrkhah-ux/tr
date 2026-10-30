@@ -253,7 +253,7 @@ function PaymentForm({
           type="button"
           disabled={pending || !(Number(amount) > 0) || !date}
           onClick={save}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Wallet className="size-4" />}
           {editing ? t("save") : t("ops.payment.add")}
@@ -339,7 +339,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
             type="button"
             disabled={pending}
             onClick={() => run(() => deletePayment(payment.id))}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c22850] px-3 text-[11.5px] font-bold text-white disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c22850] px-3 text-[11.5px] font-bold text-white disabled:opacity-60 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
             {t("delete")}
@@ -378,7 +378,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
                 type="button"
                 disabled={pending}
                 onClick={() => setConfirming(true)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
               >
                 <Trash2 className="size-3.5" />
                 {t("delete")}
@@ -522,7 +522,7 @@ function Schedule({
               type="button"
               disabled={pending || draft.length === 0 || draft.some((r) => !r.due_date || !(Number(r.amount) > 0))}
               onClick={() => save(draft.map((r) => ({ due_date: r.due_date, amount: Number(r.amount) })))}
-              className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+              className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60 max-sm:min-h-10"
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
               {t("save")}

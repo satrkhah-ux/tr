@@ -202,7 +202,7 @@ function DriverCard({
               type="button"
               disabled={pending}
               onClick={save}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
             >
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
               {t("save")}
@@ -271,7 +271,7 @@ export function DriverSend({ bookingId, onSent }: { bookingId: string; onSent?: 
         type="button"
         disabled={pending}
         onClick={() => (draft ? setDraft(null) : prepare())}
-        className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-2.5 text-[11.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10"
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
         {t("ops.drv.send")}
@@ -399,7 +399,7 @@ function MessageBox({
           type="button"
           disabled={pending}
           onClick={() => send("manual")}
-          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+          className="tv-btn-secondary inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
         >
           <Check className="size-3.5" />
           {t("ops.request.markSent")}

@@ -56,7 +56,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
                   ادفع بتمارا — قسّمها
                 </button>
               ) : (
-                <button type="submit" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-[#185045] text-[16px] font-extrabold text-white hover:bg-[#0f4439]">
+                <button type="submit" className="tv-btn-primary inline-flex h-12 w-full items-center justify-center gap-2 rounded-[12px] text-[16px] font-extrabold">
                   <CreditCard className="size-5" />
                   ادفع الآن
                 </button>

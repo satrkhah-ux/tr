@@ -181,7 +181,7 @@ export function EmployeeAccounts() {
                           type="button"
                           onClick={() => setTemp({ id: row.id, value: "" })}
                           disabled={busy !== null}
-                          className="me-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50"
+                          className="me-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50 max-sm:min-h-10"
                         >
                           <KeyRound className="size-3.5" />
                           {t("emp.tempPassword")}
@@ -253,7 +253,7 @@ export function TempPassword({
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
         {t("emp.tempPasswordSave")}
       </button>
-      <button type="button" onClick={onCancel} className="h-9 px-1 text-[12px] font-bold text-[#557d78]">
+      <button type="button" onClick={onCancel} className="h-9 px-1 text-[12px] font-bold text-[#557d78] max-sm:min-h-10">
         {t("cancel")}
       </button>
       {value && weak ? <span className="basis-full text-end text-[11px] font-bold text-[#a86a10]">{weak}</span> : null}

@@ -180,7 +180,7 @@ export function TeamMembers({
                   <button
                     type="button"
                     onClick={() => { setError(null); setDraft(toDraft()); }}
-                    className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]"
+                    className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold"
                   >
                     <UserPlus className="size-4" />
                     {t("add")}
@@ -243,7 +243,7 @@ export function TeamMembers({
                 type="button"
                 onClick={save}
                 disabled={pending}
-                className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-[13px] font-bold disabled:opacity-60"
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                 {t("save")}
@@ -251,7 +251,7 @@ export function TeamMembers({
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="inline-flex h-11 items-center rounded-[10px] border border-[#d8e3de] px-5 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+                className="tv-btn-secondary inline-flex h-11 items-center rounded-[10px] border px-5 text-[13px] font-bold"
               >
                 {t("cancel")}
               </button>
@@ -301,7 +301,7 @@ export function TeamMembers({
                       type="button"
                       onClick={() => setTgFor(tgFor === m.id ? null : m.id)}
                       aria-expanded={tgFor === m.id}
-                      className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
+                      className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] max-sm:min-h-10 ${
                         m.telegram_linked ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-tv-text-faint"
                       }`}
                     >
@@ -340,7 +340,7 @@ export function TeamMembers({
                         type="button"
                         onClick={() => setExtraFor(extraFor === m.id ? null : m.id)}
                         aria-expanded={extraFor === m.id}
-                        className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
+                        className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] max-sm:min-h-10 ${
                           m.extra_permission_keys.length + m.removed_permission_keys.length > 0 ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"
                         }`}
                       >
@@ -355,7 +355,7 @@ export function TeamMembers({
                           type="button"
                           onClick={() => { setPwDone(null); setPw(pw?.id === m.id ? null : { id: m.id, value: "" }); }}
                           aria-expanded={pw?.id === m.id}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10"
                         >
                           <KeyRound className="size-3.5" />
                           {t("emp.tempPassword")}
@@ -364,7 +364,7 @@ export function TeamMembers({
                       <button
                         type="button"
                         onClick={() => { setError(null); setDraft(toDraft(m)); }}
-                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
                         aria-label={t("edit")}
                       >
                         <Pencil className="size-4" />
@@ -373,7 +373,7 @@ export function TeamMembers({
                         type="button"
                         disabled={busyId === m.id}
                         onClick={() => void toggleSuspend(m)}
-                        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60"
+                        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60 max-sm:min-h-10"
                       >
                         {busyId === m.id ? <Loader2 className="size-3.5 animate-spin" /> : m.status === "Active" ? t("team.suspend") : t("team.reactivate")}
                       </button>
@@ -381,7 +381,7 @@ export function TeamMembers({
                         type="button"
                         disabled={busyId === m.id}
                         onClick={() => void remove(m)}
-                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#f0c4cf] text-[#c22850] hover:bg-[#fdf6f7] disabled:opacity-60"
+                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#f0c4cf] text-[#c22850] hover:bg-[#fdf6f7] disabled:opacity-60 max-sm:min-h-10 max-sm:min-w-10"
                         aria-label={t("team.delete")}
                         title={t("team.delete")}
                       >
@@ -511,7 +511,7 @@ function ExtraSections({ member, roleKeys, onDone }: { member: TeamMember; roleK
           type="button"
           disabled={busy}
           onClick={() => void save()}
-          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-4 text-[12px] font-extrabold disabled:opacity-60 max-sm:min-h-10"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
           {t("save")}

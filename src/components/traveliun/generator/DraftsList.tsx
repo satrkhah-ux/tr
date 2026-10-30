@@ -296,7 +296,7 @@ export function DraftsList({
                             type="button"
                             onClick={() => void onDuplicate(draft.id)}
                             disabled={busyId === draft.id}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+                            className="tv-btn-secondary inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10"
                           >
                             {busyId === draft.id ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
                             {t("pg.reissue")}
@@ -323,7 +323,7 @@ export function DraftsList({
                             type="button"
                             onClick={() => void onDelete(draft.id)}
                             disabled={busyId === draft.id}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#f2c7c7] px-3 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#f2c7c7] px-3 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
                           >
                             <Trash2 className="size-3.5" />
                             {t("pg.deleteDraft")}

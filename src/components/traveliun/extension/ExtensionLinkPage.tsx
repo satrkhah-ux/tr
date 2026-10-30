@@ -121,7 +121,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                 type="button"
                 onClick={() => void link()}
                 disabled={busy}
-                className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-[13.5px] font-extrabold text-white disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-[13.5px] font-extrabold disabled:opacity-60"
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 {ext.linked ? "أعد ربط هذا المتصفح" : "اربط هذا المتصفح"}
@@ -148,7 +148,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                 type="button"
                 onClick={() => void revokeAll()}
                 disabled={busy}
-                className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
               >
                 <Trash2 className="size-3.5" />
                 ألغِ كل الأجهزة
@@ -171,7 +171,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                     type="button"
                     onClick={() => void revoke(l.id)}
                     disabled={busy}
-                    className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                    className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
                   >
                     <Trash2 className="size-3.5" />
                     إلغاء

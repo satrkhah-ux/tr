@@ -145,7 +145,7 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
           type="button"
           onClick={() => setAdding((o) => !o)}
           aria-expanded={adding}
-          className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] border px-2.5 text-[12px] font-bold ${
+          className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] border px-2.5 text-[12px] font-bold max-sm:min-h-10 ${
             adding ? "border-[#185045] bg-[#185045] text-white" : "border-[#cfe0d9] bg-white text-[#185045] hover:border-[#2aa87a]"
           }`}
         >

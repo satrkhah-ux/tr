@@ -93,7 +93,7 @@ export function PartnerTeam({ team }: { team: TeamMember[] }) {
             <option value="owner">{ROLE.owner}</option>
           </select>
         </label>
-        <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white disabled:opacity-60">
+        <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white disabled:opacity-60 max-sm:min-h-10">
           {pending ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
           إضافة مستخدم
         </button>

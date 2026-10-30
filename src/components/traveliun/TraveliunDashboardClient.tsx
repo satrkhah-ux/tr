@@ -448,7 +448,7 @@ function TeamOperations() {
           ) : null}
         </div>
         {selected ? (
-          <button type="button" onClick={() => { setSelected(null); setQuery(""); }} className="inline-flex h-9 items-center gap-1 rounded-full bg-[#e8f1ed] px-3 text-xs font-bold text-[#185045]">
+          <button type="button" onClick={() => { setSelected(null); setQuery(""); }} className="inline-flex h-9 items-center gap-1 rounded-full bg-[#e8f1ed] px-3 text-xs font-bold text-[#185045] max-sm:min-h-10">
             {selected.name} <X className="size-3.5" />
           </button>
         ) : null}
@@ -458,7 +458,7 @@ function TeamOperations() {
         <Popover open={customizing} onOpenChange={setCustomizing}>
           <PopoverTrigger
             render={
-              <button type="button" className="me-auto inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus hover:bg-[#f4f8f6] data-[popup-open]:border-[#2aa87a]">
+              <button type="button" className="tv-btn-secondary me-auto inline-flex h-11 items-center gap-2 rounded-[11px] border px-4 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus data-[popup-open]:border-[#2aa87a]">
                 <SlidersHorizontal className="size-4" /> {t("dash.customize")}
               </button>
             }
@@ -487,7 +487,7 @@ function TeamOperations() {
                 );
               })}
             </div>
-            <button type="button" onClick={() => setCustomizing(false)} className="mt-3 w-full rounded-md bg-[#185045] px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]">
+            <button type="button" onClick={() => setCustomizing(false)} className="tv-btn-primary mt-3 w-full rounded-md px-3 py-2 text-sm font-bold transition-colors">
               {t("done")}
             </button>
           </PopoverContent>

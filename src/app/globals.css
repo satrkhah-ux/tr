@@ -125,6 +125,7 @@
   --tv-border-default: #dbe6e1;
   --tv-border-strong: #cfe0d9;
   --tv-action-primary: #185045;
+  --tv-action-primary-hover: #0f4439;
   --tv-action-on-primary: #ffffff;
   --tv-action-focus: #2aa87a;
   --tv-status-success: #0f7a52;
@@ -160,6 +161,32 @@
   the colours were raw hex classes, and :focus (higher specificity) still beats
   a plain error border while a focus:border-[#…] override still beats it.
 */
+/*
+  Button looks (ui/button-variants.ts maps primary/secondary/ghost onto these). Utilities, not colour
+  classes, for the same reason as tv-field: a screen that adds bg-[#…] for an active state still wins.
+*/
+@utility tv-btn-primary {
+  background-color: var(--tv-action-primary);
+  color: var(--tv-action-on-primary);
+  &:hover:not(:disabled) {
+    background-color: var(--tv-action-primary-hover);
+  }
+}
+@utility tv-btn-secondary {
+  border-color: var(--tv-border-default);
+  background-color: var(--tv-surface-raised);
+  color: var(--tv-text-brand);
+  &:hover:not(:disabled) {
+    background-color: var(--tv-surface-sunken);
+  }
+}
+@utility tv-btn-ghost {
+  color: var(--tv-text-brand);
+  &:hover:not(:disabled) {
+    background-color: var(--tv-surface-sunken);
+  }
+}
+
 @utility tv-field {
   border-color: var(--tv-border-default);
   background-color: var(--tv-surface-raised);

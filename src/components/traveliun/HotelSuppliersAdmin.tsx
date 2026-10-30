@@ -222,7 +222,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
             <button
               type="button"
               onClick={() => setReplacing(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#557d78] hover:bg-[#f0f7f4]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#557d78] hover:bg-[#f0f7f4] max-sm:min-h-10"
             >
               {t("settings.suppliers.replace")}
             </button>
@@ -270,7 +270,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
           type="button"
           onClick={() => void onSave()}
           disabled={saveState === "saving"}
-          className="inline-flex h-9 items-center gap-2 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[9px] px-4 text-[12.5px] font-bold transition-colors disabled:opacity-60 max-sm:min-h-10"
         >
           {saveState === "saving" ? <Loader2 className="size-4 animate-spin" /> : null}
           {saveState === "saved" ? t("settings.suppliers.saved") : t("settings.suppliers.save")}
@@ -279,7 +279,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
           type="button"
           onClick={() => void onTest()}
           disabled={test.state === "testing"}
-          className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-4 text-[12.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-60"
+          className="tv-btn-secondary inline-flex h-9 items-center gap-2 rounded-[9px] border px-4 text-[12.5px] font-bold transition-colors disabled:opacity-60 max-sm:min-h-10"
         >
           {test.state === "testing" ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}
           {t("settings.suppliers.test")}

@@ -84,10 +84,10 @@ export function DataAdditionsReview({ initial, enabled }: { initial: AdditionFor
                 <td className="p-2">
                   {r.status === "pending" ? (
                     <span className="flex gap-1">
-                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "approved")} className="inline-flex items-center gap-1 rounded-[8px] bg-[#185045] px-2 py-1 font-bold text-white disabled:opacity-60">
+                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "approved")} className="tv-btn-primary inline-flex items-center gap-1 rounded-[8px] px-2 py-1 font-bold disabled:opacity-60 max-sm:min-h-10">
                         <Check className="size-3.5" /> اعتمد
                       </button>
-                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "rejected")} className="inline-flex items-center gap-1 rounded-[8px] border border-[#f0c9d2] px-2 py-1 font-bold text-[#c22850] disabled:opacity-60">
+                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "rejected")} className="inline-flex items-center gap-1 rounded-[8px] border border-[#f0c9d2] px-2 py-1 font-bold text-[#c22850] disabled:opacity-60 max-sm:min-h-10">
                         <X className="size-3.5" /> ارفض
                       </button>
                     </span>

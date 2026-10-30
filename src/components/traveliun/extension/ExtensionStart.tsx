@@ -43,7 +43,7 @@ export function ExtensionStart({ lead }: { lead: { id: string; name: string; pho
                 type="button"
                 onClick={() => void start()}
                 disabled={busy}
-                className="mt-4 inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-[13.5px] font-extrabold text-white disabled:opacity-60"
+                className="tv-btn-primary mt-4 inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-[13.5px] font-extrabold disabled:opacity-60"
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
                 {lead.hasFile ? "افتح ملف العميل" : "ابدأ عرضاً جديداً لهذا العميل"}

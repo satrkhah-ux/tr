@@ -237,7 +237,7 @@ export function TableTransfer({
                 type="button"
                 disabled={busy || plan.creates.length + plan.updates.length === 0}
                 onClick={() => save(plan)}
-                className="flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                className="tv-btn-primary flex h-10 items-center gap-2 rounded-[10px] px-6 text-sm font-bold disabled:opacity-50"
               >
                 {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                 {t("data.tools.import.save")}

@@ -48,13 +48,13 @@ export function ComparePanel({ query, current, sarPer, action }: {
       <strong>{query.cityAr}</strong>
       {query.hotelName && <span className="text-[#557d78]">{query.hotelName}</span>}
       <span className="text-xs text-tv-text-faint tabular-nums">{query.checkIn ?? "؟"} ← {query.checkOut ?? "؟"} · {query.rooms} غرفة · {query.adults} بالغ</span>
-      {current && <button type="button" onClick={() => void copyCurrent()} className="inline-flex items-center gap-1 rounded border border-[#dbe6e1] px-2 py-0.5 text-xs font-bold text-[#185045]">
+      {current && <button type="button" onClick={() => void copyCurrent()} className="inline-flex items-center gap-1 rounded border border-[#dbe6e1] px-2 py-0.5 text-xs font-bold text-[#185045] max-sm:min-h-10">
         <Copy size={11} /> {copied ? "نُسخ ✓" : `سعرنا للإقامة: ${current.amount.toLocaleString("en-US")} ${current.currency}`}
       </button>}
     </div>
     <div className="flex flex-wrap gap-2">
       {links.map((l) => <button key={l.key} type="button" onClick={() => openCompare(l.url)}
-        className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6]">
+        className="tv-btn-secondary inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-bold max-sm:min-h-10">
         <ExternalLink size={12} /> {l.label}
       </button>)}
     </div>

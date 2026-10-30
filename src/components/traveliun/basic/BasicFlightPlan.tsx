@@ -226,7 +226,7 @@ export function LegRow({
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
           {tx("pickRoute")}
           {look.hits.map((hit, i) => (
-            <button key={i} type="button" onClick={() => apply(hit)} className="tv-tnum rounded-[7px] border border-[#cfe0d9] bg-[#f4f8f6] px-2 py-1 text-[#185045] hover:bg-[#e7f2ec]">
+            <button key={i} type="button" onClick={() => apply(hit)} className="tv-tnum rounded-[7px] border border-[#cfe0d9] bg-[#f4f8f6] px-2 py-1 text-[#185045] hover:bg-[#e7f2ec] max-sm:min-h-10">
               {`${hit.from_iata} → ${hit.to_iata} ${localTimePart(hit.departure_at) ?? ""}`}
             </button>
           ))}

@@ -114,7 +114,7 @@ export function PayLinkTools({ draftId }: { draftId: string }) {
             type="button"
             disabled={pending || !body.trim()}
             onClick={send}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-45"
+            className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold disabled:opacity-45 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
             {t("pay.send")}

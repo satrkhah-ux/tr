@@ -9,6 +9,7 @@ import { sendMemberTestMessage, staffBotLink, teletelAgentsForTeam } from "@/lib
 import type { TeletelAgent } from "@/lib/providers/teletel";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «تنبيهاتي» on one colleague's row (employees.manage): their Telegram ID,
  * editable and audited, a test message, and their Teletel agent. The agent
@@ -18,7 +19,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const field = "tv-field h-9 rounded-[9px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60";
 const button =
-  "inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10`;
 
 export function TelegramLink({ member }: { member: TeamMember }) {
   const { t } = useTraveliunUI();

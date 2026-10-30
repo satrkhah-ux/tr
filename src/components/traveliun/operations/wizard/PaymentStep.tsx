@@ -145,7 +145,7 @@ function AgreedPrice({ data, canManage }: Pick<StepProps, "data" | "canManage">)
               type="button"
               disabled={pending}
               onClick={() => save(typed)}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-3.5 text-[12px] font-bold text-white disabled:opacity-60"
+              className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-3.5 text-[12px] font-bold disabled:opacity-60"
             >
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {t("save")}
@@ -212,7 +212,7 @@ function PaymentException({ data, canManage }: Pick<StepProps, "data" | "canMana
           <span className="tv-tnum">{granted.at.slice(0, 10)}</span>
           {granted.note ? <span>— {granted.note}</span> : null}
           {canManage ? (
-            <button type="button" disabled={pending} onClick={() => save(null)} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 font-bold text-[#c43d3d] disabled:opacity-60">
+            <button type="button" disabled={pending} onClick={() => save(null)} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 font-bold text-[#c43d3d] disabled:opacity-60 max-sm:min-h-10">
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {t("wz.pay.exception.remove")}
             </button>
@@ -227,7 +227,7 @@ function PaymentException({ data, canManage }: Pick<StepProps, "data" | "canMana
             placeholder={t("wz.pay.exception.note")}
             className="h-10 min-w-0 flex-1 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045]"
           />
-          <button type="button" disabled={pending || !note.trim()} onClick={() => save(note)} className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-3.5 text-[12px] font-bold text-white disabled:opacity-60">
+          <button type="button" disabled={pending || !note.trim()} onClick={() => save(note)} className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-3.5 text-[12px] font-bold disabled:opacity-60">
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
             {t("wz.pay.exception.grant")}
           </button>

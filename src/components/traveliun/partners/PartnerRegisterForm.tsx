@@ -185,7 +185,7 @@ export function PartnerRegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-6 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary inline-flex h-11 items-center justify-center gap-2 rounded-[10px] px-6 text-[13px] font-bold disabled:opacity-60"
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
         إرسال الطلب

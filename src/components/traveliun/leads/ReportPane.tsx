@@ -258,16 +258,16 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
       <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#e3ece8] bg-white p-3">
         <div className="inline-flex overflow-hidden rounded-[9px] border border-[#cfe0d9]">
           {PERIODS.map(([k, label]) => (
-            <button key={k} type="button" onClick={() => go({ kind: k })} className={`h-8 px-3 text-[12px] font-extrabold ${kind === k ? "bg-[#185045] text-white" : "bg-white text-[#185045] hover:bg-[#f0f7f4]"}`}>
+            <button key={k} type="button" onClick={() => go({ kind: k })} className={`h-8 px-3 text-[12px] font-extrabold max-sm:min-h-10 ${kind === k ? "bg-[#185045] text-white" : "bg-white text-[#185045] hover:bg-[#f0f7f4]"}`}>
               {label}
             </button>
           ))}
         </div>
         {/* the arrows read as the board's pager: previous on the right, next on the left */}
-        <button type="button" onClick={() => step(-1)} aria-label="الفترة السابقة" className="grid size-8 place-items-center rounded-[8px] border border-[#cfe0d9] text-[#185045]">
+        <button type="button" onClick={() => step(-1)} aria-label="الفترة السابقة" className="grid size-8 place-items-center rounded-[8px] border border-[#cfe0d9] text-[#185045] max-sm:min-h-10 max-sm:min-w-10">
           <ChevronRight className="size-4" />
         </button>
-        <button type="button" onClick={() => step(1)} disabled={period.to >= today} aria-label="الفترة التالية" className="grid size-8 place-items-center rounded-[8px] border border-[#cfe0d9] text-[#185045] disabled:opacity-40">
+        <button type="button" onClick={() => step(1)} disabled={period.to >= today} aria-label="الفترة التالية" className="grid size-8 place-items-center rounded-[8px] border border-[#cfe0d9] text-[#185045] disabled:opacity-40 max-sm:min-h-10 max-sm:min-w-10">
           <ChevronLeft className="size-4" />
         </button>
         <input type="date" value={anchor} max={today} onChange={(e) => e.target.value && go({ anchor: e.target.value })} className="h-8 rounded-[8px] border border-[#cfe0d9] px-2 text-[12px] font-semibold text-[#185045]" />
@@ -306,12 +306,12 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
 
       <div className="flex flex-wrap items-center gap-1.5">
         {VIEWS.map(([k, label]) => (
-          <button key={k} type="button" onClick={() => setView(k)} className={`h-8 rounded-full px-3 text-[12px] font-extrabold ${view === k ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045] hover:bg-[#f0f7f4]"}`}>
+          <button key={k} type="button" onClick={() => setView(k)} className={`h-8 rounded-full px-3 text-[12px] font-extrabold max-sm:min-h-10 ${view === k ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045] hover:bg-[#f0f7f4]"}`}>
             {label}
           </button>
         ))}
         {edited > 0 ? (
-          <button type="button" onClick={reset} className="ms-auto inline-flex h-8 items-center gap-1 rounded-full border border-[#f2c7c7] px-3 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1]">
+          <button type="button" onClick={reset} className="ms-auto inline-flex h-8 items-center gap-1 rounded-full border border-[#f2c7c7] px-3 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] max-sm:min-h-10">
             <RotateCcw className="size-3.5" />
             ألغِ كل التصحيحات ({edited})
           </button>
@@ -331,11 +331,11 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
             className="w-full resize-y rounded-[10px] border border-[#cfe0d9] bg-[#fbfdfc] p-3 font-semibold leading-7 text-[#103f37] text-[13px]"
           />
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void copy()} className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-extrabold text-white">
+            <button type="button" onClick={() => void copy()} className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-extrabold">
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               {copied ? "نُسخ ✓" : "انسخ التقرير"}
             </button>
-            <button type="button" onClick={download} className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#185045] px-4 text-[13px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]">
+            <button type="button" onClick={download} className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-4 text-[13px] font-extrabold">
               <Download className="size-4" />
               تصدير (Excel)
             </button>
@@ -417,13 +417,13 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
           </div>
           {pages > 1 ? (
             <div className="flex items-center justify-center gap-2 text-[12px] font-bold text-[#185045]">
-              <button type="button" disabled={at === 0} onClick={() => setPage(at - 1)} className="rounded-[8px] border border-[#cfe0d9] px-2.5 py-1 disabled:opacity-40">
+              <button type="button" disabled={at === 0} onClick={() => setPage(at - 1)} className="rounded-[8px] border border-[#cfe0d9] px-2.5 py-1 disabled:opacity-40 max-sm:min-h-10">
                 السابق
               </button>
               <span className="tv-tnum">
                 {at + 1} / {pages}
               </span>
-              <button type="button" disabled={at >= pages - 1} onClick={() => setPage(at + 1)} className="rounded-[8px] border border-[#cfe0d9] px-2.5 py-1 disabled:opacity-40">
+              <button type="button" disabled={at >= pages - 1} onClick={() => setPage(at + 1)} className="rounded-[8px] border border-[#cfe0d9] px-2.5 py-1 disabled:opacity-40 max-sm:min-h-10">
                 التالي
               </button>
             </div>

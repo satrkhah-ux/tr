@@ -573,7 +573,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
             <button
               type="button"
               onClick={takeCitiesFromFlights}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold max-sm:min-h-10"
             >
               {t("pg.citiesFromFlightsTake")}
             </button>
@@ -720,7 +720,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           type="button"
                           disabled={cityBusy || !newCityName.trim()}
                           onClick={() => void saveNewCity(cityIndex)}
-                          className="inline-flex h-11 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50"
+                          className="tv-btn-primary inline-flex h-11 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold transition-colors disabled:opacity-50"
                         >
                           {cityBusy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
                           {t("pg.saveCity")}
@@ -795,7 +795,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                       <button
                         type="button"
                         onClick={() => setExpanded(null)}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#bfe5d4] bg-[#e9f7f0] px-3.5 text-[12px] font-bold text-[#0f7a52] transition-colors hover:bg-[#dff3ea]"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#bfe5d4] bg-[#e9f7f0] px-3.5 text-[12px] font-bold text-[#0f7a52] transition-colors hover:bg-[#dff3ea] max-sm:min-h-10"
                       >
                         <CheckCircle2 className="size-3.5" />
                         {t("pg.cityDone")}
@@ -921,7 +921,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                     <button
                       type="button"
                       onClick={() => void saveHotels()}
-                      className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-5 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439]"
+                      className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-5 text-[12.5px] font-bold transition-colors"
                     >
                       <Check className="size-4" />
                       {t("pg.saveHotels")}
@@ -992,7 +992,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                     type="button"
                     disabled={copying !== null}
                     onClick={() => void copyProgram(program.serial)}
-                    className="inline-flex h-9 items-center gap-2 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-60"
+                    className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12px] font-bold transition-colors disabled:opacity-60 max-sm:min-h-10"
                   >
                     {copying === program.serial ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
                     {t("pg.reuseCopy")}

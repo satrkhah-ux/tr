@@ -295,7 +295,7 @@ export function RecentFiles({
                 type="button"
                 disabled={deleting}
                 onClick={() => remove(pickedShown)}
-                className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#c22850] px-3 text-white hover:bg-[#a51f43] disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#c22850] px-3 text-white hover:bg-[#a51f43] disabled:opacity-60 max-sm:min-h-10"
               >
                 {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
                 {tx("deletePicked")}
@@ -303,11 +303,11 @@ export function RecentFiles({
               <button
                 type="button"
                 onClick={() => setPicked(new Set(shown.filter((d) => !states[d.id]?.operation_id).map((d) => d.id)))}
-                className="h-8 rounded-[8px] border border-[#f2b8c6] bg-white px-3 hover:bg-[#fff7f9]"
+                className="h-8 rounded-[8px] border border-[#f2b8c6] bg-white px-3 hover:bg-[#fff7f9] max-sm:min-h-10"
               >
                 {tx("pickAll")}
               </button>
-              <button type="button" onClick={() => setPicked(new Set())} className="h-8 rounded-[8px] px-2 text-tv-text-faint hover:underline">
+              <button type="button" onClick={() => setPicked(new Set())} className="h-8 rounded-[8px] px-2 text-tv-text-faint hover:underline max-sm:min-h-10">
                 {tx("clearPicked")}
               </button>
             </>

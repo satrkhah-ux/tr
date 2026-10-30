@@ -109,12 +109,12 @@ export function SecretaryChat({ tall = false, active = true, pendingError = null
     {error && <p role="alert" data-murad-own className="px-3 pb-1 text-sm text-red-700">{error}</p>}
     {lastError && !busy && <div className="flex items-center gap-2 px-3 pt-2 text-xs">
       <button type="button" onClick={() => void report()} disabled={!!reported}
-        className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 font-bold text-red-800 hover:bg-red-100 disabled:opacity-60">أبلغ الإدارة</button>
+        className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 font-bold text-red-800 hover:bg-red-100 disabled:opacity-60 max-sm:min-h-10">أبلغ الإدارة</button>
       {reported && <span role="status" className="text-[#557d78]">{reported}</span>}
     </div>}
     <div className="flex shrink-0 gap-2 overflow-x-auto border-t border-[#e7eeeb] px-3 pt-3 pb-1">
       {QUICK.map((q) => <button key={q} type="button" disabled={busy || loading} onClick={() => void send(q)}
-        className="shrink-0 rounded-full border border-[#dfe8e4] bg-white px-3 py-1.5 text-xs font-semibold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50">{q}</button>)}
+        className="tv-btn-secondary shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 max-sm:min-h-10">{q}</button>)}
     </div>
     <form className="flex shrink-0 items-end gap-2 bg-white p-3" onSubmit={(e) => { e.preventDefault(); void send(text); }}>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={2000} placeholder="اكتب لمُراد…" aria-label="رسالتك إلى مُراد"

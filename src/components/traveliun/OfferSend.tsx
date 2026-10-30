@@ -164,7 +164,7 @@ export function OfferSend({
               type="button"
               onClick={() => void send(false)}
               disabled={!canSend}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "send" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               {tx("sendNow")}
@@ -186,7 +186,7 @@ export function OfferSend({
               type="button"
               onClick={() => void send(true)}
               disabled={busy !== null}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "manual" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
               {tx("sendManual")}
@@ -198,7 +198,7 @@ export function OfferSend({
           type="button"
           onClick={() => void open()}
           disabled={busy !== null}
-          className={`inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12.5px] font-extrabold disabled:opacity-60 ${filled ? "bg-[#1f8a5b] text-white hover:bg-[#18744c]" : "border border-[#1f8a5b] bg-white text-[#1f8a5b] hover:bg-[#eef8f3]"}`}
+          className={`inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10 ${filled ? "bg-[#1f8a5b] text-white hover:bg-[#18744c]" : "border border-[#1f8a5b] bg-white text-[#1f8a5b] hover:bg-[#eef8f3]"}`}
         >
           {busy === "prepare" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           {again ? tx("sendAgain") : tx("sendTitle")}

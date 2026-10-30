@@ -181,7 +181,7 @@ export function TraveliunClimateAdmin({ cities }: { cities: ClimateCity[] }) {
                               type="button"
                               onClick={() => save(m)}
                               disabled={savingMonth === m}
-                              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[8px] bg-[#185045] px-3 text-xs font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
+                              className="tv-btn-primary inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[8px] px-3 text-xs font-bold transition-colors disabled:opacity-70 max-sm:min-h-10"
                             >
                               {savingMonth === m ? <Loader2 className="size-4 animate-spin" /> : savedMonth === m ? <Check className="size-4" /> : null}
                               {savedMonth === m ? t("climate.saved") : t("climate.saveRow")}

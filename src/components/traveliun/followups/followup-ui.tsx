@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import { HEAT_LABEL, type Heat } from "@/lib/followups/summary-core";
 import { STEP_LABELS, todayGroup, type TodayGroup, type WorkRow } from "@/lib/followups/rules";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /** «المتابعة»'s look (the owner's approved mockup, 2026-10-23): white cards on #F4F6F3, radius 16, 44 px targets. */
 export const GREEN = "#185045";
 export const CLAY = "#9A3412";
 export const BLUE = "#1D4ED8";
 export const card = "rounded-2xl border border-[#E3E8E4] bg-white";
-export const btn = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#D5DED9] bg-white px-4 text-sm font-bold text-[#185045] transition-colors hover:bg-[#F4F6F3] disabled:opacity-40";
-export const btnPrimary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#185045] px-4 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40";
+export const btn = `${buttonTone({ variant: "secondary" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold transition-colors disabled:opacity-40`;
+export const btnPrimary = `${buttonTone({ variant: "default" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-opacity disabled:opacity-40`;
 export const field = "tv-field w-full rounded-xl border p-3 text-sm";
 
 export const when = (at: string | null) => at ? new Date(at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" }) : "—";

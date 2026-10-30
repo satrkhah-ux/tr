@@ -120,7 +120,7 @@ export function RoomPrice({
           <button
             type="button"
             onClick={() => onChange({ price: Math.round(remembered.price * n * 100) / 100 })}
-            className="rounded-full border border-[#b7d0c7] px-2 py-0.5 text-[10.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="tv-btn-secondary rounded-full border px-2 py-0.5 text-[10.5px] font-bold max-sm:min-h-10"
           >
             {t("pg.useLastRate")}
           </button>

@@ -79,7 +79,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
             type="button"
             onClick={() => void save({ by, default_pct: pct })}
             disabled={state === "saving"}
-            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-extrabold disabled:opacity-60"
           >
             {state === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
             {t("settings.profit.save")}
@@ -115,7 +115,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
             type="button"
             onClick={() => void saveUsd()}
             disabled={usdState === "saving" || !(usd >= 3 && usd <= 5)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-extrabold disabled:opacity-60"
           >
             {usdState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
             {t("settings.profit.save")}

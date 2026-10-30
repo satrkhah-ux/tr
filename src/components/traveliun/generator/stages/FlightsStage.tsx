@@ -611,7 +611,7 @@ function FlightLookup({ flightNo, onPick }: { flightNo: string; onPick: (hit: Fl
         type="button"
         onClick={run}
         disabled={pending || !flightNo.trim()}
-        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-50"
+        className="tv-btn-secondary inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold transition-colors disabled:opacity-50 max-sm:min-h-10"
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
         {t("pg.flightLookup.button")}
@@ -843,7 +843,7 @@ function FlightRow({
               <button
                 type="button"
                 onClick={() => restoreAuto(index)}
-                className="inline-flex items-center gap-1 rounded-md bg-[#fff2d6] px-1.5 py-0.5 font-extrabold text-[#8a5a0c] hover:bg-[#ffe9bd]"
+                className="inline-flex items-center gap-1 rounded-md bg-[#fff2d6] px-1.5 py-0.5 font-extrabold text-[#8a5a0c] hover:bg-[#ffe9bd] max-sm:min-h-10"
               >
                 <RotateCcw className="size-3" />
                 {t("pg.restoreAutoDate")}
@@ -911,7 +911,7 @@ function FlightRow({
             type="button"
             onClick={() => setMore((v) => !v)}
             aria-expanded={more}
-            className="inline-flex h-7 items-center rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+            className="tv-btn-secondary inline-flex h-7 items-center rounded-[8px] border px-2.5 text-[11px] font-bold max-sm:min-h-10"
           >
             {t("pg.fb.moreDetails")}
           </button>

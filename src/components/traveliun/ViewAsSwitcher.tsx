@@ -86,7 +86,7 @@ export function ViewAsBanner() {
         type="button"
         disabled={pending}
         onClick={() => go(null)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#8a6a00] px-3 text-xs font-bold text-white hover:bg-[#6f5500] disabled:opacity-60"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#8a6a00] px-3 text-xs font-bold text-white hover:bg-[#6f5500] disabled:opacity-60 max-sm:min-h-10"
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
         {t("viewAs.back")}

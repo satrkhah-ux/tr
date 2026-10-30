@@ -131,7 +131,7 @@ export function GeneratorShell({
               <button
                 type="button"
                 onClick={() => setPreviewOpen((v) => !v)}
-                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex"
+                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex max-sm:min-h-10"
               >
                 {previewOpen ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 {previewOpen ? t("pg.hidePreview") : t("pg.showPreview")}

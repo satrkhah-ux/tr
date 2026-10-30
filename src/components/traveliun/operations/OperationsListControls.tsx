@@ -78,7 +78,7 @@ export function OperationsFilters({
         <button
           type="button"
           onClick={() => onChange(NO_FILTERS)}
-          className="inline-flex h-9 items-center gap-1 rounded-[9px] px-2 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1]"
+          className="inline-flex h-9 items-center gap-1 rounded-[9px] px-2 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] max-sm:min-h-10"
         >
           <X className="size-3.5" />
           {t("ops.list.clear")}
@@ -113,7 +113,7 @@ export function ArrivalsCalendar<T extends ListedCase & { id: string }>({ operat
               key={s.key}
               type="button"
               onClick={() => setSpan(s.key)}
-              className={`rounded-full border px-3 py-1 text-[12px] font-bold transition-colors ${
+              className={`rounded-full border px-3 py-1 text-[12px] font-bold transition-colors max-sm:min-h-10 ${
                 span === s.key ? "border-[#185045] bg-[#185045] text-white" : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
               }`}
             >

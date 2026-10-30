@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { PAYMENT_LABEL, VISA_STATUS_LABEL, type PaymentState, type VisaStatus } from "@/lib/visa-files/types";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * The visa screens' look: the operations screens' palette (white cards, #185045 green, 44 px targets), which the dark
  * layer in globals.css already remaps. Status and payment chips keep their own tints, as the other badges do.
@@ -17,8 +18,8 @@ export const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_
 export const field = "tv-field h-11 w-full min-w-0 rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60";
 export const area = "tv-field min-h-24 w-full min-w-0 rounded-[10px] border p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 export const label = "grid min-w-0 gap-1.5 text-[12px] font-bold text-[#185045]";
-export const btn = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6] disabled:opacity-50";
-export const btnPrimary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50";
+export const btn = `${buttonTone({ variant: "secondary" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border px-4 text-sm font-bold transition-colors disabled:opacity-50`;
+export const btnPrimary = `${buttonTone({ variant: "default" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 text-sm font-bold transition-colors disabled:opacity-50`;
 export const btnDanger = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#f3c9d3] bg-white px-4 text-sm font-bold text-[#c22850] transition-colors hover:bg-[#fdecef] disabled:opacity-50";
 export const heading = "text-sm font-extrabold text-[#185045]";
 

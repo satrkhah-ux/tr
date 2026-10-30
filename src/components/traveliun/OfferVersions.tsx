@@ -174,13 +174,13 @@ export function OfferVersions({
                             type="button"
                             disabled={busy != null}
                             onClick={() => void restore(v.version)}
-                            className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#c25a28] px-2.5 text-[11.5px] font-bold text-white disabled:opacity-60"
+                            className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#c25a28] px-2.5 text-[11.5px] font-bold text-white disabled:opacity-60 max-sm:min-h-10"
                           >
                             {busy === v.version ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
                             {busy === v.version ? t("pg.versions.restoring") : t("pg.versions.confirm", { n: v.version, next: latest + 1 })}
                           </button>
                           {busy == null ? (
-                            <button type="button" onClick={() => setConfirming(null)} className="h-8 rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78]">
+                            <button type="button" onClick={() => setConfirming(null)} className="h-8 rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] max-sm:min-h-10">
                               {t("pg.versions.cancel")}
                             </button>
                           ) : null}
@@ -190,7 +190,7 @@ export function OfferVersions({
                           type="button"
                           disabled={busy != null}
                           onClick={() => setConfirming(v.version)}
-                          className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#c25a28] px-2.5 text-[11.5px] font-bold text-[#c25a28] hover:bg-[#fdf3ee] disabled:opacity-60"
+                          className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#c25a28] px-2.5 text-[11.5px] font-bold text-[#c25a28] hover:bg-[#fdf3ee] disabled:opacity-60 max-sm:min-h-10"
                         >
                           <RotateCcw className="size-3.5" /> {t("pg.versions.restore")}
                         </button>

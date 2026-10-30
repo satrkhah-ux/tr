@@ -189,7 +189,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
                           type="button"
                           disabled={busy !== null || (done && !t?.price)}
                           onClick={() => void save(r)}
-                          className={`inline-flex h-9 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[12px] font-bold disabled:opacity-60 ${
+                          className={`inline-flex h-9 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10 ${
                             done && !t?.price ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#185045] text-white hover:bg-[#0f4439]"
                           }`}
                         >

@@ -84,7 +84,7 @@ export function HotelResultRow({
           type="button"
           disabled={busyKey !== null}
           onClick={() => onSelect(hotel, best)}
-          className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[11.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-8 items-center gap-1 rounded-[8px] px-3 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10"
         >
           {busyKey === (best?.key ?? hotel.id) ? <Loader2 className="size-3 animate-spin" /> : null}
           {t("pg.supplier.select")}
@@ -95,7 +95,7 @@ export function HotelResultRow({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-label="بقية الغرف"
-            className={`inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] transition-transform hover:bg-[#f4f8f6] ${open ? "rotate-180" : ""}`}
+            className={`inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] transition-transform hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10 ${open ? "rotate-180" : ""}`}
           >
             <ChevronDown className="size-3.5" />
           </button>
@@ -126,7 +126,7 @@ export function HotelResultRow({
                 type="button"
                 disabled={busyKey !== null}
                 onClick={() => onSelect(hotel, rate)}
-                className="ms-auto inline-flex h-7 items-center gap-1 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+                className="tv-btn-secondary ms-auto inline-flex h-7 items-center gap-1 rounded-[8px] border px-2.5 text-[11px] font-bold disabled:opacity-60 max-sm:min-h-10"
               >
                 {busyKey === rate.key ? <Loader2 className="size-3 animate-spin" /> : null}
                 {t("pg.supplier.select")}

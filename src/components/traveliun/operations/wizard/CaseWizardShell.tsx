@@ -127,7 +127,7 @@ export function CaseWizardShell({
               type="button"
               onClick={() => setUploading((v) => !v)}
               aria-expanded={uploading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-extrabold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-10 items-center justify-center gap-2 rounded-[10px] px-4 text-[13px] font-extrabold"
             >
               <FileUp className="size-4" />
               {t("wz.up.button")}
@@ -179,7 +179,7 @@ export function CaseWizardShell({
               type="button"
               disabled={index === WIZARD_STEPS.length - 1}
               onClick={() => setStep(WIZARD_STEPS[index + 1])}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white disabled:opacity-40"
+              className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-40"
             >
               {t("wz.next")}
               <ArrowLeft className="size-4 ltr:rotate-180" />

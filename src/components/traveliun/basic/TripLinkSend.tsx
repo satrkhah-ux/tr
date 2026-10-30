@@ -80,7 +80,7 @@ export function TripLinkSend({ operationId }: { operationId: string }) {
               type="button"
               onClick={() => void send()}
               disabled={busy || !body.trim() || Boolean(list?.blocked)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-50 max-sm:min-h-10"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               {tx("sendNow")}
@@ -98,7 +98,7 @@ export function TripLinkSend({ operationId }: { operationId: string }) {
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               {copied ? tx("sendCopied") : tx("sendCopy")}
             </button>
-            <button type="button" onClick={() => setOpen(false)} className="h-9 px-2 text-[12px] font-bold text-[#557d78]">
+            <button type="button" onClick={() => setOpen(false)} className="h-9 px-2 text-[12px] font-bold text-[#557d78] max-sm:min-h-10">
               {tx("cancelEdit")}
             </button>
           </div>
