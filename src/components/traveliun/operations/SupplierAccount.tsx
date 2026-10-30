@@ -46,15 +46,21 @@ function BalanceChips({ balances }: { balances: SupplierBalance[] }) {
   );
 }
 
-/** /operations/suppliers — every supplier and where its account stands. */
+/** Where the suppliers' pages sit: under «العمليات», or under «الحسابات» for the financial section (2026-10-30). */
+export type SupplierBase = "/operations/suppliers" | "/accounts/suppliers";
+const inAccounts = (base: SupplierBase) => base === "/accounts/suppliers";
+
+/** /operations/suppliers (and /accounts/suppliers) — every supplier and where its account stands. */
 export function SupplierAccountsList({
   suppliers,
   replyHours,
   canManage,
+  base = "/operations/suppliers",
 }: {
   suppliers: SupplierAccountSummary[];
   replyHours: number;
   canManage: boolean;
+  base?: SupplierBase;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -63,11 +69,11 @@ export function SupplierAccountsList({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <TraveliunShell title="nav.operations">
+    <TraveliunShell title={inAccounts(base) ? "nav.accounts" : "nav.operations"}>
       <div className="tv-fade-up space-y-4">
-        <Link href="/operations" className={back}>
+        <Link href={inAccounts(base) ? "/accounts" : "/operations"} className={back}>
           <ArrowRight className="size-4 ltr:rotate-180" />
-          {t("ops.backToBoard")}
+          {inAccounts(base) ? t("nav.accounts") : t("ops.backToBoard")}
         </Link>
 
         <section className={card}>
@@ -115,7 +121,7 @@ export function SupplierAccountsList({
             {suppliers.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/operations/suppliers/${s.id}`}
+                  href={`${base}/${s.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-[#e2ebe7] px-4 py-2.5 hover:bg-[#f8fbf9]"
                 >
                   <span className="min-w-0">
@@ -133,8 +139,8 @@ export function SupplierAccountsList({
   );
 }
 
-/** /operations/suppliers/[id] — one supplier: how to reach it, its bookings, payments and balance. */
-export function SupplierAccountView({ account }: { account: SupplierAccount }) {
+/** /operations/suppliers/[id] (and under /accounts) — one supplier: how to reach it, its bookings, payments and balance. */
+export function SupplierAccountView({ account, base = "/operations/suppliers" }: { account: SupplierAccount; base?: SupplierBase }) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const router = useRouter();
@@ -143,9 +149,9 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
   const unpaid = bookings.filter((b) => b.status === "confirmed" && !b.is_paid);
 
   return (
-    <TraveliunShell title="nav.operations">
+    <TraveliunShell title={inAccounts(base) ? "nav.accounts" : "nav.operations"}>
       <div className="tv-fade-up space-y-4">
-        <Link href="/operations/suppliers" className={back}>
+        <Link href={base} className={back}>
           <ArrowRight className="size-4 ltr:rotate-180" />
           {t("ops.sup.accounts")}
         </Link>

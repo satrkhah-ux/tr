@@ -136,10 +136,15 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
         : defaultSchedule({ total, confirmed_on: (m?.confirmed_at ?? today).slice(0, 10), travel_start: op.travel_start });
       const paid = paidTotal(((pays ?? []) as { amount: number | string; kind: string }[]).map((p) => ({ amount: Number(p.amount), kind: p.kind })));
       for (const row of installmentStates(schedule, paid, today)) {
-        if (row.state === "overdue" && row.due_date && (await alertOnce(supabase, op.id, "installment_overdue", row.due_date, `💳 قسط متأخر منذ ${row.due_date}: ${(row.amount - row.covered).toLocaleString("en-US")} — ${head}`))) result.alerts += 1;
-        // due soon (3 days) and due today — the agreed schedule's own reminders (the owner, 2026-10-30)
-        const due = dueReminder(row, today);
-        if (due && row.due_date && (await alertOnce(supabase, op.id, `installment_due_${due}`, row.due_date, `💳 قسط مستحق ${due === "today" ? "اليوم" : "بعد ٣ أيام"} (${row.due_date}): ${(row.amount - row.covered).toLocaleString("en-US")} — ${head}`))) result.alerts += 1;
+        // overdue, due soon (3 days) and due today — to operations and to «الحسابات», who collect it (the owner, 2026-10-30)
+        const due = row.state === "overdue" ? "overdue" : dueReminder(row, today);
+        if (!due || !row.due_date) continue;
+        const left = (row.amount - row.covered).toLocaleString("en-US");
+        const text = due === "overdue" ? `💳 قسط متأخر منذ ${row.due_date}: ${left} — ${head}` : `💳 قسط مستحق ${due === "today" ? "اليوم" : "بعد ٣ أيام"} (${row.due_date}): ${left} — ${head}`;
+        const kind = due === "overdue" ? "installment_overdue" : `installment_due_${due}`;
+        if (!(await alertOnce(supabase, op.id, kind, row.due_date, text))) continue;
+        result.alerts += 1;
+        await notifyEmployee({ permission: ACCOUNTS_PERMISSION, kind: "ops", title: text, href: `/operations/${op.id}`, source: "operations", dedupeKey: `${kind}:${op.id}:${row.due_date}` });
       }
     }
 
@@ -165,11 +170,10 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
 }
 
 /**
- * Who answers for paying a supplier (the owner, 2026-10-30: «الموظف المسؤول والحسابات»).
- * ponytail: no «الحسابات» permission exists; commissions.approve («يعتمد ويصرف») is the
- * one that pays money out — a dedicated key when the accounts team gets a role.
+ * Who answers for paying a supplier (the owner, 2026-10-30: «الموظف المسؤول والحسابات»):
+ * «الحسابات», the financial section's staff — the owner assigns finance.accounts on the employees screen.
  */
-export const ACCOUNTS_PERMISSION = "commissions.approve" as const;
+export const ACCOUNTS_PERMISSION = "finance.accounts" as const;
 
 /**
  * «ادفع قبل … وإلا يُلغى الحجز» / «آخر يوم للإلغاء المجاني …» (the owner, 2026-10-30):

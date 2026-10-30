@@ -88,6 +88,8 @@ export const ALL_PERMISSIONS = [
   "commissions.manage",
   /** approve and pay a cycle, approve the commission policy (never one you edited yourself). */
   "commissions.approve",
+  /** «الحسابات»: the financial section's staff — the accounts home (/accounts) and the reminders to pay suppliers, refund deadlines and clients' installments. */
+  "finance.accounts",
   /** «مطوّر»: the developer page — external links' health, and turning system services on and off. */
   "developer.access",
   /** «العملاء» (/clients): every client conversation (0107 — every role got it; take it per role or colleague). */
@@ -241,6 +243,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "commissions.manage", kind: "do", sensitive: true },
       { key: "commissions.approve", kind: "do", sensitive: true },
     ],
+  },
+  {
+    key: "perm.group.accounts",
+    items: [{ key: "finance.accounts", kind: "do", sensitive: true }],
   },
   {
     key: "perm.group.team",

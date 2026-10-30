@@ -55,6 +55,7 @@ import {
   Table2,
   UserCircle,
   Timer,
+  Wallet,
   Wrench,
   X,
   Zap,
@@ -232,6 +233,8 @@ export const navGroups: NavGroup[] = [
   { labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck },
   // «العمولات» — each employee's own commission; the month and the policy inside (section-access.ts)
   { labelKey: "nav.commissions", href: "/commissions", icon: BadgePercent },
+  // «الحسابات» — the financial section's home: the month's sales, profit, collected, overdue (finance.accounts)
+  { labelKey: "nav.accounts", href: "/accounts", icon: Wallet },
 
   // ---------- «قسم البيانات» — the reference tables the generator reads ----------
   // Fifty links of «البيانات» and «الإدارة» down to eighteen (the owner, 2026-10-19):
@@ -838,7 +841,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
 /** Visual sections only: access filtering and link order stay in useNavGroups. */
 function menuSection(key: TranslationKey): TranslationKey {
   if (["nav.dataSection", "nav.adminSection", "nav.sla", "nav.managementDecisions", "nav.muradSettings", "nav.developer"].includes(key)) return "nav.section.management";
-  if (["nav.visaFiles", "nav.partnerCompanies", "nav.almatar", "nav.operations", "nav.commissions"].includes(key)) return "nav.section.services";
+  if (["nav.visaFiles", "nav.partnerCompanies", "nav.almatar", "nav.operations", "nav.commissions", "nav.accounts"].includes(key)) return "nav.section.services";
   return "nav.section.daily";
 }
 
