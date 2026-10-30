@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BadgePercent, BookOpen, ClipboardCheck, FileSignature, FileText, Landmark, Lock, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgePercent, BarChart3, BookOpen, ClipboardCheck, FileSignature, FileText, Landmark, Lock, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
 import type { AccountsHomeView } from "@/lib/data/accounts";
 import { TraveliunShell } from "../TraveliunShell";
 import { profitTone } from "../operations/CaseProfitCard";
@@ -12,6 +12,7 @@ import { EXPENSE_CATEGORY_AR } from "@/lib/accounts/expenses";
 
 export function AccountsHome({ home }: { home: AccountsHomeView }) {
   const actions: [string, string, typeof Wallet][] = [
+    ["/accounts/reports", "التقارير", BarChart3],
     ["/accounts/invoices", "الفواتير", FileText],
     ["/accounts/expenses", "المصروفات", Receipt],
     ["/accounts/suppliers", "الموردون", Truck],

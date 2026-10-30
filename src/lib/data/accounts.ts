@@ -11,7 +11,8 @@ import { listSupplierAccounts } from "./supplier-work";
 import { financeFixedCost } from "./finance";
 import { quotesView, type Quote, type QuotesView } from "@/lib/accounts/quotes";
 import { journal } from "@/lib/accounts/journal";
-import { byCurrency } from "@/lib/operations/money";
+import { byCurrency, caseProfit } from "@/lib/operations/money";
+import { clientDebts, employeeResults, periodOf, supplierSpend, type Period, type ReportCase } from "@/lib/accounts/reports";
 import { loadCases, type LoadedCase } from "./operation-money";
 
 /**
@@ -304,4 +305,81 @@ export async function getJournal(monthParam?: string): Promise<(ReturnType<typeo
   }));
   const expenses = spent.filter((e) => e.currency === "SAR").map((e) => ({ on: e.spent_on, title: e.title, category: e.category, amount: e.amount }));
   return { ...journal({ month, sales, clientPayments, supplierPayments, expenses }), month, months: recentMonths(thisMonth), left };
+}
+
+// ------------------------------------------------------ «التقارير المالية» ----
+
+export type ReportsView = {
+  period: Period;
+  months: string[];
+  debts: ReturnType<typeof clientDebts>;
+  spend: ReturnType<typeof supplierSpend>;
+  employees: ReturnType<typeof employeeResults>;
+};
+
+/** Stage 5: who owes, whom we pay most, and each employee's financial results (finance.accounts). */
+export async function getReports(periodParam?: string): Promise<ReportsView | null> {
+  if (!(await allowed())) return null;
+  const supabase = db();
+  const today = riyadhDate();
+  const thisMonth = today.slice(0, 7);
+  const period = periodOf(periodParam, thisMonth);
+  const sorted = [...period.months].sort();
+  const [y, m] = sorted[sorted.length - 1].split("-").map(Number);
+  const from = `${sorted[0]}-01`;
+  const to = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+
+  const cases = (await loadCases(supabase)).filter((c) => invoiceable(c) && c.currency === "SAR");
+  const inPeriod = cases.filter((c) => period.months.includes(c.month));
+  const [clients, staff, books, sups, pays, targets] = await Promise.all([
+    clientNames(supabase, cases.map((c) => c.id)),
+    supabase.from("employees").select("id, arabic_name"),
+    chunked<{ kind: string; title: string; city_name: string | null; supplier_name: string | null; status: string; net_charged: number | null; quoted_net: number | null; currency: string | null }>(
+      inPeriod.map((c) => c.id),
+      (part) => supabase.from("operation_bookings").select("kind, title, city_name, supplier_name, status, net_charged, quoted_net, currency").in("operation_id", part),
+    ),
+    supabase.from("supplier_payments").select("amount, currency, kind, created_by, company_suppliers(arabic_name)").gte("paid_on", from).lt("paid_on", to).limit(10000),
+    supabase.from("operation_payments").select("recorded_by, paid_at").gte("paid_at", new Date(`${from}T00:00:00+03:00`).toISOString()).lt("paid_at", new Date(`${to}T00:00:00+03:00`).toISOString()).limit(10000),
+    supabase.from("sales_targets").select("employee_id, month, amount"),
+  ]);
+  for (const r of [staff, sups, pays, targets]) if (r.error) throw r.error;
+  const names = Object.fromEntries(((staff.data ?? []) as { id: string; arabic_name: string | null }[]).map((e) => [e.id, e.arabic_name ?? ""]));
+
+  const report: ReportCase[] = cases.map((c) => ({
+    id: c.id,
+    serial: c.serial,
+    client: clients[c.id] ?? "",
+    seller: c.employee_id ? (names[c.employee_id] ?? "") : "",
+    employee_id: c.employee_id,
+    month: c.month,
+    confirmed_on: c.confirmed_on,
+    travel_start: c.travel_start,
+    total: c.total,
+    paid: c.paid,
+    installments: c.installments,
+    profit: caseProfit(c.facts).expected.find((l) => l.currency === "SAR")?.profit ?? 0,
+  }));
+  type Sup = { amount: number | string; currency: string; kind: "payment" | "refund"; created_by: string | null; company_suppliers: unknown };
+  const supRows = (sups.data ?? []) as Sup[];
+  const recordedBy = [
+    ...((pays.data ?? []) as { recorded_by: string | null }[]).map((p) => p.recorded_by),
+    ...supRows.map((p) => p.created_by),
+  ].filter((x): x is string => !!x);
+
+  return {
+    period,
+    months: recentMonths(thisMonth),
+    debts: clientDebts(report, today),
+    spend: supplierSpend(
+      books.filter((b) => (b.currency || "SAR") === "SAR").map((b) => ({ kind: b.kind, title: b.title, city: b.city_name, supplier: b.supplier_name ?? "", status: b.status, cost: Number(b.net_charged ?? b.quoted_net ?? 0) })),
+      supRows.filter((p) => p.currency === "SAR").map((p) => ({ supplier: one(p.company_suppliers as { arabic_name: string } | null)?.arabic_name ?? "مورد", amount: Number(p.amount), kind: p.kind })),
+    ),
+    employees: employeeResults({
+      months: period.months,
+      cases: report,
+      names,
+      targets: ((targets.data ?? []) as { employee_id: string; month: string | null; amount: number | string }[]).map((t) => ({ employee_id: t.employee_id, month: t.month ? t.month.slice(0, 7) : null, amount: Number(t.amount) })),
+      recordedBy,
+    }),
+  };
 }
