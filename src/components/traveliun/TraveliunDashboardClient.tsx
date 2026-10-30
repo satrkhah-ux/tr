@@ -261,7 +261,8 @@ function AdminHome({ opsSummary, mine, latest, salesCard }: { opsSummary: OpsSum
         </button>
       </div>
 
-      {tab === "mine" && salesCard ? <SalesTargetCard data={salesCard} /> : null}
+      {/* an administrator who sells nothing and has no target gets no row of zeros */}
+      {tab === "mine" && salesCard && (salesCard.target || salesCard.sales > 0) ? <SalesTargetCard data={salesCard} /> : null}
       {tab === "mine" ? <MyFollowups /> : null}
       {tab === "mine" ? <MyDashboard data={mine} /> : canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
 
