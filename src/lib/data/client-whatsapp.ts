@@ -111,7 +111,7 @@ export type WaTemplateSend = {
 export async function messageClient(
   offer: OfferClient,
   text: string,
-  extra: { note?: string; labels?: string[]; template?: WaTemplateSend; pdf?: { serial: string; name: string; cover?: CoverStyle } } = {},
+  extra: { note?: string; labels?: string[]; template?: WaTemplateSend; pdf?: { serial: string; name: string; cover?: CoverStyle }; templateOnly?: boolean } = {},
 ): Promise<ClientSendResult> {
   try {
     const blocked = await clientWhatsappAllowed(offer);
@@ -123,7 +123,8 @@ export async function messageClient(
     if (extra.labels?.length) await addTeletelLabels(thread.conversationId, extra.labels);
     if (extra.note) await addTeletelNote(thread.conversationId, extra.note);
     const body = tidyWhatsapp(text);
-    if (!thread.canReply) {
+    // templateOnly: the template even inside the 24 hours — the coupon is its picture, a plain text would lose it
+    if (!thread.canReply || (extra.templateOnly && extra.template)) {
       const def = extra.template ? WA_TEMPLATES[extra.template.key] : null;
       const approved = def ? (await whatsappTemplateStatus())?.get(def.name) === "APPROVED" : false;
       if (def && extra.template && approved) {
