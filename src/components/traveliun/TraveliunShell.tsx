@@ -637,7 +637,8 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           <button
             type="button"
             onClick={openPalette}
-            className="hidden h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] pe-3 ps-2 text-[13px] font-semibold text-[#6f8f88] transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1] sm:flex"
+            aria-label={t("quickSearch")}
+            className="flex h-10 w-10 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] text-[13px] sm:w-auto sm:justify-start sm:pe-3 sm:ps-2 font-semibold text-[#6f8f88] transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1] sm:flex"
           >
             <Search className="size-[18px]" />
             <span className="hidden lg:inline">{t("quickSearch")}</span>
@@ -714,7 +715,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
       </Sheet>
 
       <main
-        className={(partner ? "" : "me-10 ") + (
+        className={(partner ? "" : "lg:me-10 ") + (
           focus
             ? ""
             : `pt-[60px] transition-[margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:pt-[74px] ${

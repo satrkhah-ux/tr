@@ -1517,7 +1517,7 @@ export function BasicEditor({
         </div>
 
         {/* when and how many: the nights sit between the two dates they join */}
-        <div className="mt-2 grid grid-cols-3 gap-2 lg:grid-cols-[1.3fr_0.8fr_1.3fr_0.7fr_0.7fr_0.7fr_0.7fr_1.3fr]">
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-[1.3fr_0.8fr_1.3fr_0.7fr_0.7fr_0.7fr_0.7fr_1.3fr]">
           <label className={basicLabel}>
             {tx("start")}
             <input type="date" dir="ltr" value={trip.arrival_date ?? ""} onChange={(e) => setTrip({ arrival_date: e.target.value || null })} className={`${basicField} tv-tnum px-2`} />
@@ -1754,7 +1754,7 @@ export function BasicEditor({
                 <label className={`${basicLabel} w-32 shrink-0`}>
                   {tx("barPrice")}
                   <input
-                    type="number"
+                    type="number" inputMode="decimal"
                     min={0}
                     dir="ltr"
                     value={newPrice ?? ""}
@@ -1907,7 +1907,7 @@ export function BasicEditor({
                           </span>
                           <span className="tv-tnum hidden text-center text-[11px] font-bold text-[#7a948f] sm:block">{per ? tx("night") : `× ${item.quantity}`}</span>
                           <input
-                            type="number"
+                            type="number" inputMode="decimal"
                             min={0}
                             dir="ltr"
                             aria-label={per ? tx("night") : tx("sell")}
@@ -1979,7 +1979,7 @@ export function BasicEditor({
                   </div>
                   <label className="inline-flex items-center gap-1.5">
                     <input
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       dir="ltr"
                       aria-label={tx("profit")}
@@ -2029,7 +2029,7 @@ export function BasicEditor({
                   <label className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
                     <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{t(partnerSession ? "pg.partnerSell" : "pg.finalTotal")}</span>
                     <input
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       dir="ltr"
                       value={data.pricing.final_total ?? ""}

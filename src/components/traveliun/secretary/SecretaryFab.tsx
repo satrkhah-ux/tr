@@ -28,6 +28,7 @@ export function SecretaryFab() {
     }
   }
 
+  const [statusOpen, setStatusOpen] = useState(false);
   const clearPending = useCallback(() => setPendingError(null), []);
   // «أرسل الخطأ لمُراد» from anywhere on the page: open the chat with it
   useEffect(() => {
@@ -43,12 +44,20 @@ export function SecretaryFab() {
 
   return <Sheet open={open} onOpenChange={changeOpen}>
     {!open && <ErrorWatch />}
-    <div className="fixed end-0 top-[74px] bottom-20 z-[100] flex w-10 flex-col items-center justify-center gap-3 border-s border-[#dfe8e4] bg-[#eef3f1] md:bottom-0">
-      <SheetTrigger aria-label="استدعاء مُراد — سكرتيري الخاص" className="flex h-24 w-10 items-center justify-center rounded-s-xl bg-[var(--tv-brand)] text-[13px] font-extrabold text-white shadow-md focus-visible:outline-2 focus-visible:outline-offset-2">
+    {/* a full-height strip on a computer; on a phone a round button over the tab bar, the status buttons one tap
+        behind «حالتي» so the page keeps its whole width (the owner, 2026-10-30: «الاستخدام اليسير للموظف على الموبايل») */}
+    <div className="fixed end-2 bottom-[84px] z-[100] flex flex-col-reverse items-center gap-2 lg:end-0 lg:top-[74px] lg:bottom-0 lg:w-10 lg:flex-col lg:justify-center lg:gap-3 lg:border-s lg:border-[#dfe8e4] lg:bg-[#eef3f1]">
+      <SheetTrigger aria-label="استدعاء مُراد — سكرتيري الخاص" className="flex size-12 items-center justify-center rounded-full bg-[var(--tv-brand)] text-[12px] font-extrabold text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 lg:h-24 lg:w-10 lg:rounded-none lg:rounded-s-xl lg:text-[13px] lg:shadow-md">
         مُراد
       </SheetTrigger>
-      {/* the status buttons (presence, 2026-10-29): in مُراد's own strip, so they never stand over a button or a field */}
-      <StatusButtons />
+      <button type="button" onClick={() => setStatusOpen((v) => !v)} aria-expanded={statusOpen} className="rounded-full border border-[#dfe8e4] bg-white px-2.5 py-1.5 text-[11px] font-extrabold text-[var(--tv-brand)] shadow-md lg:hidden">
+        حالتي
+      </button>
+      {/* the status buttons (presence, 2026-10-29): in مُراد's own strip, so they never stand over a button or a field;
+          hidden by CSS only — their away screen is a portal and must outlive the closed list */}
+      <div className={statusOpen ? "rounded-xl bg-[#eef3f1]/95 p-1 shadow-lg lg:bg-transparent lg:p-0 lg:shadow-none" : "max-lg:hidden"}>
+        <StatusButtons />
+      </div>
     </div>
     <SheetContent side="inline-end" dir="rtl" aria-describedby={undefined} className="w-[420px] max-w-[calc(100vw/var(--tv-zoom))] overflow-hidden bg-[#fbfdfc]">
       <div className="flex items-center gap-2 bg-[var(--tv-brand)] px-4 py-2.5 text-white">

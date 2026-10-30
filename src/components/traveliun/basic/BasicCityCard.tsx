@@ -719,7 +719,7 @@ export function HotelPanel({
   const priceField = (value: number | null, nights: number, currency: string, onValue: (v: number | null) => void) => (
     <span className="grid gap-0.5">
       <input
-        type="number"
+        type="number" inputMode="decimal"
         min={0}
         dir="ltr"
         aria-label={tx("nightPrice")}
@@ -1708,7 +1708,7 @@ function ServiceLine({
       {showPrice ? (
         <span className="grid gap-0.5">
           <input
-            type="number"
+            type="number" inputMode="decimal"
             min={0}
             dir="ltr"
             aria-label={t("pg.tour.carPrice")}

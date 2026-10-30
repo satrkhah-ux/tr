@@ -207,7 +207,7 @@ function PaymentForm({
       {editing ? <p className="text-[12px] font-extrabold text-[#185045] sm:col-span-2">{t("ops.pay.editing")}</p> : null}
       <label className={label}>
         {t("ops.payment.amount")}
-        <input type="number" min={0} step="0.01" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} className={`${field} tv-tnum text-center`} />
+        <input type="number" inputMode="decimal" min={0} step="0.01" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} className={`${field} tv-tnum text-center`} />
       </label>
       <label className={label}>
         {t("ops.payment.kind")}
@@ -489,7 +489,7 @@ function Schedule({
               <label className={`${label} flex-1`}>
                 {t("ops.payment.amount")}
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   min={0}
                   step="0.01"
                   dir="ltr"

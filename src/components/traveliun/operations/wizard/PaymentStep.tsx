@@ -130,7 +130,7 @@ function AgreedPrice({ data, canManage }: Pick<StepProps, "data" | "canManage">)
       {canManage ? (
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <input
-            type="number"
+            type="number" inputMode="decimal"
             min={0}
             step="0.01"
             dir="ltr"

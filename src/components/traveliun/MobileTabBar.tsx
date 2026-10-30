@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Stamp,
   Users,
+  UserRound,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +39,7 @@ type TabDest = { id: string; labelKey: TranslationKey; href: string; icon: Lucid
 const DESTINATIONS: TabDest[] = [
   { id: "dashboard", labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
   { id: "basic", labelKey: "nav.basic", href: "/basic", icon: Zap, perm: "offers.write" },
+  { id: "mine", labelKey: "nav.myFollowups", href: "/my-followups", icon: UserRound },
   { id: "operations", labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck },
   { id: "kanban", labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
   // «التأشيرات» (section-access.ts shows it to the visa department and the management only)
@@ -62,7 +64,7 @@ const PARTNER_TABS: TabDest[] = [
 ];
 
 // «بيسك» is where a package starts now (2026-10-17); a saved pick keeps whatever it chose
-const DEFAULT_TABS = ["dashboard", "basic", "kanban", "repackage"];
+const DEFAULT_TABS = ["basic", "mine", "customers", "operations"];
 const MAX_TABS = 4;
 
 function loadTabs(): string[] {

@@ -197,7 +197,7 @@ export function LegRow({
           <span className="grid min-w-0 gap-0.5">
             <span className={SMALL_CAPTION}>{price.label}</span>
             <input
-              type="number"
+              type="number" inputMode="decimal"
               min={0}
               dir="ltr"
               aria-label={price.label}
@@ -370,7 +370,7 @@ export function BasicFlightPlan({
             </select>
           </label>
           <input
-            type="number"
+            type="number" inputMode="decimal"
             min={0}
             dir="ltr"
             aria-label={tx("planPrice")}

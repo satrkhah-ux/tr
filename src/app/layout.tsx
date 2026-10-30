@@ -85,6 +85,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // no auto-zoom when a phone field is tapped (fields are under 16px); pinch-zoom still works on iOS
+  maximumScale: 1,
   // lets the fixed bottom tab bar extend under the home indicator (safe-area).
   viewportFit: "cover",
   themeColor: "#185045",
