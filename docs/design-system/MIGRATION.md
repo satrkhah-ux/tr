@@ -6,7 +6,7 @@
 
 | # | الدفعة | الملفات | الحجم | الخطر |
 |---|---|---|---|---|
-| 0 | ✓ **منجز**: الرموز + `basicField` + `basicLabel` | `globals.css`، `basic/styles.ts`، `basic/BasicEditor.tsx:1917` | 9 ملفات مستهلكة | منخفض — مثبت |
+| 0 | ✓ **منجز**: الرموز + `basicField` + `basicLabel` | `globals.css`، `basic/styles.ts`، `basic/BasicEditor.tsx` (حذف خلفية ميتة) | 9 ملفات مستهلكة | مثبت: صفر فرق في الفاتح؛ الداكن يُظهر الآن التركيز والخطأ |
 | 1 | بقية ثوابت الحقول المطابقة لنفس الألوان | `commissions/ui.tsx:12`، `finance/FinanceBookView.tsx:12`، `developer/SecretsPanel.tsx:18`، `followups/SupervisionBoard.tsx:19`، `followups/SupervisionSetup.tsx:15`، `generator/stage-props.ts:27` | ~6 ثوابت | منخفض؛ `stage-props` له مستخدمون كُثر — افحص تجاوزات الخطأ أولاً |
 | 2 | ثوابت البطاقات بلونها الحالي | `basic/styles.ts:5` `basicCard`، `commissions/ui.tsx:9`، `operations/CaseManagement.tsx:13`، `generator/DraftsList.tsx:42` | ~4 | منخفض |
 | 3 | الأزرار: ثوابت `btn`/`btnPrimary` | `followups/followup-ui.tsx:12-13`، `developer/SecretsPanel.tsx:19`، `followups/SupervisionBoard.tsx:20`، `decisions/*` | 19 ثابتاً | متوسط — `followup-ui` بحروف كبيرة لا يلتقطها الداكن اليوم، فسيتغيّر **داكنه** (تحسين) |
@@ -21,4 +21,6 @@
 4. هل يتبع نص الحقل لون الشريك `--tv-brand` في بوابة الشركاء؟ اليوم ثابت `#185045`.
 
 ## التحقق لكل دفعة
-`npx tsc --noEmit -p .` ← `npx vitest run` للملفات المعنية ← بناء الإنتاج في `tv-verify` ← `grep` لملف CSS المبني للتأكد من بقاء الرموز ← مقارنة القيم المحسوبة (`getComputedStyle`) قبل/بعد في الفاتح والداكن كما في الدفعة 0.
+`npx tsc --noEmit -p .` ← `npx vitest run` للملفات المعنية ← بناء الإنتاج في `tv-verify` ← `grep` لملف CSS المبني للتأكد من بقاء الرموز ← مقارنة القيم المحسوبة قبل/بعد في الفاتح والداكن بنسخة من `scripts/ds-field-proof.mjs` (بعد `next build`: `node scripts/ds-field-proof.mjs`).
+
+درس الدفعة 0: صنفان من نفس الخاصية على عنصر واحد يحسمهما **ترتيب Tailwind لا ترتيب الكتابة** — فقد يكون صنف «الخطأ» ميتاً اليوم ويظهر بعد الترحيل. القياس وحده يكشف ذلك.
