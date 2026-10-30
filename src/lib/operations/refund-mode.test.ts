@@ -138,6 +138,8 @@ describe("the client's reminder — prepared, never sent", () => {
     const [m, ...rest] = preparedMessages({ ...base, bookings: [hotel] });
     expect(rest).toEqual([]);
     expect(m.key).toBe("paydue:b1:2026-11-05");
+    expect(m.template).toBe("payment_due");
+    expect(m.date).toBeTruthy();
     expect(m.body).toContain("نذكّركم بأن حجز فندق بولمان في كوالالمبور يتطلب إتمام السداد قبل");
     expect(m.body).not.toContain("يُلغى");
   });

@@ -80,7 +80,7 @@ const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split("
 for (const [key, def] of Object.entries(WA_TEMPLATES)) {
   if (only && !only.includes(def.name)) continue;
   // the programme and the prepared booking updates are always sent by a person — no switch to wait for
-  if (!["programme", "programme_updated", "booking_update"].includes(key) && !key.startsWith("offer_followup_") && !enabled.has(key)) continue;
+  if (!["programme", "programme_updated", "booking_update", "payment_due"].includes(key) && !key.startsWith("offer_followup_") && !enabled.has(key)) continue;
   if (existing.has(def.name)) {
     console.log(`= ${def.name}: already on the account (${existing.get(def.name)})`);
     continue;

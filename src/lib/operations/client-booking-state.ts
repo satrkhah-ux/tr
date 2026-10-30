@@ -152,7 +152,8 @@ export function hotelAtRisk(b: ClientBookingRow, travelStart: string | null, tod
 // ---------- the updates prepared for staff ----------
 
 /** `template`: the approved WhatsApp template it travels as after the client's 24 hours (WA_TEMPLATES). */
-export type PreparedMessage = { key: string; label: string; body: string; template: "bookings_confirmed" | "booking_update" };
+/** `date`: the template's date value (payment_due — the day the payment is due). */
+export type PreparedMessage = { key: string; label: string; body: string; template: "bookings_confirmed" | "booking_update" | "payment_due"; date?: string };
 
 const SIGN = "فريق ترافليون للسفر والسياحة";
 
@@ -263,7 +264,8 @@ export function preparedMessages(input: {
       out.push({
         key,
         label: `تذكير السداد — فندق ${h.name}`,
-        template: "booking_update",
+        template: "payment_due",
+        date: arabicDay(day),
         body: [
           input.hello,
           `نذكّركم بأن حجز فندق ${h.name}${h.city ? ` في ${h.city}` : ""} يتطلب إتمام السداد قبل ${arabicDay(day)}، حتى نثبّت الحجز لكم.`,

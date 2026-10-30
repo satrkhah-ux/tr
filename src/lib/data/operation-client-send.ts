@@ -213,6 +213,7 @@ export async function sendClientMessageNow(input: { operation_id: string; body: 
       serial: c.offer.serial,
       link: c.token ? `${site()}/trip/${c.token}` : "",
       rate_link: "",
+      date: item?.date,
     };
     const raw = await messageClient(
       c.offer,

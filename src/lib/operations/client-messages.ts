@@ -129,7 +129,7 @@ export function messagesDueToday(start: string | null, end: string | null, today
  * What a template is about: a stage message, the programme sent when a file is
  * issued, or a booking's update prepared for staff (client-booking-state.ts).
  */
-export type WaTemplateKey = ClientMessageKey | "programme" | "programme_updated" | "booking_update" | "offer_followup_1" | "offer_followup_2" | "offer_followup_3";
+export type WaTemplateKey = ClientMessageKey | "programme" | "programme_updated" | "booking_update" | "payment_due" | "offer_followup_1" | "offer_followup_2" | "offer_followup_3";
 
 type WaField = "name" | "destination" | "serial" | "link" | "date";
 
@@ -181,6 +181,12 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
     name: "traveliun_booking_update",
     params: ["name", "destination", "serial", "link"],
     body: [HELLO, "تم تحديث حجوزات رحلتك إلى {{2}}", "(رقم الملف {{3}})", "أرقام الحجز والمستندات المحدَّثة من هنا:", "{{4}}", SIGN].join("\n\n"),
+  },
+  // a hotel's free cancellation or hold ending, unpaid (the owner said «نعم», 2026-10-30) — submitted by scripts/submit-wa-templates.mjs
+  payment_due: {
+    name: "traveliun_payment_due",
+    params: ["name", "destination", "serial", "date", "link"],
+    body: [HELLO, "بخصوص رحلتك إلى {{2}} (رقم الملف {{3}})", "نذكّركم بأن إتمام السداد مطلوب قبل {{4}} لتثبيت حجوزاتكم", "تفاصيل رحلتك من هنا:", "{{5}}", SIGN].join("\n\n"),
   },
   documents_ready: {
     name: "traveliun_documents_ready",
