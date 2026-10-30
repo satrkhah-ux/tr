@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import jsQR from "jsqr";
-import { Camera, CheckCircle2, CircleX, Clock, ScanLine } from "lucide-react";
+import { Camera, CheckCircle2, CircleX, Clock, ImageUp, ScanLine } from "lucide-react";
 import { lookupCoupon, redeemCoupon, type ScanResult } from "@/lib/data/discounts-actions";
 import { card, field } from "./Campaigns";
 
@@ -14,7 +14,9 @@ import { card, field } from "./Campaigns";
 export function CouponScanner({ initial }: { initial: string | null }) {
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [camera, setCamera] = useState<"off" | "on" | "denied">("off");
+  const [camera, setCamera] = useState<"off" | "on">("off");
+  // why the live camera did not open — the photo button below still works (the phone's own camera app)
+  const [cameraError, setCameraError] = useState("");
   const [code, setCode] = useState("");
   const [ref, setRef] = useState("");
   const [coupon, setCoupon] = useState<ScanResult | null>(null);
@@ -65,8 +67,13 @@ export function CouponScanner({ initial }: { initial: string | null }) {
       }
       raf = requestAnimationFrame(tick);
     };
+    const fail = (why: string) => { setCamera("off"); setCameraError(why); };
+    if (!navigator.mediaDevices?.getUserMedia) {
+      fail("هذا المتصفح لا يفتح الكاميرا داخل الصفحة. استعمل «صوّر الكوبون» أو اكتب الكود.");
+      return;
+    }
     navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+      .getUserMedia({ video: { facingMode: "environment" }, audio: false })
       .then((s) => {
         stream = s;
         if (stopped || !video.current) return s.getTracks().forEach((t) => t.stop());
@@ -74,13 +81,47 @@ export function CouponScanner({ initial }: { initial: string | null }) {
         void video.current.play();
         raf = requestAnimationFrame(tick);
       })
-      .catch(() => setCamera("denied"));
+      .catch((e: unknown) => {
+        const name = e instanceof DOMException ? e.name : "";
+        fail(
+          name === "NotAllowedError" || name === "SecurityError"
+            ? "المتصفح منع الكاميرا. اضغط على القفل بجانب العنوان ← الكاميرا ← سماح، ثم أعد المحاولة. أو استعمل «صوّر الكوبون»."
+            : name === "NotFoundError" || name === "OverconstrainedError"
+              ? "لا توجد كاميرا متاحة في هذا الجهاز. استعمل «صوّر الكوبون» أو اكتب الكود."
+              : name === "NotReadableError"
+                ? "الكاميرا مشغولة ببرنامج آخر. أغلقه ثم أعد المحاولة، أو استعمل «صوّر الكوبون»."
+                : "تعذّر فتح الكاميرا. استعمل «صوّر الكوبون» أو اكتب الكود.",
+        );
+      });
     return () => {
       stopped = true;
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [camera, look]);
+
+  // a photo from the phone's own camera app: no browser permission needed, read the same way
+  const readPhoto = (file: File | undefined) => {
+    const c = canvas.current;
+    if (!file || !c) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const w = Math.round(img.width * k), h = Math.round(img.height * k);
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, w, h);
+      const hit = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "attemptBoth" });
+      if (hit?.data) { setCameraError(""); look(hit.data); }
+      else { setCoupon(null); setError("لم يظهر رمز QR واضح في الصورة. صوّره من قريب وبإضاءة جيدة، أو اكتب الكود."); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); setError("تعذّرت قراءة الصورة."); };
+    img.src = url;
+  };
 
   const redeem = () =>
     start(async () => {
@@ -108,14 +149,18 @@ export function CouponScanner({ initial }: { initial: string | null }) {
             <button type="button" onClick={() => setCamera("off")} className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-1.5 text-[13px] font-bold text-black">إغلاق الكاميرا</button>
           </div>
         ) : (
-          <button type="button" onClick={() => { setCamera("on"); setCoupon(null); setError(""); }}
+          <button type="button" onClick={() => { setCamera("on"); setCameraError(""); setCoupon(null); setError(""); }}
             className="flex min-h-32 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-tv-action-primary text-tv-text-brand">
             <Camera className="size-9" />
             <span className="text-[15px] font-extrabold">امسح كوبون العميل</span>
             <span className="text-[12px] font-semibold text-tv-text-faint">وجّه الكاميرا إلى رمز QR في كوبونه</span>
           </button>
         )}
-        {camera === "denied" && <p role="alert" className="mt-2 text-[12.5px] font-bold text-tv-status-danger">لم يُسمح بالكاميرا. اسمح بها من إعدادات المتصفح، أو اكتب الكود.</p>}
+        {cameraError && <p role="alert" className="mt-2 text-[12.5px] font-bold text-tv-status-danger">{cameraError}</p>}
+        <label className="mt-3 flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-tv-border-default text-[13px] font-extrabold text-tv-text-brand">
+          <ImageUp className="size-4" />صوّر الكوبون
+          <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { readPhoto(e.target.files?.[0]); e.target.value = ""; }} />
+        </label>
         <canvas ref={canvas} className="hidden" />
         <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) look(code); }} className="mt-3 flex gap-2">
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="أو اكتب الكود: TRV-XXXXXX" dir="ltr" className={`${field} font-mono`} />
