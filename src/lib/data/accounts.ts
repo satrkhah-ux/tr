@@ -10,6 +10,8 @@ import { expenseTotals, type Expense } from "@/lib/accounts/expenses";
 import { listSupplierAccounts } from "./supplier-work";
 import { accountsCompanyStatus, accountsOpen, financeFixedCost } from "./finance";
 import { quarterOf, type CompanyStatus, type SystemMonth } from "@/lib/accounts/status";
+import { installmentsDue, payTerm, type InstallmentDue, type PayTerm } from "@/lib/accounts/dues";
+import { METHOD_AR, KIND_AR } from "@/lib/operations/payments";
 import { quotesView, type Quote, type QuotesView } from "@/lib/accounts/quotes";
 import { journal } from "@/lib/accounts/journal";
 import { byCurrency, caseProfit } from "@/lib/operations/money";
@@ -497,4 +499,85 @@ async function statusNow(supabase: SupabaseClient, cases: LoadedCase[], month: s
     by.set(mm, { ...t, expenses: spent });
   }
   return accountsCompanyStatus(month, Object.fromEntries(by));
+}
+
+// ------------------------------------------------------------- «المستحقات» ----
+
+export type Payable = {
+  id: string; operation_id: string; serial: string; client: string;
+  kind: string; title: string; city: string | null; from: string | null; to: string | null;
+  supplier: string; supplier_id: string | null; cost: number; currency: string; term: PayTerm | null;
+};
+export type Received = { operation_id: string; serial: string; client: string; on: string; amount: number; currency: string; kind: string; method: string; receipt_no: string | null };
+export type DuesView = { today: string; payables: Payable[]; installments: InstallmentDue[]; received: Received[] };
+
+/**
+ * Stage 10 — when money is due and from whom: every confirmed supplier booking not paid yet with its
+ * pay-by or free-cancellation day, every client installment not settled, and the client payments of the
+ * last 90 days; each row names its file and opens it.
+ */
+export async function getDues(): Promise<DuesView | null> {
+  if (!(await allowed())) return null;
+  const supabase = db();
+  const today = riyadhDate();
+  const cases = (await loadCases(supabase)).filter(invoiceable);
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  const [clients, books, pays] = await Promise.all([
+    clientNames(supabase, cases.map((c) => c.id)),
+    supabase
+      .from("operation_bookings")
+      .select("id, operation_id, kind, title, city_name, start_date, end_date, cancellation_deadline, refund_mode:detail->>refund_mode, net_charged, quoted_net, currency, supplier_name, assignee_supplier_id")
+      .eq("status", "confirmed")
+      .eq("is_paid", false)
+      .limit(5000),
+    supabase.from("operation_payments").select("operation_id, amount, currency, kind, method, paid_at, receipt_no").gte("paid_at", since).order("paid_at", { ascending: false }).limit(2000),
+  ]);
+  if (books.error) throw books.error;
+  if (pays.error) throw pays.error;
+  type Book = { id: string; operation_id: string; kind: string; title: string; city_name: string | null; start_date: string | null; end_date: string | null; cancellation_deadline: string | null; refund_mode: string | null; net_charged: number | null; quoted_net: number | null; currency: string | null; supplier_name: string | null; assignee_supplier_id: string | null };
+  const rows = ((books.data ?? []) as Book[]).filter((b) => byId.has(b.operation_id));
+  const supplierIds = [...new Set(rows.map((b) => b.assignee_supplier_id).filter((x): x is string => !!x))];
+  const suppliers = await chunked<{ id: string; arabic_name: string }>(supplierIds, (part) => supabase.from("company_suppliers").select("id, arabic_name").in("id", part));
+  const supplierName = new Map(suppliers.map((x) => [x.id, x.arabic_name]));
+
+  const payables: Payable[] = rows
+    .map((b) => ({
+      id: b.id,
+      operation_id: b.operation_id,
+      serial: byId.get(b.operation_id)?.serial ?? "",
+      client: clients[b.operation_id] ?? "",
+      kind: b.kind,
+      title: b.title,
+      city: b.city_name,
+      from: b.start_date,
+      to: b.end_date,
+      supplier: (b.assignee_supplier_id && supplierName.get(b.assignee_supplier_id)) || b.supplier_name || "بلا مورد",
+      supplier_id: b.assignee_supplier_id,
+      // ponytail: the booking's own net (as the home's supplier tiles read it); a pricing-line booking's buy is supplier-work's bookingCost
+      cost: Number(b.net_charged ?? b.quoted_net ?? 0),
+      currency: b.currency || "SAR",
+      term: payTerm({ refund_mode: b.refund_mode, deadlineDay: b.cancellation_deadline ? riyadhDate(b.cancellation_deadline) : null }, today),
+    }))
+    // the nearest deadline first; no deadline last, the earliest stay first among them
+    .sort((x, y) => (x.term?.date ?? "9999").localeCompare(y.term?.date ?? "9999") || (x.from ?? "9999").localeCompare(y.from ?? "9999"));
+
+  const live = cases.filter((c) => !c.cancelled);
+  const installments = installmentsDue(live.map((c) => ({ id: c.id, serial: c.serial, client: clients[c.id] ?? "", confirmed_on: c.confirmed_on, travel_start: c.travel_start, total: c.total, paid: c.paid, installments: c.installments })), today);
+
+  type Pay = { operation_id: string; amount: number | string; currency: string | null; kind: string; method: string | null; paid_at: string; receipt_no: string | null };
+  const received: Received[] = ((pays.data ?? []) as Pay[])
+    .filter((p) => byId.has(p.operation_id))
+    .map((p) => ({
+      operation_id: p.operation_id,
+      serial: byId.get(p.operation_id)?.serial ?? "",
+      client: clients[p.operation_id] ?? "",
+      on: riyadhDate(p.paid_at),
+      amount: Number(p.amount),
+      currency: p.currency || "SAR",
+      kind: KIND_AR[p.kind as keyof typeof KIND_AR] ?? p.kind,
+      method: (p.method && METHOD_AR[p.method as keyof typeof METHOD_AR]) || "—",
+      receipt_no: p.receipt_no,
+    }));
+  return { today, payables, installments, received };
 }

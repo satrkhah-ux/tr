@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Loader2, Pencil, Store, Wallet } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { payTerm, payTermText, payTermTone } from "@/lib/accounts/dues";
 import {
   setSupplierReplyHours,
   type SupplierAccount,
@@ -150,6 +151,7 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
   const [paying, setPaying] = useState(false);
   const { supplier, bookings, payments, balances } = account;
   const unpaid = bookings.filter((b) => b.status === "confirmed" && !b.is_paid);
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
 
   return (
     <Frame base={base}>
@@ -219,12 +221,27 @@ export function SupplierAccountView({ account, base = "/operations/suppliers" }:
                     <Link href={`/operations/${b.operation_id}`} className="tv-tnum me-2 text-[#2b57c4] hover:underline">
                       <DirText dir="ltr">{b.serial || "—"}</DirText>
                     </Link>
-                    <span className="text-[#0f3d38]">{b.title}</span>
+                    <span className="text-tv-text-strong">{b.title}</span>
                     {b.start_date ? (
                       <span className="tv-tnum ms-2 text-tv-text-faint">
-                        <DirText dir="ltr">{b.start_date}</DirText>
+                        {b.end_date && b.end_date !== b.start_date ? (
+                          <>من <DirText dir="ltr">{b.start_date}</DirText> إلى <DirText dir="ltr">{b.end_date}</DirText></>
+                        ) : (
+                          <DirText dir="ltr">{b.start_date}</DirText>
+                        )}
                       </span>
                     ) : null}
+                    {/* when the money is due — the owner, 2026-10-30: hotels showed no payment dates */}
+                    {b.status === "confirmed" && !b.is_paid && (() => {
+                      const term = payTerm({ refund_mode: b.refund_mode, deadlineDay: b.deadline_day }, today);
+                      if (!term) return <span className="mt-0.5 block text-[11px] font-semibold text-tv-text-faint">لا موعد دفع مسجّل على الحجز</span>;
+                      const tone = payTermTone(term);
+                      return (
+                        <span className={`mt-0.5 block text-[11.5px] font-extrabold ${tone === "danger" ? "text-tv-status-danger" : tone === "warning" ? "text-tv-status-warning" : "text-tv-text-muted"}`}>
+                          {payTermText(term)}
+                        </span>
+                      );
+                    })()}
                   </span>
                   <span className="flex flex-wrap items-center gap-2">
                     <span className={b.status === "confirmed" ? "text-[#0f7a52]" : "text-[#a86a10]"}>

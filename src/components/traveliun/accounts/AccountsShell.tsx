@@ -14,6 +14,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const NAV: [string, string][] = [
   ["/accounts", "الرئيسية"],
+  ["/accounts/dues", "المستحقات"],
   ["/accounts/invoices", "الفواتير"],
   ["/accounts/reports", "التقارير"],
   ["/accounts/expenses", "المصروفات"],

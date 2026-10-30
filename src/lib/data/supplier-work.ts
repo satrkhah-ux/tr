@@ -728,6 +728,11 @@ export type SupplierAccountBooking = {
   kind: SupplierBookingKind;
   title: string;
   start_date: string | null;
+  /** the stay's or service's last day (the owner, 2026-10-30: hotels showed no dates) */
+  end_date: string | null;
+  /** «ادفع قبل» / «إلغاء مجاني حتى»: the booking's refund mode and its cancellation deadline as a Riyadh day */
+  refund_mode: string | null;
+  deadline_day: string | null;
   status: string;
   is_paid: boolean;
   cost: Money | null;
@@ -749,6 +754,9 @@ type AccountBookingRow = BookingMoneyRow & {
   kind: SupplierBookingKind;
   title: string;
   start_date: string | null;
+  end_date: string | null;
+  cancellation_deadline: string | null;
+  refund_mode: string | null;
   status: string;
   is_paid: boolean;
   operations: { offers: unknown } | { offers: unknown }[] | null;
@@ -761,7 +769,7 @@ const owedOf = (rows: (AccountBookingRow & { cost: Money | null })[]) =>
 async function accountRows(supabase: SupabaseClient, supplierId: string | null) {
   let bq = supabase
     .from("operation_bookings")
-    .select("id, operation_id, assignee_supplier_id, kind, title, start_date, status, is_paid, quoted_net, net_charged, currency, origin_ref, operations(offers(serial))")
+    .select("id, operation_id, assignee_supplier_id, kind, title, start_date, end_date, cancellation_deadline, refund_mode:detail->>refund_mode, status, is_paid, quoted_net, net_charged, currency, origin_ref, operations(offers(serial))")
     .not("assignee_supplier_id", "is", null)
     .neq("status", "cancelled")
     .order("start_date", { ascending: false, nullsFirst: false });
@@ -831,6 +839,9 @@ export async function getSupplierAccount(supplierId: string): Promise<SupplierAc
         kind: b.kind,
         title: b.title,
         start_date: b.start_date,
+        end_date: b.end_date,
+        refund_mode: b.refund_mode,
+        deadline_day: b.cancellation_deadline ? new Date(b.cancellation_deadline).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }) : null,
         status: b.status,
         is_paid: b.is_paid,
         cost: b.cost,
