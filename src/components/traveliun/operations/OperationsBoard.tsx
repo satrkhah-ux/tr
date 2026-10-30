@@ -132,10 +132,10 @@ export function OperationsBoard({
     <TraveliunShell title="nav.operations">
       <div className="tv-fade-up space-y-4">
         {/* a slim head — the title, the four lists as chips, search, upload — so the cards come first (the owner, 2026-10-23) */}
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ops.title")}</h1>
-            <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.subtitle")}</p>
+            <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.subtitle")}</p>
           </div>
           {canSeeMoney ? <MoneyLinks /> : null}
 
@@ -184,12 +184,12 @@ export function OperationsBoard({
               {activeFilters > 0 ? <span className="tv-tnum rounded-full bg-[#185045] px-1.5 text-[10.5px] text-white">{activeFilters}</span> : null}
             </button>
             <div className="relative basis-full sm:ms-auto sm:basis-auto">
-              <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+              <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("ops.list.searchHint")}
-                className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus:border-[#2aa87a] sm:w-64"
+                className="tv-field h-10 w-full rounded-[10px] border px-3 pe-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus sm:w-64"
               />
             </div>
           </div>
@@ -197,7 +197,7 @@ export function OperationsBoard({
         </section>
 
         {rows.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState
               icon={filter === "needs_action" && counts.all > 0 ? CheckCircle2 : ClipboardCheck}
               title={filter === "needs_action" && counts.all > 0 ? t("ops.allClear") : t("ops.noOperations")}
@@ -360,7 +360,7 @@ function UploadPicker({ operations }: { operations: OperationCard[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439]"
+        className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-extrabold"
       >
         <FileUp className="size-4" />
         {t("wz.up.pick")}
@@ -379,7 +379,7 @@ function UploadPicker({ operations }: { operations: OperationCard[] }) {
         }}
         placeholder={t("wz.up.pickHint")}
         ariaLabel={t("wz.up.pick")}
-        className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+        className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
       />
     </div>
   );

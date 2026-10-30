@@ -118,10 +118,10 @@ export function GeneratorShell({
               role="status"
               className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${
                 saveState === "error"
-                  ? "bg-[#fdeef2] text-[#c22850]"
+                  ? "bg-tv-status-danger-bg text-tv-status-danger"
                   : saveState === "saving"
-                    ? "bg-[#fff8e8] text-[#a86a10]"
-                    : "bg-[#e9f7f0] text-[#0f7a52]"
+                    ? "bg-tv-status-warning-bg text-tv-status-warning"
+                    : "bg-tv-status-success-bg text-tv-status-success"
               }`}
             >
               {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : saveState === "error" ? <XCircle className="size-3.5" /> : <Check className="size-3.5" />}
@@ -131,7 +131,7 @@ export function GeneratorShell({
               <button
                 type="button"
                 onClick={() => setPreviewOpen((v) => !v)}
-                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex"
+                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex max-sm:min-h-10"
               >
                 {previewOpen ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 {previewOpen ? t("pg.hidePreview") : t("pg.showPreview")}
@@ -205,8 +205,8 @@ export function GeneratorShell({
                 other question — "is this whole file ready to go out" — and each
                 row is a link straight to the box that is wrong. */}
             {stage === "preview" ? (
-            <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-              <p className="mb-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]">{t("pg.validationPanel")}</p>
+            <div className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <p className="mb-2 text-[11px] font-extrabold tracking-wide text-tv-text-faint">{t("pg.validationPanel")}</p>
               {validation.blocking.length === 0 && validation.warnings.length === 0 ? (
                 <p className="flex items-start gap-2 text-[12px] font-bold text-[#0f7a52]">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
@@ -244,7 +244,7 @@ export function GeneratorShell({
             {stage !== "preview" && previewOpen ? (
               <div className="hidden xl:block">
                 <div className="sticky top-[90px]">
-                  <p className="mb-2 text-[11px] font-bold text-[#93aaa3]">{t("pg.previewHint")}</p>
+                  <p className="mb-2 text-[11px] font-bold text-tv-text-faint">{t("pg.previewHint")}</p>
                   <div className="max-h-[calc(100vh/var(--tv-zoom)_-_160px)] overflow-y-auto rounded-[14px]">
                     <div className="origin-top scale-[0.62] rtl:origin-top-right ltr:origin-top-left" style={{ width: "161%" }}>
                       <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer, draftFinance(data, lookups))} {...draftBrand(data, lookups.partners, canPricing && !can("pricing.view"))} />
@@ -324,7 +324,7 @@ function StepDot({ index, status, active }: { index: number; status: StageStatus
   if (status === "error") return <XCircle className="size-6 shrink-0 text-[#c22850]" />;
   if (status === "partial") return <CircleDot className="size-6 shrink-0 text-[#d99a00]" />;
   return (
-    <span className={`${shell} bg-[#eef4f1] text-[#93aaa3]`}>
+    <span className={`${shell} bg-[#eef4f1] text-tv-text-faint`}>
       <DirText dir="ltr">{String(index + 1)}</DirText>
     </span>
   );
@@ -364,7 +364,7 @@ function IssueList({
               >
                 {icon}
                 <span className="flex-1">{issueText(issue)}</span>
-                <ChevronLeft className="mt-0.5 size-3.5 shrink-0 text-[#b6c9c2] ltr:rotate-180" />
+                <ChevronLeft className="mt-0.5 size-3.5 shrink-0 text-tv-text-faint ltr:rotate-180" />
               </Link>
             </li>
           );

@@ -27,7 +27,7 @@ import { loginName, passwordProblem } from "@/lib/auth/password-rule";
  */
 
 const field =
-  "h-9 w-full rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-9 w-full rounded-[9px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 export function PendingRegistrations({ companies }: { companies: PartnerCompany[] }) {
   const pending = companies.filter((c) => c.status === "pending");
@@ -38,7 +38,7 @@ export function PendingRegistrations({ companies }: { companies: PartnerCompany[
       <h2 className="text-sm font-extrabold text-[#a86a10]">
         طلبات شراكة بانتظار القرار ({pending.length})
       </h2>
-      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">
+      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-tv-text-faint">
         الشركة لا ترى شيئاً ولا تدخل النظام قبل الاعتماد. النسبة تُحدَّد هنا، ولا يمكن للشركة التأثير فيها.
       </p>
       <div className="space-y-2.5">
@@ -58,7 +58,7 @@ function PendingRow({ company }: { company: PartnerCompany }) {
   const [pct, setPct] = useState("15");
 
   return (
-    <div className="rounded-[12px] border border-[#e2ebe7] bg-white p-3">
+    <div className="tv-card rounded-[12px] border p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[13px] font-extrabold text-[#003c3a]">{company.name}</p>
@@ -69,7 +69,7 @@ function PendingRow({ company }: { company: PartnerCompany }) {
             {company.contact_name ? <span>{company.contact_name}</span> : null}
           </p>
           {company.registration_note ? (
-            <p className="mt-1 text-[11.5px] text-[#93aaa3]">{company.registration_note}</p>
+            <p className="mt-1 text-[11.5px] text-tv-text-faint">{company.registration_note}</p>
           ) : null}
           <RequestDetails company={company} />
         </div>
@@ -264,7 +264,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
             {company.has_account || made ? "تعيين كلمة المرور" : "إصدار الحساب بكلمة المرور"}
           </button>
-          <button type="button" onClick={() => setTemp(null)} className="h-9 px-2 text-[12px] font-bold text-[#557d78]">
+          <button type="button" onClick={() => setTemp(null)} className="h-9 px-2 text-[12px] font-bold text-[#557d78] max-sm:min-h-10">
             إلغاء
           </button>
           {temp && weak ? <span className="basis-full text-[11px] font-bold text-[#a86a10]">{weak}</span> : null}
@@ -294,7 +294,7 @@ function RequestDetails({ company }: { company: PartnerCompany }) {
   return (
     <div className="mt-1.5 space-y-1">
       {facts.length ? <p className="text-[11.5px] font-bold text-[#557d78]">{facts.join(" · ")}</p> : null}
-      <p className="text-[11px] font-semibold text-[#93aaa3]">
+      <p className="text-[11px] font-semibold text-tv-text-faint">
         {company.terms_accepted_at
           ? `وافقت على شروط التعاون (${company.terms_version ?? "—"}) في ${company.terms_accepted_at.slice(0, 10)}`
           : "لا موافقة مسجّلة على شروط التعاون"}

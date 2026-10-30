@@ -72,7 +72,7 @@ export function DepartmentHomes({ opsSummary, mine, visaBoard }: { opsSummary: O
   return (
     <div className="space-y-4">
       {kinds.length > 1 ? (
-        <div className="flex max-w-full overflow-x-auto rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex dark:border-[#24423a] dark:bg-[#12261f]">
+        <div className="tv-card flex max-w-full overflow-x-auto rounded-[12px] border p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex">
           {kinds.map((k) => (
             <button
               key={k}
@@ -127,7 +127,7 @@ function QuickTiles({ kind }: { kind: HomeKind }) {
 /** «التأشيرات»: the board's counters, and the files whose next step is due — each opens its file. */
 function VisasHome({ board }: { board: VisaBoard | null }) {
   const { t } = useTraveliunUI();
-  if (!board) return <p className={`${CARD} text-[13px] font-semibold text-[#93aaa3]`}>{t("dash.home.visaLoadError")}</p>;
+  if (!board) return <p className={`${CARD} text-[13px] font-semibold text-tv-text-faint`}>{t("dash.home.visaLoadError")}</p>;
   const c = board.counts;
   const open = VISA_OPEN.reduce((n, s) => n + (c.byStatus[s] ?? 0), 0);
   const stats: { label: TranslationKey; value: number; icon: LucideIcon; warn?: boolean }[] = [
@@ -144,7 +144,7 @@ function VisasHome({ board }: { board: VisaBoard | null }) {
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
         {stats.map((s) => (
           <Link key={s.label} href="/visa-files" className={`${CARD} block`}>
-            <span className={`flex items-center gap-2 text-[12px] font-bold ${s.warn ? "text-[#b45309] dark:text-[#f0b45c]" : "text-[#6f8f88] dark:text-[#9fc4bb]"}`}>
+            <span className={`flex items-center gap-2 text-[12px] font-bold ${s.warn ? "text-[#b45309] dark:text-[#f0b45c]" : "text-tv-text-faint dark:text-[#9fc4bb]"}`}>
               <s.icon className="size-4" />
               {t(s.label)}
             </span>
@@ -157,16 +157,16 @@ function VisasHome({ board }: { board: VisaBoard | null }) {
       <section className={CARD}>
         <h2 className="mb-2 text-[13px] font-extrabold text-[#185045] dark:text-[#d4e7e1]">{t("dash.home.today")}</h2>
         {due.length === 0 ? (
-          <p className="text-[12.5px] font-semibold text-[#93aaa3]">{t("dash.home.noneToday")}</p>
+          <p className="text-[12.5px] font-semibold text-tv-text-faint">{t("dash.home.noneToday")}</p>
         ) : (
           <ul className="divide-y divide-[#eef3f1] dark:divide-[#24423a]">
             {due.map((r) => (
               <li key={r.id}>
                 <Link href={`/visa-files/${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[12.5px] font-bold text-[#185045] hover:underline dark:text-[#d4e7e1]">
-                  <DirText className="text-[#93aaa3]">{r.serial}</DirText>
+                  <DirText className="text-tv-text-faint">{r.serial}</DirText>
                   <span>{r.clientName ?? "—"}</span>
                   <span className="text-[#557d78] dark:text-[#9fc4bb]">{r.country ?? ""}</span>
-                  <span className="ms-auto font-semibold text-[#6f8f88] dark:text-[#9fc4bb]">{r.nextAction ?? ""}</span>
+                  <span className="ms-auto font-semibold text-tv-text-faint dark:text-[#9fc4bb]">{r.nextAction ?? ""}</span>
                 </Link>
               </li>
             ))}

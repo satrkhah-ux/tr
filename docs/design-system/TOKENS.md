@@ -14,16 +14,26 @@
 | `--tv-text-strong` | `text-tv-text-strong` | `#003c3a` | `#eaf3ef` | `#003c3a` `#0f3d38` |
 | `--tv-text-brand` | `text-tv-text-brand` | `#185045` | `#7fd3ba` | `text-[#185045]` |
 | `--tv-text-muted` | `text-tv-text-muted` | `#557d78` | `#9fb3ac` | `#557d78` `#6f8f88` |
-| `--tv-text-faint` | `text-tv-text-faint` | `#93aaa3` | `#9fb3ac` | `#93aaa3` `#8aa29b` (تباين ضعيف — انظر AUDIT) |
+| `--tv-text-faint` | `text-tv-text-faint` | `#5e776f` (كان `#93aaa3`) | `#9fb3ac` | 35 درجة رمادية-خضراء (`#93aaa3` `#8aa29b` `#78948f`…) — 4.83:1 على الأبيض |
 | `--tv-border-subtle` | `border-tv-border-subtle` | `#e2ebe7` | `#294039` | فواصل البطاقات |
 | `--tv-border-default` | `border-tv-border-default` | `#dbe6e1` | `#294039` | حدود الحقول والأزرار |
 | `--tv-border-strong` | `border-tv-border-strong` | `#cfe0d9` | `#294039` | حدود متقطعة/مجموعات |
 | `--tv-action-primary` | `bg-tv-action-primary` | `#185045` | `#185045` | `bg-[#185045]` (العلامة لا تتغير في الداكن عمداً) |
+| `--tv-action-primary-hover` | (داخل `tv-btn-primary`) | `#0f4439` | `#0f4439` | `hover:bg-[#0f4439]` |
 | `--tv-action-on-primary` | `text-tv-action-on-primary` | `#ffffff` | `#ffffff` | `text-white` على الزر الأساسي |
 | `--tv-action-focus` | `border-tv-action-focus` | `#2aa87a` | `#2aa87a` | `focus:border-[#2aa87a]` |
 | `--tv-status-success` / `-bg` | `text-tv-status-success` | `#0f7a52` / `#e9f7f0` | `#86eac4` / `#12352c` | مؤكَّد / نجاح |
 | `--tv-status-danger` / `-bg` | `text-tv-status-danger` | `#c22850` / `#fdeef2` | `#e789a1` / `#31161f` | خطأ / ملغى |
-| `--tv-status-warning` / `-bg` | `text-tv-status-warning` | `#a86a10` / `#fff8e8` | `#eac186` / `#312811` | تحذير |
+| `--tv-status-warning` / `-bg` | `text-tv-status-warning` | `#9f640f` (كان `#a86a10`) / `#fff8e8` | `#eac186` / `#312811` | تحذير |
+
+## أصناف المكوّنات (`@utility` في `globals.css`)
+| الصنف | يرسم | المستخدمون |
+|---|---|---|
+| `tv-field` | حد/سطح/نص الحقل + لون التركيز | `basicField` + 60 ثابتاً + 47 حقلاً مضمَّناً |
+| `tv-btn-primary` / `tv-btn-secondary` / `tv-btn-ghost` | الزر الأساسي/الثانوي/الشفاف + hover | `ui/button-variants.ts` (`buttonTone`، `buttonVariants`) + 25 ثابتاً + 166 زراً مضمَّناً |
+| `tv-card` | حد `border.subtle` + سطح مرفوع | 29 ثابتاً + 177 حاوية |
+
+كلها تُرتَّب قبل أصناف الألوان، فأي لون تضيفه الشاشة فوقها يغلب.
 
 ## رموز موجودة لم تُمس
 - `--tv-brand` / `--tv-accent`: لون شركة الشريك يُكتب على `<body>` — يبقى كما هو.

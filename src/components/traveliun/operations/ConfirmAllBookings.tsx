@@ -9,7 +9,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
 const field =
-  "h-10 w-full min-w-0 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full min-w-0 rounded-[9px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 type Row = { no: string; supplier: string; net: string };
 
@@ -86,17 +86,17 @@ export function ConfirmAllBookings({
           type="button"
           disabled={!one.trim() || picked.size === 0}
           onClick={() => setRows((r) => ({ ...r, ...Object.fromEntries([...picked].map((id) => [id, { ...row(id), no: one.trim() }])) }))}
-          className="inline-flex h-10 items-center rounded-[9px] border border-[#b7d0c7] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-45"
+          className="tv-btn-secondary inline-flex h-10 items-center rounded-[9px] border px-3 text-[12px] font-bold disabled:opacity-45"
         >
           {t("ops.confirmAll.apply")}
-          <DirText dir="ltr" className="ms-1.5 tv-tnum text-[#93aaa3]">{`(${picked.size})`}</DirText>
+          <DirText dir="ltr" className="ms-1.5 tv-tnum text-tv-text-faint">{`(${picked.size})`}</DirText>
         </button>
       </div>
       <div className="mb-3 flex flex-wrap gap-1.5">
         <button
           type="button"
           onClick={() => setPicked((p) => (p.size === bookings.length ? new Set() : new Set(bookings.map((b) => b.id))))}
-          className="rounded-full border border-[#b7d0c7] bg-white px-2.5 py-1 text-[11px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+          className="tv-btn-secondary rounded-full border px-2.5 py-1 text-[11px] font-bold max-sm:min-h-10"
         >
           {t("ops.confirmAll.all")}
         </button>
@@ -105,7 +105,7 @@ export function ConfirmAllBookings({
             key={s}
             type="button"
             onClick={() => setPicked(new Set(bookings.filter((b) => supplierOf(b) === s).map((b) => b.id)))}
-            className="rounded-full border border-[#b7d0c7] bg-white px-2.5 py-1 text-[11px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="tv-btn-secondary rounded-full border px-2.5 py-1 text-[11px] font-bold max-sm:min-h-10"
           >
             {t("ops.confirmAll.supplierPick", { name: s })}
           </button>
@@ -136,7 +136,7 @@ export function ConfirmAllBookings({
               />
               <div className="min-w-0 self-center">
                 <p className="truncate text-[12.5px] font-extrabold text-[#0f3d38]">{b.title}</p>
-                <p className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                <p className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                   {t(`ops.booking.${b.kind}` as TranslationKey)}
                   {b.city_name ? ` · ${b.city_name}` : ""}
                   {b.start_date ? <DirText dir="ltr" className="ms-1.5">{b.start_date}</DirText> : null}
@@ -178,7 +178,7 @@ export function ConfirmAllBookings({
           type="button"
           disabled={pending || ready.length === 0}
           onClick={save}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
           {t("ops.confirmAll.save", { n: ready.length })}

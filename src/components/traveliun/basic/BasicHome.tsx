@@ -111,18 +111,18 @@ export function BasicHome({
   return (
     <TraveliunShell title="nav.basic">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-5">
+        <section className="tv-card rounded-[16px] border p-5">
           <h1 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
             <Zap className="size-5 text-[#e0a92a]" />
             {t("nav.basic")}
           </h1>
-          <p className="mt-1 mb-4 max-w-3xl text-[12.5px] font-semibold leading-6 text-[#78948f]">{tx("homeHint")}</p>
+          <p className="mt-1 mb-4 max-w-3xl text-[12.5px] font-semibold leading-6 text-tv-text-faint">{tx("homeHint")}</p>
           <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => void onCreate()}
             disabled={creating}
-            className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-[13.5px] font-extrabold text-white disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-[13.5px] font-extrabold disabled:opacity-60"
           >
             {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
             {tx("newFile")}
@@ -132,7 +132,7 @@ export function BasicHome({
               type="button"
               onClick={() => setShowReady((v) => !v)}
               aria-expanded={showReady}
-              className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#185045] px-5 text-[13.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+              className="tv-btn-secondary inline-flex h-11 items-center gap-2 rounded-[11px] border px-5 text-[13.5px] font-extrabold"
             >
               <Package className="size-4" />
               {tx("fromReady")}
@@ -159,13 +159,13 @@ export function BasicHome({
           </div>
           {showReady ? (
             <div className="mt-3 rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-              <p className="mb-2 text-[11.5px] font-semibold text-[#78948f]">{tx("readyHint")}</p>
+              <p className="mb-2 text-[11.5px] font-semibold text-tv-text-faint">{tx("readyHint")}</p>
               <ul className="grid gap-1.5 sm:grid-cols-2">
                 {readyOffers.map((o) => (
                   <li key={o.id} className="flex items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-bold text-[#185045]">{o.title}</span>
-                      <span className="tv-tnum block text-[11px] font-semibold text-[#78948f]">
+                      <span className="tv-tnum block text-[11px] font-semibold text-tv-text-faint">
                         {[o.country, o.nights ? `${o.nights} ${t("pg.nightsShort")}` : "", o.price ? `${Number(o.price).toLocaleString("en-US")} ${o.currency ?? ""}` : ""]
                           .filter(Boolean)
                           .join(" · ")}
@@ -175,7 +175,7 @@ export function BasicHome({
                       type="button"
                       disabled={busy !== null}
                       onClick={() => void openNew(`r-${o.id}`, () => startDraftFromReadyOffer(o.id))}
-                      className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+                      className="tv-btn-primary inline-flex h-8 items-center gap-1 rounded-[8px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
                     >
                       {busy === `r-${o.id}` ? <Loader2 className="size-3.5 animate-spin" /> : null}
                       {tx("startReady")}
@@ -188,7 +188,7 @@ export function BasicHome({
           {error ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
         </section>
 
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-5">
+        <section className="tv-card rounded-[16px] border p-5">
           <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a]">{tx("recent")}</h2>
           <RecentFiles
             drafts={drafts}

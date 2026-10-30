@@ -269,7 +269,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           <DirText dir="ltr">{String(day.day_number)}</DirText>
         </span>
         <span className="text-[12.5px] font-extrabold text-[#185045]">{day.city_name || "—"}</span>
-        {day.date ? <span className="text-[11.5px] font-bold text-[#93aaa3]">{dateOf(day)}</span> : null}
+        {day.date ? <span className="text-[11.5px] font-bold text-tv-text-faint">{dateOf(day)}</span> : null}
         {day.ai_generated ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-[#efe7fb] px-2 py-0.5 text-[10.5px] font-extrabold text-[#6b3fa0]">
             <Sparkles className="size-3" />
@@ -279,7 +279,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
         {!isWeatherEmpty(day.weather) && day.weather ? (
           <span
             className={`tv-tnum inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
-              day.weather.source === "forecast" ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#eef2fb] text-[#3c5a9a]"
+              day.weather.source === "forecast" ? "bg-tv-status-success-bg text-tv-status-success" : "bg-[#eef2fb] text-[#3c5a9a]"
             }`}
             title={`${weatherSourceAr(day.weather.source)} · ${day.weather.fetched_at.slice(0, 10)}`}
           >
@@ -294,7 +294,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
         {current === arrivalIndex && arrivalNote ? (
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
-              dayOneUsable ? "bg-[#eef2fb] text-[#3c5a9a]" : "bg-[#fff8e8] text-[#a86a10]"
+              dayOneUsable ? "bg-[#eef2fb] text-[#3c5a9a]" : "bg-tv-status-warning-bg text-tv-status-warning"
             }`}
           >
             <PlaneLanding className="size-3" />
@@ -336,7 +336,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           <button
             type="button"
             onClick={() => setAsked(current)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-[#b7d0c7] bg-white px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-[#b7d0c7] bg-white px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
           >
             <Plus className="size-3.5" />
             {t(onDay.departure ? "pg.itin.tourBeforeDeparture" : "pg.itin.tourAfterArrival")}
@@ -393,7 +393,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           }
           rows={4}
           placeholder={t("pg.itin.activitiesPlaceholder")}
-          className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm leading-6 text-[#185045] outline-none transition-colors focus:border-[#2aa87a]"
+          className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]"
         />
       </label>
 
@@ -411,7 +411,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           <button
             type="button"
             onClick={() => select(current + 1)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439]"
+            className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold transition-colors"
           >
             {t("pg.itin.nextDay")}
             <ChevronLeft className="size-4 ltr:rotate-180 rtl:rotate-0" />
@@ -431,7 +431,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
               type="button"
               onClick={() => fillFromPrograms()}
               disabled={days.length === 0}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#185045] bg-white px-3.5 text-[12.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-50"
+              className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[12.5px] font-bold transition-colors disabled:opacity-50"
             >
               <BookOpen className="size-4" />
               {t("pg.itin.fillFromPrograms")}
@@ -442,7 +442,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
               type="button"
               onClick={() => runAssistant("ai")}
               disabled={pending || days.length === 0}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-3.5 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f3d38] disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-3.5 text-[12.5px] font-bold transition-colors hover:bg-[#0f3d38] disabled:opacity-50"
             >
               {busy === "ai" ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
               {t("pg.itin.generate")}
@@ -452,7 +452,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
             type="button"
             onClick={() => runAssistant("weather")}
             disabled={pending || days.length === 0}
-            className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-3.5 text-[12.5px] font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6] disabled:opacity-50"
+            className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[12.5px] font-bold transition-colors disabled:opacity-50"
           >
             {busy === "weather" ? <Loader2 className="size-4 animate-spin" /> : <CloudSun className="size-4" />}
             {t("pg.itin.refreshWeather")}
@@ -481,7 +481,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
       <FieldIssue field="itinerary" className="mb-3" />
 
       {!day ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">
           {t("pg.itin.empty")}
         </p>
       ) : (
@@ -510,7 +510,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
                         <span className={`size-2 rounded-full ${written ? "bg-[#2aa87a]" : active ? "bg-white/50" : "bg-[#d8e3de]"}`} />
                         {t("pg.itin.dayN", { n: d.day_number })}
                       </span>
-                      <span className={`text-[10.5px] font-bold ${active ? "text-[#bfe9d9]" : "text-[#93aaa3]"}`}>{dateOf(d)}</span>
+                      <span className={`text-[10.5px] font-bold ${active ? "text-[#bfe9d9]" : "text-tv-text-faint"}`}>{dateOf(d)}</span>
                       <span className={`max-w-[140px] truncate text-[10.5px] font-bold ${active ? "text-white" : "text-[#557d78]"}`}>{d.city_name || "—"}</span>
                     </button>
                   );
@@ -541,7 +541,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
                       <button
                         type="button"
                         onClick={() => fillFromPrograms(g.city)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                        className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
                       >
                         <BookOpen className="size-3.5" />
                         {t("pg.itin.fillCity")}
@@ -560,8 +560,8 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
                               <span className="tv-tnum inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-[#eef4f1] text-[11px] font-extrabold text-[#185045]">
                                 {d.day_number}
                               </span>
-                              <span className="shrink-0 text-[11px] font-bold text-[#93aaa3]">{dateOf(d)}</span>
-                              <span className={`min-w-0 flex-1 truncate text-[12.5px] font-bold ${d.title.trim() ? "text-[#185045]" : "text-[#b9c9c4]"}`}>
+                              <span className="shrink-0 text-[11px] font-bold text-tv-text-faint">{dateOf(d)}</span>
+                              <span className={`min-w-0 flex-1 truncate text-[12.5px] font-bold ${d.title.trim() ? "text-[#185045]" : "text-tv-text-faint"}`}>
                                 {d.title.trim() || "—"}
                               </span>
                               {tours.length > 0 ? (
@@ -584,7 +584,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
       )}
 
       {days.length > 0 ? (
-        <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-5 text-[#93aaa3]">
+        <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-5 text-tv-text-faint">
           <RefreshCw className="mt-0.5 size-3.5 shrink-0" />
           {t("pg.itin.hint")}
         </p>

@@ -15,7 +15,7 @@ const SELECT = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12
 const BTN = "inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[12px] font-bold disabled:opacity-60";
 const KIND_TONE: Record<SlaKind, string> = {
   first_reply: "border-[#d7c8f0] bg-[#f6f1fd] text-[#5b3c9a]",
-  waiting: "border-[#f4d9a6] bg-[#fff8e8] text-[#a86a10]",
+  waiting: "border-[#f4d9a6] bg-tv-status-warning-bg text-tv-status-warning",
   cold: "border-[#c9d6ea] bg-[#f2f6fb] text-[#3d5a80]",
 };
 
@@ -84,7 +84,7 @@ export function SlaBoard({ initial }: { initial: OkBoard }) {
             <p className="mt-1 text-[12.5px] font-semibold leading-6 text-[#557d78]">{tx("hint")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="tv-tnum text-[11.5px] font-semibold text-[#93aaa3]">{tx("updatedAt", { t: when(board.at) })}</span>
+            <span className="tv-tnum text-[11.5px] font-semibold text-tv-text-faint">{tx("updatedAt", { t: when(board.at) })}</span>
             <button type="button" disabled={loading} onClick={() => reload(true)} className={`${BTN} bg-[#185045] text-white hover:bg-[#0f4439]`}>
               {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
               {tx("refresh")}
@@ -92,7 +92,7 @@ export function SlaBoard({ initial }: { initial: OkBoard }) {
           </div>
         </div>
         {/* the rules act only when a manager says so (the owner, 2026-10-18) */}
-        <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[12.5px] font-bold ${board.applying ? "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]" : "border-[#f4d9a6] bg-[#fff8e8] text-[#a86a10]"}`}>
+        <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[12.5px] font-bold ${board.applying ? "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success" : "border-[#f4d9a6] bg-tv-status-warning-bg text-tv-status-warning"}`}>
           <span className="min-w-0 flex-1">{tx(board.applying ? "applyOn" : "applyOff")}</span>
           <button type="button" disabled={loading} onClick={toggleApply} className={`${BTN} border bg-white ${board.applying ? "border-[#bfe5d4] text-[#0f7a52]" : "border-[#e0c48a] text-[#7a5a10]"}`}>
             {tx(board.applying ? "applyStop" : "applyStart")}
@@ -216,7 +216,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
 
       {kind !== "all" ? (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11.5px] font-semibold text-[#78948f]">{tx(`kh_${kind}`)}</span>
+          <span className="text-[11.5px] font-semibold text-tv-text-faint">{tx(`kh_${kind}`)}</span>
           {[{ id: "ontime", name: tx("onTime"), color: "#0f7a52" }, ...kindRules].map((r) => {
             const n = ofKind.filter((x) => (r.id === "ontime" ? !x.tierId : x.tierId === r.id)).length;
             const on = tier === r.id;
@@ -225,7 +225,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
                 key={r.id}
                 type="button"
                 onClick={() => setTier(on ? "" : r.id)}
-                className="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-bold"
+                className="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
                 style={{ color: r.color, borderColor: on ? r.color : `${r.color}55`, background: on ? `${r.color}22` : `${r.color}0d` }}
               >
                 {r.name}
@@ -244,7 +244,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
               key={name || "__none"}
               type="button"
               onClick={() => setAgent(agent === (name || "__none") ? "" : name || "__none")}
-              className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-bold ${agent === (name || "__none") ? "border-[#c22850] bg-[#fdf3f6] text-[#c22850]" : "border-[#f2c9d4] bg-white text-[#8a1f3c]"}`}
+              className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10 ${agent === (name || "__none") ? "border-[#c22850] bg-tv-status-danger-bg text-tv-status-danger" : "border-[#f2c9d4] bg-white text-[#8a1f3c]"}`}
             >
               {name || tx("noAgent")} <span className="tv-tnum">{n}</span>
             </button>
@@ -260,13 +260,13 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
           ))}
         </select>
         <label className="relative min-w-40 flex-1">
-          <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-[#8aa29b]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tx("search")} className="h-8 w-full rounded-[8px] border border-[#cfe0d9] bg-white pe-2 ps-7 text-[12px] font-semibold text-[#185045]" />
+          <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-tv-text-faint" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tx("search")} className="tv-field h-8 w-full rounded-[8px] border pe-2 ps-7 text-[12px] font-semibold" />
         </label>
       </div>
 
       {shown.length === 0 ? (
-        <p className="mt-4 text-[12.5px] font-semibold text-[#93aaa3]">{tx("noRows")}</p>
+        <p className="mt-4 text-[12.5px] font-semibold text-tv-text-faint">{tx("noRows")}</p>
       ) : (
         <ul className="mt-3 divide-y divide-[#e6eeea] rounded-[10px] border border-[#e3ece8]">
           {shown.slice(0, limit).map((r) => {
@@ -275,14 +275,14 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
               <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5" style={rule ? { borderInlineStart: `4px solid ${rule.color}` } : undefined}>
                 <span className="min-w-[10rem] flex-1">
                   <span className="block truncate text-[13px] font-bold text-[#103f37]">{r.name}</span>
-                  {r.phone ? <DirText className="block text-[11px] font-semibold text-[#78948f]">{r.phone}</DirText> : null}
+                  {r.phone ? <DirText className="block text-[11px] font-semibold text-tv-text-faint">{r.phone}</DirText> : null}
                 </span>
                 <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${KIND_TONE[r.kind]}`}>{kindText(r.kind)}</span>
                 <span className="tv-tnum w-20 text-[13px] font-extrabold text-[#185045]">{wait(r.minutes)}</span>
                 <TierChip rule={rule} />
                 <span className="w-32 truncate text-[11.5px] font-semibold text-[#557d78]">{[r.assignee ?? tx("noAgent"), r.team].filter(Boolean).join(" · ")}</span>
                 {r.movedTo ? <span className="inline-flex rounded-full border border-[#c9d6ea] bg-[#f2f6fb] px-2 py-0.5 text-[10.5px] font-bold text-[#3d5a80]">{tx("movedTo", { t: r.movedTo })}</span> : null}
-                <span className="min-w-[8rem] flex-1 truncate text-[11.5px] text-[#78948f]" title={r.preview}>{r.preview}</span>
+                <span className="min-w-[8rem] flex-1 truncate text-[11.5px] text-tv-text-faint" title={r.preview}>{r.preview}</span>
                 <span className="ms-auto flex items-center gap-1.5">
                   {r.followupId ? (
                     <Link href={`/followups/${r.followupId}`} className={`${BTN} border border-[#f2c9d4] bg-[#fdf3f6] text-[#8a1f3c]`}>{tx("inFollowup")}</Link>
@@ -353,7 +353,7 @@ function Followups({ board, onChanged }: { board: OkBoard; onChanged: () => void
             key={s}
             type="button"
             onClick={() => setStatus(s)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${status === s ? "bg-[#185045] text-white" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold max-sm:min-h-10 ${status === s ? "bg-[#185045] text-white" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
           >
             {tx(s === "open" ? "fuOpen" : "fuDone")}
             <span className="tv-tnum">{board.followups.filter((f) => f.status === s).length}</span>
@@ -368,14 +368,14 @@ function Followups({ board, onChanged }: { board: OkBoard; onChanged: () => void
       </div>
       {note ? <p className="mt-2 text-[12px] font-bold text-[#557d78]">{note}</p> : null}
       {list.length === 0 ? (
-        <p className="mt-4 text-[12.5px] font-semibold text-[#93aaa3]">{tx("fuEmpty")}</p>
+        <p className="mt-4 text-[12.5px] font-semibold text-tv-text-faint">{tx("fuEmpty")}</p>
       ) : (
         <ul className="mt-3 divide-y divide-[#e6eeea] rounded-[10px] border border-[#e3ece8]">
           {list.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5">
               <span className="min-w-[10rem] flex-1">
                 <span className="block truncate text-[13px] font-bold text-[#103f37]">{f.contact_name ?? `#${f.conversation_id}`}</span>
-                {f.contact_phone ? <DirText className="block text-[11px] font-semibold text-[#78948f]">{f.contact_phone}</DirText> : null}
+                {f.contact_phone ? <DirText className="block text-[11px] font-semibold text-tv-text-faint">{f.contact_phone}</DirText> : null}
               </span>
               <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${KIND_TONE[f.kind]}`}>
                 {kindText(f.kind)}
@@ -383,7 +383,7 @@ function Followups({ board, onChanged }: { board: OkBoard; onChanged: () => void
               </span>
               <span className="tv-tnum text-[11.5px] font-semibold text-[#557d78]">
                 {f.waited_minutes != null ? tx("fuWaited", { w: wait(f.waited_minutes) }) : null}
-                <span className="block text-[#93aaa3]">{tx("fuSince", { t: when(f.created_at) })}</span>
+                <span className="block text-tv-text-faint">{tx("fuSince", { t: when(f.created_at) })}</span>
               </span>
               <span className="text-[11.5px] font-semibold text-[#557d78]">{f.teletel_assignee ?? tx("noAgent")}</span>
               {f.status === "open" ? (
@@ -437,7 +437,7 @@ function Rules({ rules, teams, suggestions, onChanged }: { rules: SlaRule[]; tea
           return (
             <div key={k} className="rounded-[10px] border border-[#e3ece8] p-3">
               <h3 className="text-[13px] font-extrabold text-[#185045]">
-                {kindText(k)} <span className="text-[11.5px] font-semibold text-[#78948f]">— {tx(`kh_${k}`)}</span>
+                {kindText(k)} <span className="text-[11.5px] font-semibold text-tv-text-faint">— {tx(`kh_${k}`)}</span>
               </h3>
               <div className="mt-2 grid gap-2">
                 {mine.map((r) => (
@@ -562,7 +562,7 @@ function Suggestions({ suggestions, onChanged }: { suggestions: Suggestion[]; on
               )}
             </div>
             <p className="mt-1.5 text-[12px] font-semibold leading-6 text-[#557d78]">
-              {tx(`sg_${s.key}`, { n: s.hits })} <span className="text-[#93aaa3]">{tx("sgOfKind", { total: s.ofKind })}</span>
+              {tx(`sg_${s.key}`, { n: s.hits })} <span className="text-tv-text-faint">{tx("sgOfKind", { total: s.ofKind })}</span>
             </p>
           </li>
         ))}
@@ -619,9 +619,9 @@ function RuleRow({ initial, teams, onChanged, onDiscard }: { initial: Draft; tea
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[8px] bg-[#f8fbfa] p-2">
-      <input value={r.name} onChange={(e) => set({ name: e.target.value })} placeholder={tx("ruleName")} aria-label={tx("ruleName")} className="h-8 min-w-36 flex-1 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12.5px] font-bold text-[#103f37]" />
+      <input value={r.name} onChange={(e) => set({ name: e.target.value })} placeholder={tx("ruleName")} aria-label={tx("ruleName")} className="tv-field h-8 min-w-36 flex-1 rounded-[8px] border px-2 text-[12.5px] font-bold" />
       <span className="text-[12px] font-bold text-[#557d78]">{tx("ruleAfter")}</span>
-      <input type="number" min={1} value={r.amount} onChange={(e) => set({ amount: Number(e.target.value) })} className="tv-tnum h-8 w-20 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12.5px] font-bold" dir="ltr" />
+      <input type="number" min={1} value={r.amount} onChange={(e) => set({ amount: Number(e.target.value) })} className="tv-field tv-tnum h-8 w-20 rounded-[8px] border px-2 text-[12.5px] font-bold" dir="ltr" />
       <select value={r.unit} onChange={(e) => set({ unit: e.target.value as SlaRule["unit"] })} className={SELECT}>
         {SLA_UNITS.map((u) => (
           <option key={u} value={u}>{unit(u, Number(r.amount) || 1)}</option>
@@ -629,7 +629,7 @@ function RuleRow({ initial, teams, onChanged, onDiscard }: { initial: Draft; tea
       </select>
       <label className="flex items-center gap-1 text-[11.5px] font-bold text-[#557d78]">
         {tx("ruleColor")}
-        <input type="color" value={r.color} onChange={(e) => set({ color: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-[#cfe0d9] bg-white" />
+        <input type="color" value={r.color} onChange={(e) => set({ color: e.target.value })} className="tv-field h-7 w-9 cursor-pointer rounded border" />
       </label>
       <MoveSelect value={r} teams={teams} onChange={(v) => set(v)} />
       <label className="flex items-center gap-1 text-[11.5px] font-bold text-[#557d78]">
@@ -640,7 +640,7 @@ function RuleRow({ initial, teams, onChanged, onDiscard }: { initial: Draft; tea
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
         {tx("save")}
       </button>
-      <button type="button" disabled={busy} onClick={remove} title={tx("delete")} aria-label={tx("delete")} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c9d4] bg-white text-[#c22850] hover:bg-[#fdf3f6]">
+      <button type="button" disabled={busy} onClick={remove} title={tx("delete")} aria-label={tx("delete")} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c9d4] bg-white text-[#c22850] hover:bg-[#fdf3f6] max-sm:min-h-10 max-sm:min-w-10">
         <Trash2 className="size-3.5" />
       </button>
       {msg ? <span className="text-[11.5px] font-bold text-[#557d78]">{msg}</span> : null}

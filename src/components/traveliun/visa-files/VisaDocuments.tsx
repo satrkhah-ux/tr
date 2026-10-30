@@ -18,8 +18,8 @@ import { docState, docTotals, fmtDate, importTargets, settle, sortedDocs, type D
 import { Notice, btn, btnDanger, card, field, heading, label, type Message } from "./visa-ui";
 
 const STATE_CHIP: Record<DocState, { text: string; tone: string }> = {
-  received: { text: "مستلم", tone: "bg-[#e9f7f0] text-[#0f7a52]" },
-  missing: { text: "ناقص", tone: "bg-[#fdecef] text-[#c22850]" },
+  received: { text: "مستلم", tone: "bg-tv-status-success-bg text-tv-status-success" },
+  missing: { text: "ناقص", tone: "bg-tv-status-danger-bg text-tv-status-danger" },
   optional: { text: "اختياري", tone: "bg-[#eef1f4] text-[#5b6b78]" },
 };
 type Attachment = TeletelPull["attachments"][number];
@@ -122,14 +122,14 @@ export function VisaDocuments({
     <section id="documents" aria-labelledby="documents-h" className={`${card} scroll-mt-24 space-y-3`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="documents-h" className={heading}>المستندات — ماذا أرفق</h2>
-        <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${totals.missing > 0 ? "bg-[#fdecef] text-[#c22850]" : "bg-[#e9f7f0] text-[#0f7a52]"}`}>
+        <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${totals.missing > 0 ? "bg-tv-status-danger-bg text-tv-status-danger" : "bg-tv-status-success-bg text-tv-status-success"}`}>
           {totals.required === 0 ? "لا مستندات مطلوبة بعد" : totals.missing > 0 ? `ناقص ${totals.missing} من ${totals.required}` : `اكتملت المستندات (${totals.required})`}
         </span>
       </div>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {opened ? <a href={opened.url} target="_blank" rel="noreferrer" className={`${btn} w-full`}><ExternalLink className="size-4" /> افتح الملف</a> : null}
 
-      {documents.length === 0 ? <p className="text-sm font-semibold text-[#8aa29b]">لا مستندات بعد. أضف ما يطلبه الملف من النموذج أدناه.</p> : null}
+      {documents.length === 0 ? <p className="text-sm font-semibold text-tv-text-faint">لا مستندات بعد. أضف ما يطلبه الملف من النموذج أدناه.</p> : null}
       <ul className="space-y-2">
         {sortedDocs(documents).map((d) => {
           const state = docState(d);
@@ -181,7 +181,7 @@ export function VisaDocuments({
                   <p className="text-sm font-extrabold text-[#185045]">ما قرأه النظام من الجواز — راجعه قبل الاعتماد</p>
                   <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
                     {([["الاسم", read.traveler.fullName], ["رقم الجواز", read.traveler.passportNo], ["الجنسية", read.traveler.nationality], ["تاريخ الميلاد", read.traveler.birthDate], ["انتهاء الجواز", read.traveler.passportExpiry]] as const).map(([k, v]) => (
-                      <div key={k} className="flex gap-2"><dt className="text-[#8aa29b]">{k}:</dt><dd className="font-bold text-[#003c3a]">{v ? <DirText dir="auto">{v}</DirText> : "لم يُقرأ"}</dd></div>
+                      <div key={k} className="flex gap-2"><dt className="text-tv-text-faint">{k}:</dt><dd className="font-bold text-[#003c3a]">{v ? <DirText dir="auto">{v}</DirText> : "لم يُقرأ"}</dd></div>
                     ))}
                   </dl>
                   <label className={label}>
@@ -227,7 +227,7 @@ export function VisaDocuments({
           {tele.phase === "idle" ? <button type="button" className={btn} onClick={() => void loadTeletel()}>اعرض مرفقات المحادثة</button> : null}
           {tele.phase === "loading" ? <Notice tone="busy">جارٍ قراءة المحادثة…</Notice> : null}
           {tele.phase === "error" ? (<><Notice tone="error">{tele.error}</Notice><button type="button" className={btn} onClick={() => void loadTeletel()}>إعادة المحاولة</button></>) : null}
-          {tele.phase === "ready" && tele.attachments.length === 0 ? <p className="text-sm font-semibold text-[#8aa29b]">لا مرفقات في المحادثة.</p> : null}
+          {tele.phase === "ready" && tele.attachments.length === 0 ? <p className="text-sm font-semibold text-tv-text-faint">لا مرفقات في المحادثة.</p> : null}
           {tele.phase === "ready" && tele.attachments.length > 0 ? (
             <ul className="space-y-2">
               {tele.attachments.map((a) => {
@@ -235,7 +235,7 @@ export function VisaDocuments({
                 const target = targets[key] ?? options[0]?.value ?? "";
                 return (
                   <li key={key} className="flex flex-wrap items-center gap-2 rounded-[10px] bg-white p-2">
-                    <span className="min-w-0 flex-1 basis-40 text-sm font-bold text-[#185045]"><DirText>{a.fileName}</DirText><span className="block text-xs font-semibold text-[#8aa29b]">{a.fromClient ? "من العميل" : "منا"} · {fmtDate(a.at)}</span></span>
+                    <span className="min-w-0 flex-1 basis-40 text-sm font-bold text-[#185045]"><DirText>{a.fileName}</DirText><span className="block text-xs font-semibold text-tv-text-faint">{a.fromClient ? "من العميل" : "منا"} · {fmtDate(a.at)}</span></span>
                     <select className={`${field} w-56 max-w-full`} aria-label={`وجهة ${a.fileName}`} value={target} onChange={(e) => setTargets({ ...targets, [key]: e.target.value })}>
                       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>

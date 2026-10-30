@@ -31,7 +31,7 @@ function StayCompare({ proposal, stay }: { proposal: Proposal; stay: ProposalSta
     } catch { setError("تعذّر الاتصال."); } finally { setBusy(false); }
   }
 
-  return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
+  return <div className="tv-card rounded-xl border p-3">
     <ComparePanel
       query={{ hotelName: stay.hotelName, cityEn: stay.cityEn, cityAr: stay.cityAr, checkIn: stay.checkIn, checkOut: stay.checkOut, adults: proposal.adults, rooms: stay.roomsCount }}
       current={stay.currentTotal}
@@ -63,7 +63,7 @@ export function SecretaryCompare() {
   if (!proposals.length) return null;
   const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" });
 
-  return <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+  return <section className="tv-card rounded-2xl border p-4">
     <div className="mb-1 flex items-center gap-2">
       <Scale className="size-4 text-[#557d78]" />
       <h2 className="font-bold">عروض مقترحة من سكرتيرك — قارن بنفسك</h2>
@@ -73,7 +73,7 @@ export function SecretaryCompare() {
       {proposals.map((p) => <div key={p.id} className="rounded-xl border border-[#e7eceb]">
         <button type="button" onClick={() => setOpen(open === p.id ? null : p.id)} className="flex w-full flex-wrap items-center gap-2 p-3 text-start text-sm">
           <strong>{p.title ?? "مقترح"}</strong>
-          <span className="text-xs text-[#8ba09b]">{when(p.createdAt)}</span>
+          <span className="text-xs text-tv-text-faint">{when(p.createdAt)}</span>
           <span className="flex-1" />
           <Link href={`/basic/${p.id}`} className="text-xs font-bold text-[var(--tv-brand)] underline" onClick={(e) => e.stopPropagation()}>افتح في بيسك</Link>
         </button>

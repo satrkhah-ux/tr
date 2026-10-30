@@ -12,7 +12,7 @@ import { useSafeTransition } from "../useSafeTransition";
  * what it owes per currency, its limit, and every invoice and payment.
  */
 
-const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]";
+const card = "tv-card rounded-[14px] border p-4";
 const money = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const METHOD: Record<string, string> = { bank_transfer: "تحويل بنكي", cash: "نقداً", card: "بطاقة", other: "أخرى" };
 
@@ -27,7 +27,7 @@ export function StatementView({ statement, title }: { statement: PartnerStatemen
             <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-[#557d78]">لا مستحقات</span>
           ) : (
             balances.map((b) => (
-              <span key={b.currency} className={`tv-tnum rounded-full px-3 py-1 ${b.owed > 0 ? "bg-[#fff4e0] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"}`}>
+              <span key={b.currency} className={`tv-tnum rounded-full px-3 py-1 ${b.owed > 0 ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"}`}>
                 {b.owed > 0 ? "المستحق" : "الرصيد لكم"}: <DirText dir="ltr">{`${money(Math.abs(b.owed))} ${b.currency}`}</DirText>
               </span>
             ))
@@ -38,14 +38,14 @@ export function StatementView({ statement, title }: { statement: PartnerStatemen
         </div>
       </div>
       {lines.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-[#93aaa3]">
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
           تظهر هنا فاتورة كل ملف يؤكّده عميلكم، وكل دفعة تسجَّل.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-right text-[12.5px]">
             <thead>
-              <tr className="text-[11.5px] font-bold text-[#93aaa3]">
+              <tr className="text-[11.5px] font-bold text-tv-text-faint">
                 <th className="pb-2">التاريخ</th>
                 <th className="pb-2">البيان</th>
                 <th className="pb-2">المرجع</th>
@@ -84,7 +84,7 @@ export function StatementView({ statement, title }: { statement: PartnerStatemen
 }
 
 const field =
-  "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+  "tv-field h-9 rounded-[8px] border px-2.5 text-[12.5px] font-semibold";
 const label = "grid gap-1 text-[11.5px] font-bold text-[#185045] dark:text-[#9fc5b8]";
 
 /** Ours only: record a payment the company made, and set its credit limit. */
@@ -138,7 +138,7 @@ export function LedgerControls({ partnerId, limit }: { partnerId: string; limit:
             المرجع
             <input id={`pay-ref-${partnerId}`} dir="ltr" value={pay.reference} onChange={(e) => setPay({ ...pay, reference: e.target.value })} className={field} />
           </label>
-          <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={pending} className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10">
             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
             سجّل
           </button>
@@ -169,11 +169,11 @@ export function LedgerControls({ partnerId, limit }: { partnerId: string; limit:
             العملة
             <input id={`cap-currency-${partnerId}`} dir="ltr" value={cap.currency} onChange={(e) => setCap({ ...cap, currency: e.target.value.toUpperCase() })} className={`${field} w-20`} />
           </label>
-          <button type="submit" disabled={pending} className="inline-flex h-9 items-center rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] disabled:opacity-60">
+          <button type="submit" disabled={pending} className="inline-flex h-9 items-center rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] disabled:opacity-60 max-sm:min-h-10">
             حفظ
           </button>
         </div>
-        <p className="text-[11px] font-semibold text-[#93aaa3]">
+        <p className="text-[11px] font-semibold text-tv-text-faint">
           حين يتجاوز المستحق الحد تُرفض «العميل أكّد» من بوابة الشركة، ويبقى التأكيد ممكناً من قسم العمليات عندنا.
         </p>
       </form>

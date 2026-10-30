@@ -40,7 +40,7 @@ export default async function DriverDayPage({ params }: { params: Promise<{ toke
         </header>
 
         {day.pickups.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-[#cfe0d9] bg-white px-4 py-8 text-center text-[14px] font-semibold text-[#93aaa3]">
+          <p className="rounded-2xl border border-dashed border-[#cfe0d9] bg-white px-4 py-8 text-center text-[14px] font-semibold text-tv-text-faint">
             لا استلامات لهذا اليوم. / No pick-ups on this day.
           </p>
         ) : (
@@ -53,7 +53,7 @@ export default async function DriverDayPage({ params }: { params: Promise<{ toke
                 </span>
               </div>
               <p className="mt-1 break-words text-[15px] font-extrabold">
-                {p.lead || p.serial} <bdi dir="ltr" className="text-[12px] font-bold text-[#93aaa3]">{p.serial}</bdi>
+                {p.lead || p.serial} <bdi dir="ltr" className="text-[12px] font-bold text-tv-text-faint">{p.serial}</bdi>
               </p>
               {p.kind === "tour" || p.kind === "transfer" ? <p className="mt-0.5 break-words text-[13px] font-semibold">{p.title}</p> : null}
               {/* the day's tour: where it goes */}
@@ -109,7 +109,7 @@ export default async function DriverDayPage({ params }: { params: Promise<{ toke
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-2">
-      <dt className="text-[11.5px] font-bold text-[#93aaa3]">{label}</dt>
+      <dt className="text-[11.5px] font-bold text-tv-text-faint">{label}</dt>
       <dd className="min-w-0 break-words">{children}</dd>
     </div>
   );

@@ -88,18 +88,18 @@ export function SuggestInput({
         ) : null}
       </div>
       <Autocomplete.Portal container={unzoomedRoot()}>
-        <Autocomplete.Positioner sideOffset={4} className="z-[170] outline-none data-[empty]:hidden">
-          <Autocomplete.Popup className={`${ZOOMED_POPUP} min-w-56 overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}>
+        <Autocomplete.Positioner sideOffset={4} className="z-[170] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus data-[empty]:hidden">
+          <Autocomplete.Popup className={`${ZOOMED_POPUP} min-w-56 overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}>
             <Autocomplete.List>
               {(s: Suggestion) => (
                 <Autocomplete.Item
                   key={s.value}
                   value={s}
-                  className="flex cursor-pointer select-none items-center gap-2 rounded-[7px] px-2 py-1.5 text-[12.5px] outline-none data-[highlighted]:bg-[#f2f7f5] dark:data-[highlighted]:bg-[#1b2d27]"
+                  className="flex cursor-pointer select-none items-center gap-2 rounded-[7px] px-2 py-1.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus data-[highlighted]:bg-[#f2f7f5] dark:data-[highlighted]:bg-[#1b2d27]"
                 >
                   <span className="min-w-0 flex-1">
                     {s.label ?? s.value}
-                    {s.sub ? <span className="block text-[11px] font-semibold text-[#7a948f]">{s.sub}</span> : null}
+                    {s.sub ? <span className="block text-[11px] font-semibold text-tv-text-faint">{s.sub}</span> : null}
                   </span>
                   {s.hint ? <span className="tv-tnum shrink-0 text-[11px] font-bold text-[#557d78]">{s.hint}</span> : null}
                 </Autocomplete.Item>

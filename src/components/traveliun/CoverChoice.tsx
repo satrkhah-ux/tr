@@ -67,7 +67,7 @@ export function CoverChoice({
       </div>
       {preview ? (
         <div className="relative h-[170px] w-[120px] shrink-0 overflow-hidden rounded-[6px] border border-[#cfe0d9] bg-[#f0f7f4]">
-          {loaded !== src ? <Loader2 className="absolute inset-0 m-auto size-5 animate-spin text-[#7a948f]" /> : null}
+          {loaded !== src ? <Loader2 className="absolute inset-0 m-auto size-5 animate-spin text-tv-text-faint" /> : null}
           {/* eslint-disable-next-line @next/next/no-img-element -- a generated page picture, not an asset */}
           <img key={src} src={src} alt={tx("coverChoice")} onLoad={() => setLoaded(src)} className="size-full object-cover object-top" />
         </div>

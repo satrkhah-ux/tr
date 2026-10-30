@@ -27,7 +27,7 @@ export function UnlinkedMail({ emails, operations }: { emails: UnlinkedEmail[]; 
   const act = (work: () => Promise<unknown>) => startTransition(async () => { await work(); router.refresh(); });
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <h2 className="flex items-center gap-2 text-[14px] font-extrabold text-[#003c3a]">
         <Mail className="size-4 text-[#557d78]" />
         {t("ops.mail.title", { n: emails.length })}
@@ -63,7 +63,7 @@ function MailRow({
     <li className="flex flex-wrap items-center gap-2 py-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-bold text-[#185045]">{mail.subject || "—"}</p>
-        <p className="truncate text-[11.5px] font-semibold text-[#93aaa3]" dir="ltr">{mail.from_address || "—"}</p>
+        <p className="truncate text-[11.5px] font-semibold text-tv-text-faint" dir="ltr">{mail.from_address || "—"}</p>
       </div>
       <span className="shrink-0 rounded-full border border-[#dbe6e1] bg-[#f6faf8] px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">{t(kindKey)}</span>
       <div className="w-64 max-w-full">
@@ -77,14 +77,14 @@ function MailRow({
           }}
           placeholder={t("ops.mail.pickHint")}
           ariaLabel={t("ops.mail.pickHint")}
-          className="h-9 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]"
+          className="h-9 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
         />
       </div>
       <button
         type="button"
         disabled={disabled}
         onClick={onDismiss}
-        className="h-9 shrink-0 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#8a6100] hover:bg-[#fdf8e6] disabled:opacity-50"
+        className="h-9 shrink-0 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#8a6100] hover:bg-[#fdf8e6] disabled:opacity-50 max-sm:min-h-10"
       >
         {t("ops.mail.dismiss")}
       </button>

@@ -308,7 +308,7 @@ export function TraveliunTable({
                   type="button"
                   onClick={() => setOffersMode(mode)}
                   className={`rounded-lg px-8 py-3 font-bold transition-colors ${
-                    offersMode === mode ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-[#6f8f88]"
+                    offersMode === mode ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint"
                   }`}
                 >
                   {mode === "confirmed" ? t("offers.confirmedTab") : t("offers.unconfirmedTab")}
@@ -340,17 +340,17 @@ export function TraveliunTable({
           </div>
         ) : null}
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
+        <section className="tv-card rounded-2xl border p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
           <div className="mb-[21px] flex flex-col flex-wrap gap-4 sm:flex-row sm:items-center">
             <div className="relative h-[46px] w-full max-w-[280px]">
-              <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-[#8aa29b]" aria-hidden />
+              <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" aria-hidden />
               <input
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={t("searchPlaceholder")}
                 aria-label={t("searchPlaceholder")}
-                className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none transition-colors focus:border-[#2aa87a]"
+                className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]"
               />
             </div>
             <button
@@ -391,7 +391,7 @@ export function TraveliunTable({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="me-auto inline-flex h-[46px] items-center gap-2 rounded-[11px] bg-[#185045] px-6 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]"
+              className="tv-btn-primary me-auto inline-flex h-[46px] items-center gap-2 rounded-[11px] px-6 text-sm font-bold transition-colors"
             >
               <Plus className="size-4" aria-hidden />
               {t("add")}
@@ -480,7 +480,7 @@ export function TraveliunTable({
                               />
                             </td>
                           ) : null}
-                          <td className="px-[18px] py-[17px] text-[#a4b8b2]">
+                          <td className="px-[18px] py-[17px] text-tv-text-faint">
                             <button
                               type="button"
                               onClick={() => setViewing(row)}
@@ -605,7 +605,7 @@ function CardsView({
     return (
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="rounded-[14px] border border-[#e2ebe7] bg-white p-4">
+          <div key={index} className="tv-card rounded-[14px] border p-4">
             <div className="tv-shimmer mb-3 h-4 w-28 rounded-md" />
             <div className="tv-shimmer mb-2 h-3 w-full rounded-md" />
             <div className="tv-shimmer h-3 w-2/3 rounded-md" />
@@ -621,7 +621,7 @@ function CardsView({
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {rows.map((row) => (
-        <article key={String(row.id)} className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
+        <article key={String(row.id)} className="tv-card rounded-[14px] border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
           <div className="mb-3 flex items-start justify-between gap-2">
             <div className="min-w-0 text-[15px] font-extrabold text-[#003c3a]">
               {primary ? <Cell column={primary} row={row} /> : null}
@@ -629,7 +629,7 @@ function CardsView({
             <button
               type="button"
               onClick={() => onAction(row)}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#e2ebe7] text-[#8aa29b] transition-colors hover:bg-[#e8f1ed] hover:text-[#185045]"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#e2ebe7] text-tv-text-faint transition-colors hover:bg-[#e8f1ed] hover:text-[#185045] max-sm:min-h-10 max-sm:min-w-10"
               aria-label={actionsLabel}
             >
               <Settings className="size-4" />
@@ -639,12 +639,12 @@ function CardsView({
             {rest.map((column) =>
               column.multiline ? (
                 <div key={column.key} className="mt-1 grid gap-1 border-t border-[#eef4f1] pt-2 text-[13px]">
-                  <dt className="font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
+                  <dt className="font-semibold text-tv-text-faint">{t(column.labelKey)}</dt>
                   <dd className="min-w-0 font-medium text-[#0f3d38]"><Cell column={column} row={row} clamp /></dd>
                 </div>
               ) : (
                 <div key={column.key} className="flex items-start justify-between gap-3 text-[13px]">
-                  <dt className="shrink-0 font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
+                  <dt className="shrink-0 font-semibold text-tv-text-faint">{t(column.labelKey)}</dt>
                   <dd className="min-w-0 text-end font-medium text-[#0f3d38]"><Cell column={column} row={row} /></dd>
                 </div>
               ),
@@ -666,7 +666,7 @@ function Cell({ column, row, clamp = false }: { column: ColumnDef; row: DataRow;
         return id ? (refs[column.ref].find((o) => o.value === id)?.label ?? id) : null;
       })()
     : cellValue(row, column.key);
-  if (value === null || value === undefined || value === "") return <span className="text-[#c2cfca]">—</span>;
+  if (value === null || value === undefined || value === "") return <span className="text-tv-text-faint">—</span>;
   // an id shown by its name; a fixed option by its label
   if (column.source) return <span>{refs?.[column.source].find((o) => o.value === value)?.label ?? String(value)}</span>;
   const option = column.options?.find((o) => o.value === value);
@@ -682,13 +682,13 @@ function Cell({ column, row, clamp = false }: { column: ColumnDef; row: DataRow;
   // contained: the row height must not follow the image.
   if (column.type === "logo") {
     const url = airlineLogoUrl(String(value));
-    if (!url) return <span className="text-[#c2cfca]">—</span>;
+    if (!url) return <span className="text-tv-text-faint">—</span>;
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={url} alt="" className="h-6 w-14 object-contain object-center" />;
   }
   if (BOOLEAN_KEYS.has(column.key) || typeof value === "boolean") {
     const truthy = value === true || value === "true" || value === "Yes";
-    return <span className={truthy ? "font-bold text-[#0f7a52]" : "text-[#8aa29b]"}>{truthy ? t("yes") : t("no")}</span>;
+    return <span className={truthy ? "font-bold text-[#0f7a52]" : "text-tv-text-faint"}>{truthy ? t("yes") : t("no")}</span>;
   }
   if (column.type && LTR_TYPES.has(column.type)) {
     const numeric = column.type === "number" || column.type === "currency" || column.type === "serial" || column.type === "date";
@@ -726,7 +726,7 @@ function FilterBar({
 }) {
   const { t } = useTraveliunUI();
   return (
-    <section className="mb-3 rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card mb-3 rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {config.isOffers ? (
           <>
@@ -830,7 +830,7 @@ function Footer({
 
   return (
     <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3 text-[12.5px] font-semibold text-[#8aa29b]">
+      <div className="flex items-center gap-3 text-[12.5px] font-semibold text-tv-text-faint">
         <span>
           {t("showing")} <span className="font-bold text-[#185045]">{count === 0 ? 0 : (page - 1) * pageSize + 1}</span>
           {" – "}
@@ -842,7 +842,7 @@ function Footer({
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
           aria-label={t("data.tools.pageSize")}
-          className="h-[34px] rounded-md border border-[#dbe6e1] bg-white px-2 text-sm text-[#185045] outline-none"
+          className="h-[34px] rounded-md border border-[#dbe6e1] bg-white px-2 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
         >
           {PAGE_SIZES.map((size) => (
             <option key={size} value={size}>{size}</option>
@@ -879,7 +879,7 @@ function PagerButton({ icon: Icon, label, disabled, onClick }: { icon: typeof Ch
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-md border border-[#dbe6e1] bg-white text-[#8ca49e] transition-colors hover:bg-[#f4f8f6] disabled:opacity-40"
+      className="flex h-9 w-9 items-center justify-center rounded-md border border-[#dbe6e1] bg-white text-tv-text-faint transition-colors hover:bg-[#f4f8f6] disabled:opacity-40"
     >
       <Icon className="size-5" />
     </button>
@@ -973,11 +973,11 @@ export function RecordForm({
   return (
     <RefOptionsContext.Provider value={filterOptions}>
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" aria-label={title} dir={dir}>
-      <form inert={Boolean(adding)} onSubmit={submit} className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[860px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+      <form inert={Boolean(adding)} onSubmit={submit} className="tv-card max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[860px] overflow-y-auto rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-5 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <div>
             <h2 className="text-lg font-extrabold">{title}</h2>
-            <p className="mt-1 text-sm text-[#6d8a84]">{t(config.titleKey)}</p>
+            <p className="mt-1 text-sm text-tv-text-faint">{t(config.titleKey)}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}><X className="size-5" /></button>
         </div>
@@ -1043,8 +1043,8 @@ export function RecordForm({
         ) : null}
 
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-10 rounded-[10px] border border-[#d8e3de] px-5 text-sm font-semibold text-[#185045] hover:bg-[#f4f8f6]">{t("cancel")}</button>
-          <button type="submit" disabled={saving} className="flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-70">
+          <button type="button" onClick={onClose} className="tv-btn-secondary h-10 rounded-[10px] border px-5 text-sm font-semibold">{t("cancel")}</button>
+          <button type="submit" disabled={saving} className="tv-btn-primary flex h-10 items-center gap-2 rounded-[10px] px-6 text-sm font-bold disabled:opacity-70">
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
             {saving ? t("saving") : t("save")}
           </button>
@@ -1195,13 +1195,13 @@ function FieldInput({ column, countryId, value, required, onChange }: { column: 
           onChange={(e) => onChange(e.target.value)}
           className={formArea}
         />
-        <span className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-[#93aaa3]">
+        <span className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-tv-text-faint">
           <span>{t("data.form.oneItemPerLine")}</span>
           {runsOn(value) ? (
             <button
               type="button"
               onClick={() => onChange(splitNumbered(value))}
-              className="rounded-lg border border-[#2aa87a] px-3 py-1 text-xs font-bold text-[#185045] hover:bg-[#eef7f3]"
+              className="rounded-lg border border-[#2aa87a] px-3 py-1 text-xs font-bold text-[#185045] hover:bg-[#eef7f3] max-sm:min-h-10"
             >
               {t("data.form.splitItems")}
             </button>
@@ -1256,7 +1256,7 @@ function RowActionModal({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/20 p-4" role="dialog" aria-modal="true" dir={dir}>
-      <div className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+      <div className="tv-card max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[620px] overflow-y-auto rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <h2 className="text-lg font-extrabold">{t("details")}</h2>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}><X className="size-5" /></button>
@@ -1265,13 +1265,13 @@ function RowActionModal({
         <div className="mb-5 grid gap-3 md:grid-cols-2">
           {config.columns.map((column) => (
             <div key={column.key} className={`rounded-[10px] bg-[#f4f8f6] p-3 ${column.multiline ? "md:col-span-2" : ""}`}>
-              <p className="mb-1 text-xs font-bold text-[#93aaa3]">{t(column.labelKey)}</p>
+              <p className="mb-1 text-xs font-bold text-tv-text-faint">{t(column.labelKey)}</p>
               <div className="text-sm"><Cell column={column} row={row} /></div>
             </div>
           ))}
           {onMerge ? (
             <div className="rounded-[10px] bg-[#f4f8f6] p-3 md:col-span-2">
-              <p className="mb-1 text-xs font-bold text-[#93aaa3]">{t("data.tools.usage.title")}</p>
+              <p className="mb-1 text-xs font-bold text-tv-text-faint">{t("data.tools.usage.title")}</p>
               <div className="text-sm"><HotelUsageLine usage={usage} /></div>
             </div>
           ) : null}
@@ -1307,7 +1307,7 @@ function RowActionModal({
           </div>
         ) : (
           <div className={`grid gap-2 ${onMerge ? "sm:grid-cols-4" : onDelete ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-            <button type="button" onClick={onEdit} className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#185045] text-sm font-bold text-white hover:bg-[#0f4439]">
+            <button type="button" onClick={onEdit} className="tv-btn-primary flex h-10 items-center justify-center gap-2 rounded-[10px] text-sm font-bold">
               <Eye className="size-4" /> {t("edit")}
             </button>
             <button type="button" disabled={busy} onClick={() => start(onCopy)} className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#d8e3de] text-sm font-bold hover:bg-[#f4f8f6] disabled:opacity-70">
@@ -1355,8 +1355,8 @@ function minWidthClass(width?: string): string {
 }
 
 const fieldClass =
-  "flex h-[46px] items-center rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#557d78] outline-none transition-colors focus:border-[#2aa87a]";
+  "flex h-[46px] items-center rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]";
 const formField =
-  "h-11 rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 text-sm font-normal text-[#185045] outline-none transition-colors focus:border-[#185045]";
+  "h-11 rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 text-sm font-normal text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]";
 const formArea =
-  "min-h-[180px] w-full resize-y rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 py-2.5 text-sm font-normal leading-7 text-[#185045] outline-none transition-colors focus:border-[#185045]";
+  "min-h-[180px] w-full resize-y rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 py-2.5 text-sm font-normal leading-7 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]";

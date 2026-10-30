@@ -109,13 +109,13 @@ function ScopeTile({
       className={`flex items-center gap-3 rounded-[13px] border p-4 text-start transition-colors ${
         active
           ? "border-[#185045] bg-[#185045] text-white"
-          : "border-[#dbe6e1] bg-white text-[#93aaa3] hover:bg-[#f4f8f6]"
+          : "border-[#dbe6e1] bg-white text-tv-text-faint hover:bg-[#f4f8f6]"
       }`}
     >
       <Icon className="size-6 shrink-0" />
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-extrabold">{label}</span>
-        <span className={`block text-[11px] font-bold ${active ? "text-[#8fe3c4]" : "text-[#b6c9c2]"}`}>
+        <span className={`block text-[11px] font-bold ${active ? "text-[#8fe3c4]" : "text-tv-text-faint"}`}>
           {t(active ? "pg.scope.included" : "pg.scope.excluded")}
         </span>
       </span>

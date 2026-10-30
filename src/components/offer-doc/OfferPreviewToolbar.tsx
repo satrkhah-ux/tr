@@ -142,7 +142,7 @@ export function OfferPreviewToolbar({
           type="button"
           onClick={() => void onPublish()}
           disabled={publishing}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold transition-colors disabled:opacity-60"
         >
           {publishing ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           {publishedVersion != null ? "إعادة النشر" : "نشر وإرسال"}
@@ -171,13 +171,13 @@ export function OfferPreviewToolbar({
 
       {/* whose document, and with or without a price — the two decisions that
           turn one offer into a file a partner can resell */}
-      <div className="flex w-full flex-wrap items-center gap-2 rounded-[12px] border border-[#e2ebe7] bg-white px-3 py-2.5">
+      <div className="tv-card flex w-full flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2.5">
         <span className="text-[11.5px] font-extrabold text-[#557d78]">الإصدار باسم</span>
         <select
           value={brandId ?? "ours"}
           disabled={pending}
           onChange={(e) => void pickBrand(e.target.value)}
-          className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12.5px] font-bold text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60"
+          className="tv-field h-9 rounded-[9px] border px-2 text-[12.5px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60"
         >
           <option value="ours">ترافليون</option>
           {resellers.map((r) => (
@@ -207,11 +207,11 @@ export function OfferPreviewToolbar({
             </button>
           ))}
         </div>
-        <span className="text-[11px] font-semibold text-[#93aaa3]">الغلاف والشعار والألوان تتبع الشركة المختارة، والسعر قرار هذا الملف — يُحفظ عليه ويتبعه رابط العميل.</span>
+        <span className="text-[11px] font-semibold text-tv-text-faint">الغلاف والشعار والألوان تتبع الشركة المختارة، والسعر قرار هذا الملف — يُحفظ عليه ويتبعه رابط العميل.</span>
       </div>
 
       {publishedVersion != null && message == null ? (
-        <p className="flex w-full items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+        <p className="flex w-full items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
           <CheckCircle2 className="size-3.5 text-[#0f7a52]" />
           رابط العميل وملف الـ PDF يعرضان النسخة المنشورة — لا يتغيّران عند تعديل العرض لاحقًا حتى تعيد النشر.
         </p>

@@ -518,7 +518,7 @@ export function FlightsStage({
         </div>
 
         {domestic.length === 0 ? (
-          <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+          <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">
             {t("pg.noDomesticFlights")}
           </p>
         ) : (
@@ -611,7 +611,7 @@ function FlightLookup({ flightNo, onPick }: { flightNo: string; onPick: (hit: Fl
         type="button"
         onClick={run}
         disabled={pending || !flightNo.trim()}
-        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-50"
+        className="tv-btn-secondary inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold transition-colors disabled:opacity-50 max-sm:min-h-10"
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
         {t("pg.flightLookup.button")}
@@ -635,7 +635,7 @@ function FlightLookup({ flightNo, onPick }: { flightNo: string; onPick: (hit: Fl
               </span>
             ) : null}
           </span>
-          <span className="text-[10px] font-bold text-[#93aaa3]">
+          <span className="text-[10px] font-bold text-tv-text-faint">
             {hit.airline}
             {hit.schedule_date ? ` · ${t("pg.flightLookup.scheduleFrom", { date: hit.schedule_date })}` : ""}
           </span>
@@ -686,10 +686,10 @@ function LayoverBar({ leg, airport }: { leg: JourneyLeg<DraftFlight>; airport: s
   const wait = formatWaitAr(leg.layoverMinutes);
   const impossible = leg.layoverMinutes !== null && leg.layoverMinutes < 0;
   const tone = impossible || leg.layoverTooShort
-    ? "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]"
+    ? "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger"
     : leg.layoverLong
-      ? "border-[#f2e2b4] bg-[#fff8e8] text-[#a86a10]"
-      : "border-[#d6eadf] bg-[#f2fbf6] text-[#0f7a52]";
+      ? "border-[#f2e2b4] bg-tv-status-warning-bg text-tv-status-warning"
+      : "border-[#d6eadf] bg-tv-status-success-bg text-tv-status-success";
 
   return (
     <div className={`my-1.5 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[11.5px] font-bold ${tone}`}>
@@ -834,7 +834,7 @@ function FlightRow({
             onChange={(e) => setDeparture(index, e.target.value)}
             className={`${fieldClass} tv-tnum`}
           />
-          <span className="text-[10.5px] font-semibold text-[#93aaa3]">
+          <span className="text-[10.5px] font-semibold text-tv-text-faint">
             {flight.from_tz ? t("pg.localTimeAt", { tz: flight.from_tz }) : t("pg.localTimePick")}
           </span>
           {flight.date_user_set ? (
@@ -843,7 +843,7 @@ function FlightRow({
               <button
                 type="button"
                 onClick={() => restoreAuto(index)}
-                className="inline-flex items-center gap-1 rounded-md bg-[#fff2d6] px-1.5 py-0.5 font-extrabold text-[#8a5a0c] hover:bg-[#ffe9bd]"
+                className="inline-flex items-center gap-1 rounded-md bg-[#fff2d6] px-1.5 py-0.5 font-extrabold text-[#8a5a0c] hover:bg-[#ffe9bd] max-sm:min-h-10"
               >
                 <RotateCcw className="size-3" />
                 {t("pg.restoreAutoDate")}
@@ -860,7 +860,7 @@ function FlightRow({
             onChange={(e) => updateRow(index, { arrival_at: e.target.value === "" ? null : e.target.value })}
             className={`${fieldClass} tv-tnum`}
           />
-          <span className="text-[10.5px] font-semibold text-[#93aaa3]">
+          <span className="text-[10.5px] font-semibold text-tv-text-faint">
             {flight.to_tz ? t("pg.localTimeAt", { tz: flight.to_tz }) : t("pg.localTimePick")}
           </span>
         </label>
@@ -911,7 +911,7 @@ function FlightRow({
             type="button"
             onClick={() => setMore((v) => !v)}
             aria-expanded={more}
-            className="inline-flex h-7 items-center rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+            className="tv-btn-secondary inline-flex h-7 items-center rounded-[8px] border px-2.5 text-[11px] font-bold max-sm:min-h-10"
           >
             {t("pg.fb.moreDetails")}
           </button>
@@ -935,7 +935,7 @@ function FlightRow({
               <span
                 title={dayShiftNoteAr(timing.dayOffset) ?? undefined}
                 className={`tv-tnum inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-extrabold ${
-                  timing.dayOffset > 0 ? "bg-[#eaf1ff] text-[#2b57c4]" : "bg-[#fdeef2] text-[#c22850]"
+                  timing.dayOffset > 0 ? "bg-[#eaf1ff] text-[#2b57c4]" : "bg-tv-status-danger-bg text-tv-status-danger"
                 }`}
               >
                 <DirText dir="ltr">{`${timing.dayOffset > 0 ? "+" : "−"}${Math.abs(timing.dayOffset)}`}</DirText>
@@ -944,7 +944,7 @@ function FlightRow({
             ) : null}
           </>
         ) : bothDatesSet ? (
-          <span className="text-[11px] font-semibold text-[#93aaa3]">{t("pg.durationNeedsAirports")}</span>
+          <span className="text-[11px] font-semibold text-tv-text-faint">{t("pg.durationNeedsAirports")}</span>
         ) : null}
         <button type="button" onClick={() => removeRow(index)} className={`${removeButtonClass} ms-auto`}>
           {t("pg.removeRow")}

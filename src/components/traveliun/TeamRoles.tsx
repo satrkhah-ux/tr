@@ -34,9 +34,9 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  * one sentence of consequence under each.
  */
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 const PERM_LABEL = (key: Permission) => `perm.${key}` as TranslationKey;
@@ -96,18 +96,18 @@ export function TeamRoles({ roles, members }: { roles: TeamRole[]; members: Team
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-extrabold text-[#003c3a]">{t("team.title")}</h1>
-              <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("team.subtitle")}</p>
+              <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("team.subtitle")}</p>
             </div>
             <button
               type="button"
               onClick={() => { setError(null); setDraft(toDraft()); }}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold"
             >
               <Plus className="size-4" />
               {t("team.addRole")}
             </button>
           </div>
-          <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+          <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
             <KeyRound className="size-3.5" />
             {t("team.auditNote")}
           </p>
@@ -168,7 +168,7 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
           {role.description ? (
             <p className="mt-1 text-[12px] font-semibold text-[#557d78]">{role.description}</p>
           ) : null}
-          <p className="mt-1.5 text-[11.5px] font-bold text-[#93aaa3]">
+          <p className="mt-1.5 text-[11.5px] font-bold text-tv-text-faint">
             {held.size === 0
               ? t("team.grantsNone")
               : t("team.grants", { n: String(held.size), total: String(TOTAL_PERMISSIONS) })}
@@ -181,7 +181,7 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
           <button
             type="button"
             onClick={onEdit}
-            className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+            className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
             aria-label={t("edit")}
           >
             <Pencil className="size-4" />
@@ -228,14 +228,14 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
           {t("team.membersCount", { n: String(members.length) })}
         </p>
         {members.length === 0 ? (
-          <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("team.noMembers")}</p>
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("team.noMembers")}</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {members.map((m) => (
               <span
                 key={m.id}
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-bold ${
-                  m.status === "Active" ? "bg-[#eef4f1] text-[#185045]" : "bg-[#fdeef2] text-[#c22850]"
+                  m.status === "Active" ? "bg-[#eef4f1] text-[#185045]" : "bg-tv-status-danger-bg text-tv-status-danger"
                 }`}
               >
                 {m.arabic_name}
@@ -265,7 +265,7 @@ function PermList({
         {title}
       </p>
       {items.length === 0 ? (
-        <p className="text-[11.5px] font-semibold text-[#b6c4bf]">—</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">—</p>
       ) : (
         <ul className="space-y-1">
           {items.map((item) => (
@@ -334,14 +334,14 @@ function RoleForm({
           type="button"
           // «الحجز من المورّد» spends money: given by name, never with «تحديد الكل»
           onClick={() => setDraft({ ...draft, keys: new Set(PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key)).filter((k) => !lockedKey(k) && k !== "operations.book")) })}
-          className="rounded-full border border-[#dbe6e1] px-3 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+          className="tv-btn-secondary rounded-full border px-3 py-1 text-[11.5px] font-bold max-sm:min-h-10"
         >
           {t("team.pickAll")}
         </button>
         <button
           type="button"
           onClick={() => setDraft({ ...draft, keys: new Set() })}
-          className="rounded-full border border-[#dbe6e1] px-3 py-1 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+          className="rounded-full border border-[#dbe6e1] px-3 py-1 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10"
         >
           {t("team.pickNone")}
         </button>
@@ -372,7 +372,7 @@ function RoleForm({
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[12.5px] font-bold text-[#185045]">{t(PERM_LABEL(item.key))}</span>
-                        <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${item.kind === "view" ? "bg-[#eef4f1] text-[#557d78]" : "bg-[#e9f7f0] text-[#0f7a52]"}`}>
+                        <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${item.kind === "view" ? "bg-[#eef4f1] text-[#557d78]" : "bg-tv-status-success-bg text-tv-status-success"}`}>
                           {item.kind === "view" ? t("team.sees") : t("team.does")}
                         </span>
                         {item.sensitive ? (
@@ -381,7 +381,7 @@ function RoleForm({
                           </span>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 block text-[11px] font-semibold text-[#93aaa3]">{t(PERM_HINT(item.key))}</span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-tv-text-faint">{t(PERM_HINT(item.key))}</span>
                     </span>
                   </label>
                 );
@@ -407,7 +407,7 @@ function RoleForm({
           type="button"
           onClick={onSave}
           disabled={pending}
-          className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-[13px] font-bold disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
           {t("save")}
@@ -415,7 +415,7 @@ function RoleForm({
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex h-11 items-center rounded-[10px] border border-[#d8e3de] px-5 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+          className="tv-btn-secondary inline-flex h-11 items-center rounded-[10px] border px-5 text-[13px] font-bold"
         >
           {t("cancel")}
         </button>
@@ -452,7 +452,7 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
         <UserCog className="size-4" />
         {t("team.members")}
       </h2>
-      <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("team.noLoginHint")}</p>
+      <p className="mb-3 text-[11.5px] font-semibold text-tv-text-faint">{t("team.noLoginHint")}</p>
 
       <ul className="space-y-2">
         {members.map((m) => (
@@ -464,7 +464,7 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-extrabold text-[#003c3a]">{m.arabic_name}</span>
-              <span className="block truncate text-[11px] font-semibold text-[#93aaa3]">
+              <span className="block truncate text-[11px] font-semibold text-tv-text-faint">
                 <DirText dir="ltr">{m.email ?? m.mobile ?? "—"}</DirText>
               </span>
             </span>
@@ -480,7 +480,7 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
               value={m.role_id ?? ""}
               disabled={pendingId === m.id || developerRole(m.role_id)}
               onChange={(e) => void move(m.id, e.target.value)}
-              className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-bold text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60"
+              className="tv-field h-9 rounded-[9px] border px-2 text-[12px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60"
             >
               <option value="">{t("team.noRole")}</option>
               {roles.map((r) => (
@@ -495,7 +495,7 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
               type="button"
               disabled={pendingId === m.id}
               onClick={() => void toggleSuspend(m)}
-              className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60"
+              className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60 max-sm:min-h-10"
             >
               {pendingId === m.id ? <Loader2 className="size-3.5 animate-spin" /> : m.status === "Active" ? t("team.suspend") : t("team.reactivate")}
             </button>

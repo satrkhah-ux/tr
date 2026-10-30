@@ -132,14 +132,14 @@ export function FollowupSection({
       </div>
       <div>
         <h3 className="mb-2 text-[12px] font-bold text-[#185045]">سجل الملف</h3>
-        {sorted.length === 0 ? <p className="text-sm font-semibold text-[#8aa29b]">لا أحداث بعد.</p> : (
+        {sorted.length === 0 ? <p className="text-sm font-semibold text-tv-text-faint">لا أحداث بعد.</p> : (
           <ol className="space-y-2">
             {shown.map((e) => (
               <li key={e.id} className="flex gap-2 text-sm">
                 <CircleDot className="mt-1 size-3.5 shrink-0 text-[#2aa87a]" />
                 <div className="min-w-0">
                   <p className="font-semibold text-[#003c3a]"><span className="text-[#557d78]">{EVENT_LABEL[e.kind]}: </span>{e.text}</p>
-                  <p className="text-xs text-[#8aa29b]">{fmtDateTime(e.at)}{whoText(e.by, people) ? ` · ${whoText(e.by, people)}` : ""}</p>
+                  <p className="text-xs text-tv-text-faint">{fmtDateTime(e.at)}{whoText(e.by, people) ? ` · ${whoText(e.by, people)}` : ""}</p>
                 </div>
               </li>
             ))}
@@ -171,7 +171,7 @@ export function MoneySection({
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {([["الرسوم كلها", money(feeTotal(file), cur)], ["المدفوع", money(file.paid, cur)], ["المتبقي", money(dueAmount(file), cur)]] as const).map(([k, v]) => (
           <div key={k} className="rounded-[10px] bg-[#f7faf8] p-2.5">
-            <dt className="text-[11px] font-bold text-[#8aa29b]">{k}</dt>
+            <dt className="text-[11px] font-bold text-tv-text-faint">{k}</dt>
             <dd className="tv-tnum text-base font-extrabold text-[#185045]"><DirText>{v}</DirText></dd>
           </div>
         ))}
@@ -210,11 +210,11 @@ export function MoneySection({
             <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 py-2">
               <span className="font-extrabold text-[#0f7a52]"><DirText>{money(p.amount, cur)}</DirText></span>
               <span className="text-[#557d78]">{[p.method ? (METHOD_AR as Record<string, string>)[p.method] ?? p.method : null, p.note, whoText(p.by, people)].filter(Boolean).join(" · ")}</span>
-              <span className="text-xs text-[#8aa29b]">{fmtDate(p.paidAt)}</span>
+              <span className="text-xs text-tv-text-faint">{fmtDate(p.paidAt)}</span>
             </li>
           ))}
         </ul>
-      ) : <p className="text-sm font-semibold text-[#8aa29b]">لا دفعات مسجلة.</p>}
+      ) : <p className="text-sm font-semibold text-tv-text-faint">لا دفعات مسجلة.</p>}
     </Section>
   );
 }

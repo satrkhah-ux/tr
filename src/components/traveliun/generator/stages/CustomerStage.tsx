@@ -71,7 +71,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
               key={name}
               type="button"
               onClick={() => applyDestination(name)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0f7a52] px-3 text-[12px] font-bold text-white hover:bg-[#0c6543]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0f7a52] px-3 text-[12px] font-bold text-white hover:bg-[#0c6543] max-sm:min-h-10"
             >
               <MapPin className="size-3.5" /> {t("tl.addDestination", { name })}
             </button>
@@ -87,7 +87,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className={labelClass}>
           {t("pg.customerName")}
-          {companySale ? <span className="text-[11px] font-semibold text-[#93aaa3]">{t("pg.company.clientOptional")}</span> : null}
+          {companySale ? <span className="text-[11px] font-semibold text-tv-text-faint">{t("pg.company.clientOptional")}</span> : null}
           <input
             value={customer.customer_name}
             onChange={(e) => update({ customer_name: e.target.value })}
@@ -176,7 +176,7 @@ function CompanyPicker({ data, patch, lookups }: Pick<StageFormProps, "data" | "
           </div>
         ) : null}
       </div>
-      <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+      <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">
         {selected ? t("pg.company.brandedHint", { name: selected.name }) : t("pg.company.hint")}
       </p>
     </div>
@@ -366,7 +366,7 @@ function RoomsBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
         <BedDouble className="size-4 text-[#185045]" />
         {t("pg.roomsTitle")}
       </h3>
-      <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.roomsHint")}</p>
+      <p className="mt-1 text-[11.5px] font-semibold text-tv-text-faint">{t("pg.roomsHint")}</p>
 
       <div className="mt-3 grid gap-4 sm:grid-cols-3">
         <label className={smallLabelClass}>
@@ -407,7 +407,7 @@ function RoomsBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
           answers do not map one-to-one onto the five board codes a supplier
           understands, and the agent should know which half is which. */}
       {trip.meal_plan === "lunch" || trip.meal_plan === "dinner" ? (
-        <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.mealsHint")}</p>
+        <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("pg.mealsHint")}</p>
       ) : null}
     </div>
   );

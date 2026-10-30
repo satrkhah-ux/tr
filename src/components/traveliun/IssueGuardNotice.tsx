@@ -69,7 +69,7 @@ export function IssueGuardNotice({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`flex w-full items-center gap-2 rounded-[10px] border border-[#f3dfb0] bg-[#fff8e6] px-3 py-1.5 text-start text-[12px] font-bold text-[#8a5a00] hover:bg-[#fdf0d2] ${className}`}
+        className={`flex w-full items-center gap-2 rounded-[10px] border border-[#f3dfb0] bg-[#fff8e6] px-3 py-1.5 text-start text-[12px] font-bold text-[#8a5a00] hover:bg-[#fdf0d2] max-sm:min-h-10 ${className}`}
       >
         <AlertTriangle className="size-3.5 shrink-0" />
         {t("data.quality.guard.oneLine", { n: new Set(shown.map((i) => i.hotelId)).size })}

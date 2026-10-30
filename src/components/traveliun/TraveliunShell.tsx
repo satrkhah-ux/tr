@@ -542,7 +542,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
       >
         <button
           type="button"
-          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[var(--tv-brand)] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6]"
+          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[var(--tv-brand)] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
           aria-expanded={menuOpen}
           title={menuOpen ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
           aria-label={menuOpen ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
@@ -570,7 +570,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
                   type="button"
                   title={t(group.labelKey)}
                   className={`relative flex h-[44px] shrink-0 items-center justify-center transition-colors duration-200 ${
-                    active ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "text-[#6f8f88] hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
+                    active ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "text-tv-text-faint hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
                   }`}
                   onClick={() => {
                     setActiveMenu(group.labelKey);
@@ -607,7 +607,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
       >
         <button
           type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-md text-[#557d78] lg:hidden"
+          className="flex size-9 shrink-0 items-center justify-center rounded-md text-[#557d78] lg:hidden max-sm:min-h-10 max-sm:min-w-10"
           onClick={() => setMobileOpen(true)}
           aria-label={t("aria.openMenu")}
         >
@@ -615,14 +615,14 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
         </button>
         <div className="hidden min-w-[140px] shrink-0 lg:block">
           <div className="truncate text-lg font-extrabold leading-tight text-[#003c3a]">{displayTitle}</div>
-          <div className="mt-0.5 text-[11.5px] font-semibold text-[#8aa29b]">{t("brand")}</div>
+          <div className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{t("brand")}</div>
         </div>
         {/* phones: compact app-style title; the trial pill shows from lg up. */}
         <div className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] lg:hidden">
           {displayTitle}
         </div>
         {onDeveloperPage ? (
-          <button type="button" onClick={openFinance} aria-label="قفل" className="flex size-9 shrink-0 touch-manipulation select-none items-center justify-center rounded-md text-[#557d78] hover:bg-[#eef4f1]">
+          <button type="button" onClick={openFinance} aria-label="قفل" className="flex size-9 shrink-0 touch-manipulation select-none items-center justify-center rounded-md text-[#557d78] hover:bg-[#eef4f1] max-sm:min-h-10 max-sm:min-w-10">
             <Lock className="size-5" />
           </button>
         ) : null}
@@ -639,11 +639,11 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             type="button"
             onClick={openPalette}
             aria-label={t("quickSearch")}
-            className="flex h-10 w-10 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] text-[13px] sm:w-auto sm:justify-start sm:pe-3 sm:ps-2 font-semibold text-[#6f8f88] transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1] sm:flex"
+            className="flex h-10 w-10 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] text-[13px] sm:w-auto sm:justify-start sm:pe-3 sm:ps-2 font-semibold text-tv-text-faint transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1] sm:flex"
           >
             <Search className="size-[18px]" />
             <span className="hidden lg:inline">{t("quickSearch")}</span>
-            <kbd className="hidden items-center gap-px rounded-md border border-[#dbe6e1] bg-white px-1.5 py-0.5 text-[11px] font-bold text-[#8aa29b] md:inline-flex">
+            <kbd className="hidden items-center gap-px rounded-md border border-[#dbe6e1] bg-white px-1.5 py-0.5 text-[11px] font-bold text-tv-text-faint md:inline-flex">
               ⌘K
             </kbd>
           </button>
@@ -789,18 +789,18 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
           className="fixed inset-0 z-[160] backdrop-blur-[2px] transition-opacity duration-150 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
           style={{ background: "rgba(4,30,27,0.42)" }}
         />
-        <PaletteDialog.Popup className="tv-pop fixed left-1/2 top-[calc(12vh/var(--tv-zoom))] z-[170] h-fit w-[min(560px,calc(92vw/var(--tv-zoom)))] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(0,40,36,0.4)] outline-none transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 dark:bg-[#14231f]">
+        <PaletteDialog.Popup className="tv-pop fixed left-1/2 top-[calc(12vh/var(--tv-zoom))] z-[170] h-fit w-[min(560px,calc(92vw/var(--tv-zoom)))] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(0,40,36,0.4)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 dark:bg-[#14231f]">
           <div className="flex items-center gap-[11px] border-b border-[#eef2f0] px-[18px] py-[15px] dark:border-[#294039]">
-            <Search className="size-[18px] text-[#93aaa3]" />
+            <Search className="size-[18px] text-tv-text-faint" />
             <input
               autoFocus
               dir="auto"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("palettePlaceholder")}
-              className="flex-1 bg-transparent text-[15px] text-[#0f3d38] outline-none placeholder:text-[#9cafaa] dark:text-[#eaf3ef]"
+              className="flex-1 bg-transparent text-[15px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus placeholder:text-[#9cafaa] dark:text-[#eaf3ef]"
             />
-            <kbd className="rounded-md border border-[#e2ebe7] bg-[#f1f5f3] px-2 py-[3px] text-[11px] font-bold text-[#8aa29b] dark:border-[#294039] dark:bg-[#1b2d27]">
+            <kbd className="rounded-md border border-[#e2ebe7] bg-[#f1f5f3] px-2 py-[3px] text-[11px] font-bold text-tv-text-faint dark:border-[#294039] dark:bg-[#1b2d27]">
               ESC
             </kbd>
           </div>
@@ -826,7 +826,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
               );
             })}
             {results.length === 0 ? (
-              <div className="px-3 py-8 text-center text-[13px] text-[#93aaa3]">{t("paletteEmpty")}</div>
+              <div className="px-3 py-8 text-center text-[13px] text-tv-text-faint">{t("paletteEmpty")}</div>
             ) : null}
           </div>
         </PaletteDialog.Popup>
@@ -878,7 +878,7 @@ function SideMenu({
           const hasChildren = Boolean(group.children?.length);
           return (
             <div key={group.labelKey} className="mb-0.5">
-              {caption ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-[#8a9f99]">{t(menuSection(group.labelKey))}</p> : null}
+              {caption ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-tv-text-faint">{t(menuSection(group.labelKey))}</p> : null}
               {hasChildren ? (
                 <button
                   type="button"
@@ -888,7 +888,7 @@ function SideMenu({
                     active ? "bg-[var(--tv-brand)] text-white shadow-sm" : "text-[#365e55] hover:bg-[#edf4f0]"
                   }`}
                 >
-                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-[#6d8e83]"}`} strokeWidth={1.7} />
+                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-tv-text-faint"}`} strokeWidth={1.7} />
                   <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
                   <ChevronDown className={`size-4 transition-transform duration-200 ${expanded ? "" : "rotate-90 rtl:-rotate-90"}`} />
                 </button>
@@ -901,7 +901,7 @@ function SideMenu({
                     active ? "bg-[var(--tv-brand)] text-white shadow-sm" : "text-[#365e55] hover:bg-[#edf4f0]"
                   }`}
                 >
-                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-[#6d8e83]"}`} strokeWidth={1.7} />
+                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-tv-text-faint"}`} strokeWidth={1.7} />
                   <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
 
                 </Link>
@@ -914,7 +914,7 @@ function SideMenu({
                     return (
                       <div key={child.href}>
                       {child.captionKey ? (
-                        <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold uppercase tracking-[0.04em] text-[#9cafaa] first:mt-0">
+                        <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold uppercase tracking-[0.04em] text-tv-text-faint first:mt-0">
                           {t(child.captionKey)}
                         </p>
                       ) : null}
@@ -967,7 +967,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
         )}
         <button
           type="button"
-          className="flex size-9 items-center justify-center rounded-md text-[var(--tv-brand)]"
+          className="flex size-9 items-center justify-center rounded-md text-[var(--tv-brand)] max-sm:min-h-10 max-sm:min-w-10"
           onClick={close}
           aria-label={t("aria.closeMenu")}
         >
@@ -980,7 +980,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
         {groups.map((group, index) => {
           const Icon = group.icon;
           const caption = !partner && (index === 0 || menuSection(groups[index - 1].labelKey) !== menuSection(group.labelKey))
-            ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-[#8a9f99]">{t(menuSection(group.labelKey))}</p> : null;
+            ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-tv-text-faint">{t(menuSection(group.labelKey))}</p> : null;
           const active = isGroupActive(pathname, group);
           const rowClass = `flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm ${active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"}`;
           const badges = <>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}</>;
@@ -1010,7 +1010,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
                     const here = pathname === pageOf(child.href);
                     return (
                       <div key={child.href}>
-                        {child.captionKey ? <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold text-[#9cafaa]">{t(child.captionKey)}</p> : null}
+                        {child.captionKey ? <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold text-tv-text-faint">{t(child.captionKey)}</p> : null}
                         <Link
                           href={child.href}
                           onClick={close}
@@ -1125,21 +1125,21 @@ function CalculatorPanel() {
             dir="ltr"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus:border-[var(--tv-brand)]"
+            className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[var(--tv-brand)]"
           />
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <select value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none">
+            <select value={from} onChange={(e) => setFrom(e.target.value)} className="tv-field h-10 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
               {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
             <button
               type="button"
               onClick={() => { setFrom(to); setTo(from); }}
-              className="flex size-8 items-center justify-center rounded-md border border-[#ddd4d3] text-[var(--tv-brand)] hover:bg-[#f4f8f6]"
+              className="flex size-8 items-center justify-center rounded-md border border-[#ddd4d3] text-[var(--tv-brand)] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
               aria-label={t("aria.swap")}
             >
               ⇄
             </button>
-            <select value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none">
+            <select value={to} onChange={(e) => setTo(e.target.value)} className="tv-field h-10 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
               {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
           </div>
@@ -1152,12 +1152,12 @@ function CalculatorPanel() {
               "—"
             )}
             {unitRate != null ? (
-              <p className="tv-tnum mt-1 text-[11px] font-semibold text-[#6f8f88]">
+              <p className="tv-tnum mt-1 text-[11px] font-semibold text-tv-text-faint">
                 <DirText dir="ltr">{`1 ${from} = ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(unitRate)} ${to}`}</DirText>
               </p>
             ) : null}
           </div>
-          <p className="text-[11px] font-semibold text-[#93aaa3]">
+          <p className="text-[11px] font-semibold text-tv-text-faint">
             {source === "live" ? t("calc.live") : t("calc.fallback")}
           </p>
         </div>
@@ -1232,7 +1232,7 @@ function SettingsPanel({
         <Languages className="size-4" />
         {t("settings")}
       </h3>
-      <p className="mb-2 text-xs font-semibold text-[#8ba09b]">{t("language")}</p>
+      <p className="mb-2 text-xs font-semibold text-tv-text-faint">{t("language")}</p>
       <div className="mb-4 grid grid-cols-2 gap-2">
         <button type="button" onClick={() => pickLanguage("en")} className={panelButton(language === "en")}>
           English
@@ -1241,7 +1241,7 @@ function SettingsPanel({
           العربية
         </button>
       </div>
-      <p className="mb-2 text-xs font-semibold text-[#8ba09b]">{t("theme")}</p>
+      <p className="mb-2 text-xs font-semibold text-tv-text-faint">{t("theme")}</p>
       <div className="grid grid-cols-3 gap-2">
         {(["Light", "Dark", "System"] as const).map((item) => (
           <button key={item} type="button" onClick={() => pickTheme(item)} className={panelButton(theme === item)}>
@@ -1299,7 +1299,7 @@ function ProfilePanel({ onChangePassword }: { onChangePassword: () => void }) {
         <div className="min-w-0 flex-1">
           {/* while looking through another role, the label says which */}
           <p className="font-bold text-[var(--tv-brand)]">{t("account")} · {viewAs ? viewAs.name : t(ROLE_LABEL_KEYS[effectiveRole])}</p>
-          <p dir="ltr" className="truncate text-start text-xs text-[#8ba09b]">{email || "—"}</p>
+          <p dir="ltr" className="truncate text-start text-xs text-tv-text-faint">{email || "—"}</p>
         </div>
       </div>
 
@@ -1347,7 +1347,7 @@ function ServerLostBanner() {
   return (
     <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-[12px] border border-[#f2d39a] bg-[#fff8e8] px-3 py-2 text-[12.5px] font-bold text-[#8a5a0c]">
       <span className="min-w-0 flex-1">{t("shell.serverLost")}</span>
-      <button type="button" onClick={() => window.location.reload()} className="inline-flex h-8 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white">
+      <button type="button" onClick={() => window.location.reload()} className="inline-flex h-8 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white max-sm:min-h-10">
         {t("shell.reload")}
       </button>
     </div>

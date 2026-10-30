@@ -16,7 +16,7 @@ import { DOCUMENT_KINDS, DOCUMENT_LABEL, PARTNER_TERMS } from "@/lib/partners/re
  */
 
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 export function PartnerRegisterForm() {
@@ -148,7 +148,7 @@ export function PartnerRegisterForm() {
             </label>
           ))}
         </div>
-        <p className="text-[11.5px] font-semibold text-[#93aaa3]">PDF أو صورة، حتى 5 ميغابايت لكل ملف. تبقى المستندات عندنا ولا تُنشر.</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">PDF أو صورة، حتى 5 ميغابايت لكل ملف. تبقى المستندات عندنا ولا تُنشر.</p>
       </fieldset>
 
       <label className={label}>
@@ -157,13 +157,13 @@ export function PartnerRegisterForm() {
           rows={3}
           value={form.note}
           onChange={set("note")}
-          className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+          className="tv-field w-full rounded-[10px] border p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
         />
       </label>
 
       {/* The same story the profile page tells: the identity is set with us after
           approval — an unapproved company has nothing to brand yet. */}
-      <p className="text-[11.5px] font-semibold text-[#93aaa3]">
+      <p className="text-[11.5px] font-semibold text-tv-text-faint">
         بعد الاعتماد ترسلون لنا شعار الشركة وألوانها، ونعتمدها لتظهر على عروضكم.
       </p>
 
@@ -185,7 +185,7 @@ export function PartnerRegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-6 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary inline-flex h-11 items-center justify-center gap-2 rounded-[10px] px-6 text-[13px] font-bold disabled:opacity-60"
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
         إرسال الطلب

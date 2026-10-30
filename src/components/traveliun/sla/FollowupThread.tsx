@@ -64,7 +64,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
 
   return (
     <div className="grid gap-4">
-      <section className="rounded-[12px] border border-[#e3ece8] bg-white p-4">
+      <section className="tv-card rounded-[12px] border p-4">
         <Link href={data.manager ? "/sla" : "/dashboard"} className="inline-flex items-center gap-1 text-[12px] font-bold text-[#557d78] hover:underline">
           <ArrowRight className="size-3.5 rtl:rotate-0 ltr:rotate-180" />
           {tx("back")}
@@ -72,7 +72,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-[18px] font-extrabold text-[#103f37]">{f.contact_name ?? `#${f.conversation_id}`}</h1>
-            {f.contact_phone ? <DirText className="text-[12.5px] font-semibold text-[#78948f]">{f.contact_phone}</DirText> : null}
+            {f.contact_phone ? <DirText className="text-[12.5px] font-semibold text-tv-text-faint">{f.contact_phone}</DirText> : null}
             <p className="mt-1 text-[12px] font-bold text-[#a86a10]">
               {kind(f.kind)}
               {f.rule_name ? ` · ${f.rule_name}` : ""}
@@ -97,7 +97,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
         </div>
       </section>
 
-      <section className="rounded-[12px] border border-[#e3ece8] bg-white p-4">
+      <section className="tv-card rounded-[12px] border p-4">
         <h2 className="text-[13px] font-extrabold text-[#185045]">{tx("thread")}</h2>
         {data.messages === null ? (
           <p className="mt-2 text-[12.5px] font-bold text-[#c22850]">{tx("threadUnreachable")}</p>
@@ -106,7 +106,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
             {data.messages.map((m) => (
               <li key={m.id} className={`max-w-[85%] rounded-[10px] px-3 py-2 text-[12.5px] ${m.fromClient ? "justify-self-start bg-[#f2f6f4] text-[#103f37]" : m.isPrivate ? "justify-self-end border border-dashed border-[#e0a92a] bg-[#fffbf1] text-[#7a5a10]" : "justify-self-end bg-[#185045] text-white"}`}>
                 <span className="block whitespace-pre-wrap leading-6">{m.text}</span>
-                <span className={`tv-tnum mt-1 block text-[10.5px] ${m.fromClient ? "text-[#78948f]" : m.isPrivate ? "text-[#a8873a]" : "text-white/70"}`}>
+                <span className={`tv-tnum mt-1 block text-[10.5px] ${m.fromClient ? "text-tv-text-faint" : m.isPrivate ? "text-[#a8873a]" : "text-white/70"}`}>
                   {m.fromClient ? (f.contact_name ?? "") : m.isPrivate ? tx("note") : (m.sender ?? tx("you"))} · {fromUnix(m.at)}
                 </span>
               </li>
@@ -118,8 +118,8 @@ export function FollowupThread({ data }: { data: OkThread }) {
           <div className="mt-4 grid gap-2">
             {data.canReply ? (
               <>
-                <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={tx("reply")} className="w-full rounded-[10px] border border-[#cfe0d9] bg-white p-2.5 text-[13px] text-[#103f37]" />
-                <button type="button" disabled={busy !== null || !text.trim()} onClick={send} className="inline-flex h-9 items-center justify-center gap-1.5 justify-self-start rounded-[8px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
+                <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={tx("reply")} className="tv-field w-full rounded-[10px] border p-2.5 text-[13px]" />
+                <button type="button" disabled={busy !== null || !text.trim()} onClick={send} className="tv-btn-primary inline-flex h-9 items-center justify-center gap-1.5 justify-self-start rounded-[8px] px-4 text-[12.5px] font-bold disabled:opacity-60 max-sm:min-h-10">
                   {busy === "send" ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
                   {tx("send")}
                 </button>
@@ -128,8 +128,8 @@ export function FollowupThread({ data }: { data: OkThread }) {
               <p className="rounded-[10px] border border-[#f4d9a6] bg-[#fff8e8] p-3 text-[12.5px] font-bold leading-6 text-[#a86a10]">{tx("window")}</p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#e6eeea] pt-3">
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tx("closeNote")} className="h-9 min-w-48 flex-1 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[12.5px]" />
-              <button type="button" disabled={busy !== null} onClick={close} className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-4 text-[12.5px] font-bold text-white hover:bg-[#0b6140] disabled:opacity-60">
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tx("closeNote")} className="tv-field h-9 min-w-48 flex-1 rounded-[8px] border px-2.5 text-[12.5px]" />
+              <button type="button" disabled={busy !== null} onClick={close} className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-4 text-[12.5px] font-bold text-white hover:bg-[#0b6140] disabled:opacity-60 max-sm:min-h-10">
                 {busy === "close" ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 {tx("close")}
               </button>

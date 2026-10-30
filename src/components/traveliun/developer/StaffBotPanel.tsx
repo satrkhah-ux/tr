@@ -6,6 +6,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { checkStaffBot, registerStaffBotWebhook, saveStaffBotToken, type StaffBotCheck, type StaffBotPanelData } from "@/lib/data/staff-bot-admin";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «بوت الموظفين» on /developer (the owner, 2026-10-22). This is the bot's
  * @username and token: replace the token here and nothing else changes. The new
@@ -15,7 +16,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  */
 
 const button =
-  "inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-9 items-center rounded-[9px] border px-3 text-[12px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 
 export function StaffBotPanel({ data }: { data: StaffBotPanelData }) {
   const { t } = useTraveliunUI();
@@ -54,21 +55,21 @@ export function StaffBotPanel({ data }: { data: StaffBotPanelData }) {
   const source = { vault: "dev.sb.source.vault", env: "dev.sb.source.env" }[data.source ?? "env"] as TranslationKey;
 
   return (
-    <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.sb.title")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.sb.hint")}</p>
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.sb.hint")}</p>
 
       <dl className="mt-3 grid gap-1 text-[12px] font-bold text-[#41615b]">
         <div className="flex flex-wrap gap-2">
-          <dt className="text-[#93aaa3]">{t("dev.sb.username")}</dt>
+          <dt className="text-tv-text-faint">{t("dev.sb.username")}</dt>
           <dd dir="ltr">{data.username ? `@${data.username}` : "—"}</dd>
         </div>
         <div className="flex flex-wrap gap-2">
-          <dt className="text-[#93aaa3]">{t("dev.sb.token")}</dt>
+          <dt className="text-tv-text-faint">{t("dev.sb.token")}</dt>
           <dd className={data.source ? "" : "text-[#c22850]"}>{data.source ? t(source) : t("dev.sb.noToken")}</dd>
         </div>
         <div className="flex flex-wrap gap-2">
-          <dt className="text-[#93aaa3]">{t("dev.sb.webhookUrl")}</dt>
+          <dt className="text-tv-text-faint">{t("dev.sb.webhookUrl")}</dt>
           <dd dir="ltr">{data.webhookUrl}</dd>
         </div>
       </dl>
@@ -82,7 +83,7 @@ export function StaffBotPanel({ data }: { data: StaffBotPanelData }) {
           autoComplete="off"
           dir="ltr"
           placeholder="123456789:AA…"
-          className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus:border-[#2aa87a]"
+          className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
         />
       </label>
       {!data.vaultReady ? <p className="mt-1 text-[11.5px] font-bold text-[#c22850]">{t("dev.sb.noVault")}</p> : null}
@@ -116,7 +117,7 @@ export function StaffBotPanel({ data }: { data: StaffBotPanelData }) {
       ) : null}
 
       {data.updatedAt ? (
-        <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
+        <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">
           {t("dev.sb.updated", { at: new Date(data.updatedAt).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh" }), who: data.updatedBy ?? "—" })}
         </p>
       ) : null}

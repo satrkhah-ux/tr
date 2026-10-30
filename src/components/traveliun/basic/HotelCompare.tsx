@@ -36,7 +36,7 @@ export function HotelCompare({ line, cityName, hotelNameEn, checkIn, checkOut, n
 
   if (!open) {
     return <button type="button" onClick={() => { setOpen(true); setDone(false); }}
-      className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">
+      className="tv-btn-secondary inline-flex h-7 items-center gap-1 rounded-[7px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10">
       <Scale className="size-3.5" /> قارن
     </button>;
   }
@@ -78,8 +78,8 @@ export function HotelCompare({ line, cityName, hotelNameEn, checkIn, checkOut, n
                 className="rounded-lg bg-[var(--tv-brand)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">استخدم هذا السعر</button>
             : price && <div className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 p-2 text-xs text-[#5a4300]">
                 <span className="flex-1">سيُكتب <b className="tabular-nums">{price.perRoomNight.toLocaleString("en-US")} {currency}</b> لليلة لكل غرفة ({rooms} غرفة × {nights} ليالٍ){otherHotel.trim() ? ` وفندق «${otherHotel.trim()}»` : ""}. متأكد؟</span>
-                <button type="button" onClick={() => parsed && use(parsed)} className="rounded bg-[var(--tv-brand)] px-3 py-1 font-bold text-white">أكّد</button>
-                <button type="button" onClick={() => setConfirming(false)} className="rounded border border-[#dbe6e1] bg-white px-3 py-1 font-bold">إلغاء</button>
+                <button type="button" onClick={() => parsed && use(parsed)} className="rounded bg-[var(--tv-brand)] px-3 py-1 font-bold text-white max-sm:min-h-10">أكّد</button>
+                <button type="button" onClick={() => setConfirming(false)} className="rounded border border-[#dbe6e1] bg-white px-3 py-1 font-bold max-sm:min-h-10">إلغاء</button>
               </div>}
         </div>;
       }}

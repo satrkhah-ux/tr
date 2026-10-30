@@ -14,7 +14,7 @@ import { TraveliunShell } from "../TraveliunShell";
  */
 type Draft = Partial<Integration> & { name: string; kind: IntegrationKind };
 const EMPTY: Draft = { name: "", kind: "api" };
-const FIELD = "h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+const FIELD = "h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const ERRORS: Record<string, string> = {
   secret_value: "لا تُكتب قيمة السر هنا — اسم المتغير أو مسار الملف فقط",
   duplicate: "يوجد سطر بهذا الاسم",
@@ -88,7 +88,7 @@ function Editor({ value, onDone }: { value: Draft; onDone: () => void }) {
           {busy ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
           حفظ
         </button>
-        <button type="button" onClick={onDone} className="h-9 rounded-[9px] border border-[#cfe0d9] px-3 text-[12.5px] font-bold text-[#185045]">
+        <button type="button" onClick={onDone} className="h-9 rounded-[9px] border border-[#cfe0d9] px-3 text-[12.5px] font-bold text-[#185045] max-sm:min-h-10">
           إلغاء
         </button>
         {error ? <span className="text-[12px] font-bold text-[#c22850]">{error}</span> : null}
@@ -107,11 +107,11 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
   return (
     <TraveliunShell title="nav.integrations">
       <div className="space-y-4">
-        <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+        <section className="tv-card rounded-[14px] border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-[15px] font-extrabold text-[#003c3a]">الربط الخارجي</h2>
-              <p className="text-[12px] font-semibold text-[#78948f]">
+              <p className="text-[12px] font-semibold text-tv-text-faint">
                 كل ما يتصل به النظام من خارجه: الخوادم وقاعدة البيانات والواجهات والبوتات والشيتات والسكربتات والنطاقات والاشتراكات والمهام المجدولة. يُفحص آلياً كل 30 دقيقة، ويصل تنبيه لمرة واحدة عند عطل متكرر أو اقتراب انتهاء.
               </p>
             </div>
@@ -131,7 +131,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                 {checking ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
                 افحص الآن
               </button>
-              <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12.5px] font-extrabold text-white">
+              <button type="button" onClick={() => setEditing("new")} className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12.5px] font-extrabold max-sm:min-h-10">
                 <Plus className="size-4" />
                 إضافة
               </button>
@@ -160,11 +160,11 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
         </section>
 
         {INTEGRATION_KINDS.filter((k) => rows.some((r) => r.kind === k)).map((kind) => (
-          <section key={kind} className="rounded-[14px] border border-[#cfe0d9] bg-white p-3">
+          <section key={kind} className="tv-card rounded-[14px] border p-3">
             <h3 className="mb-2 text-[13px] font-extrabold text-[#185045]">{KIND_AR[kind]}</h3>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1040px] text-start text-[12px]">
-                <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                <thead className="text-[10.5px] font-extrabold text-tv-text-faint">
                   <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
                     <th>الاسم</th><th>الرابط</th><th>يستعمله</th><th>مكان السر</th><th>الحساب</th><th>الخطة / التكلفة</th><th>التجديد</th><th>الحالة</th><th />
                   </tr>
@@ -183,7 +183,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                         <tr key={r.id} className={`border-t border-[#eef3f1] align-top text-[#185045] [&>td]:px-2 [&>td]:py-1.5 ${r.unused ? "opacity-60" : ""}`}>
                           <td className="font-extrabold">
                             {r.name}
-                            {r.notes ? <div className="mt-0.5 text-[11px] font-semibold text-[#78948f]">{r.notes}</div> : null}
+                            {r.notes ? <div className="mt-0.5 text-[11px] font-semibold text-tv-text-faint">{r.notes}</div> : null}
                           </td>
                           <td className="whitespace-nowrap">
                             {r.link ? (
@@ -192,7 +192,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                                 {r.link.label}
                               </a>
                             ) : (
-                              <span className="text-[#93aaa3]">—</span>
+                              <span className="text-tv-text-faint">—</span>
                             )}
                           </td>
                           <td className="max-w-[16rem]">{r.used_by ?? "—"}</td>
@@ -204,7 +204,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                             {r.unused ? (
                               <span className="font-bold text-[#a86a10]">غير مستعمل</span>
                             ) : !r.check_key ? (
-                              <span className="text-[#93aaa3]">بلا فحص آلي</span>
+                              <span className="text-tv-text-faint">بلا فحص آلي</span>
                             ) : r.fail_streak > 0 ? (
                               <span className="inline-flex items-center gap-1 font-bold text-[#c22850]" title={r.last_error ?? ""}>
                                 <XCircle className="size-4" /> {when(r.last_error_at)}
@@ -214,7 +214,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                                 <CheckCircle2 className="size-4" /> {when(r.last_ok_at)}
                               </span>
                             ) : (
-                              <span className="text-[#93aaa3]">لم يُفحص بعد</span>
+                              <span className="text-tv-text-faint">لم يُفحص بعد</span>
                             )}
                           </td>
                           <td>

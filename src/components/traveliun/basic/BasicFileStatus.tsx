@@ -125,7 +125,7 @@ export function BasicFileStatus({
     // the list's row already says where the file stands: that at once, the rest when it comes
     if (variant !== "panel" || !known) return null;
     return (
-      <div className="mt-3 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
+      <div className="tv-card mt-3 space-y-3 rounded-[12px] border p-3">
         <div className="flex flex-wrap items-center gap-2">
           <FileStateChip state={known.state} version={known.version} sentVersion={known.sentVersion} stale={known.stale} />
           {known.operationId ? (
@@ -228,7 +228,7 @@ export function BasicFileStatus({
   const quiet = "inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline";
 
   return (
-    <div ref={panelRef} className="mt-3 scroll-mt-20 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
+    <div ref={panelRef} className="tv-card mt-3 scroll-mt-20 space-y-3 rounded-[12px] border p-3">
       {/* ① where the file stands, one line */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="tv-tnum text-[12.5px] font-extrabold text-[#103f37]" dir="ltr">
@@ -309,7 +309,7 @@ export function BasicFileStatus({
                 <select
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as typeof channel)}
-                  className="h-9 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]"
+                  className="tv-field h-9 rounded-[8px] border px-2 text-[12px] font-bold"
                 >
                   <option value="whatsapp">{tx("channel_whatsapp")}</option>
                   <option value="phone">{tx("channel_phone")}</option>
@@ -320,7 +320,7 @@ export function BasicFileStatus({
                 type="button"
                 onClick={() => void confirm()}
                 disabled={busy !== null}
-                className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:flex-1 ${
+                className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:flex-1 max-sm:min-h-10 ${
                   sentOnce && !view.stale ? "bg-[#185045] text-white hover:bg-[#0f4439]" : "border border-[#185045] bg-white text-[#185045] hover:bg-[#f0f7f4]"
                 }`}
               >
@@ -341,7 +341,7 @@ export function BasicFileStatus({
 
       {/* ③ the rest, small, under its name */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-dashed border-[#DCE9E5] pt-2">
-        <span className="w-full text-[10.5px] font-extrabold text-[#93aaa3] sm:w-auto">{tx("otherTools")}</span>
+        <span className="w-full text-[10.5px] font-extrabold text-tv-text-faint sm:w-auto">{tx("otherTools")}</span>
         <button
           type="button"
           onClick={() => {
@@ -388,7 +388,7 @@ export function BasicFileStatus({
             type="button"
             onClick={() => void cancel()}
             disabled={busy !== null || !reason.trim()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c22850] px-3 text-[12px] font-bold text-white disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c22850] px-3 text-[12px] font-bold text-white disabled:opacity-50 max-sm:min-h-10"
           >
             {busy === "cancel" ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
             {tx("cancelDo")}
@@ -406,10 +406,10 @@ export function BasicFileStatus({
           <ol className="space-y-0.5">
             {shown.map((e, i) => (
               <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
-                <span className="tv-tnum shrink-0 font-semibold text-[#93aaa3]">{when(e.at, language)}</span>
+                <span className="tv-tnum shrink-0 font-semibold text-tv-text-faint">{when(e.at, language)}</span>
                 <span className="font-bold text-[#185045]">{line(e)}</span>
-                {e.by ? <span className="text-[#7a948f]">— {e.by}</span> : null}
-                {e.note && e.key === "cancelled" ? <span className="text-[#7a948f]">({e.note})</span> : null}
+                {e.by ? <span className="text-tv-text-faint">— {e.by}</span> : null}
+                {e.note && e.key === "cancelled" ? <span className="text-tv-text-faint">({e.note})</span> : null}
               </li>
             ))}
           </ol>
@@ -430,14 +430,14 @@ export function BasicFileStatus({
  */
 function Step({ n, title, hint, status, children }: { n: number; title: string; hint: string; status: "done" | "now" | "next" | "off"; children?: ReactNode }) {
   const badge =
-    status === "done" ? "bg-[#0f7a52] text-white" : status === "now" ? "bg-[#185045] text-white" : "bg-[#eef3f1] text-[#93aaa3]";
+    status === "done" ? "bg-[#0f7a52] text-white" : status === "now" ? "bg-[#185045] text-white" : "bg-[#eef3f1] text-tv-text-faint";
   return (
     <li className={`space-y-2 rounded-[11px] border p-2.5 max-sm:p-2 ${status === "now" ? "border-[#b9d6cb] bg-[#f7fbf9]" : "border-[#edf3f0]"}`}>
       <div className="flex gap-2.5">
         <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[12.5px] font-extrabold ${badge}`}>{status === "done" ? "✓" : n}</span>
         <div className="min-w-0">
-          <p className={`text-[13px] font-extrabold ${status === "next" || status === "off" ? "text-[#7a948f]" : "text-[#103f37]"}`}>{title}</p>
-          <p className="text-[11.5px] font-semibold text-[#7a948f]">{hint}</p>
+          <p className={`text-[13px] font-extrabold ${status === "next" || status === "off" ? "text-tv-text-faint" : "text-[#103f37]"}`}>{title}</p>
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">{hint}</p>
         </div>
       </div>
       {/* the controls take the card's full width — on a phone the review box keeps its room */}

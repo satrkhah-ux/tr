@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getFollowupSettings, saveFollowupMapping, saveFollowupTeam } from "@/lib/data/followups";
 import type { WorkResult } from "@/lib/followups/rules";
-const input = "w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-900";
+const input = "tv-field w-full rounded-lg border p-2 text-sm";
 const errors: Record<string,string> = { failed: "تعذر حفظ إعدادات الفريق.", forbidden: "تحتاج صلاحية إدارة الموظفين والأقسام.", invalid: "اختر موظفًا مخولًا وحسابًا صحيحًا من القائمة." };
 
 export function FollowupTeamSettings() {

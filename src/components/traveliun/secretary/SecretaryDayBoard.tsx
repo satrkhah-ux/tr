@@ -55,7 +55,7 @@ function Row({ item, index, nowMs, readOnly, onDone, busyKey }: {
     } catch { setError("تعذّر الاتصال."); } finally { setRemindBusy(false); }
   }
 
-  return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
+  return <div className="tv-card rounded-xl border p-3">
     <div className="flex flex-wrap items-baseline gap-2">
       {index !== null && <span className="rounded-full bg-[#b3261e] px-2 py-0.5 text-xs font-extrabold text-white tabular-nums">{index + 1}</span>}
       <strong className="text-sm">{item.name}</strong>
@@ -72,14 +72,14 @@ function Row({ item, index, nowMs, readOnly, onDone, busyKey }: {
       {item.followupId && <a href={`/followups/${item.followupId}`} className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045]">ملف المتابعة</a>}
       {item.draft && <button type="button" onClick={() => void copyDraft()} className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045]"><Copy size={13} /> {copied ? "نُسخ ✓" : "انسخ الرد المقترح"}</button>}
       {!readOnly && <>
-        <button type="button" disabled={busy} onClick={() => onDone(item.key)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-600 px-3 py-1.5 text-xs font-bold text-emerald-700">
+        <button type="button" disabled={busy} onClick={() => onDone(item.key)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-600 px-3 py-1.5 text-xs font-bold text-emerald-700 max-sm:min-h-10">
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} تمّت
         </button>
         <div className="relative">
           <button type="button" disabled={remindBusy} onClick={() => setRemindOpen((v) => !v)} className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045]"><Clock size={13} /> ذكّرني</button>
           {remindOpen && <div className="absolute z-10 mt-1 flex gap-1 rounded-lg border border-[#dbe6e1] bg-white p-1 shadow">
             {[["ساعة", 1], ["غداً", 24], ["3 أيام", 72]].map(([label, h]) => <button key={label as string} type="button" disabled={remindBusy}
-              onClick={() => void remind(h as number)} className="rounded px-2 py-1 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6]">{label as string}</button>)}
+              onClick={() => void remind(h as number)} className="rounded px-2 py-1 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6] max-sm:min-h-10">{label as string}</button>)}
           </div>}
         </div>
       </>}
@@ -120,7 +120,7 @@ export function SecretaryDayBoard({ board, compact = false }: { board: Secretary
 
   return <div className="space-y-4">
     {/* progress: Murad follows what got done on its own — a reply, an acted follow-up, a «تمّت» */}
-    <div className="rounded-xl border border-[#dfe8e4] bg-white p-3">
+    <div className="tv-card rounded-xl border p-3">
       <div className="flex flex-wrap items-center gap-3">
         <strong className="text-sm">أنجزت {doneToday.length} من {total} اليوم</strong>
         <div className="h-2 min-w-24 flex-1 overflow-hidden rounded-full bg-[#eef3f1]">
@@ -152,8 +152,8 @@ export function SecretaryDayBoard({ board, compact = false }: { board: Secretary
             <ChevronDown size={14} className={silentOpen ? "rotate-180" : ""} />
           </button>
           {silentOpen && <div className="mt-2 space-y-2">
-            <label className="flex items-center gap-2 rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-sm"><Search size={14} className="text-[#8ba09b]" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث بالاسم…" className="min-w-0 flex-1 bg-transparent outline-none" />
+            <label className="flex items-center gap-2 rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-sm"><Search size={14} className="text-tv-text-faint" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث بالاسم…" className="min-w-0 flex-1 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus" />
             </label>
             {silent.map((i) => <Row key={i.key} item={i} index={null} nowMs={nowMs} readOnly={view.readOnly} onDone={(k) => void done(k)} busyKey={busyKey} />)}
           </div>}

@@ -21,7 +21,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
  *   ?code=                          → exchangeCodeForSession (PKCE)
  */
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 type Phase = "checking" | "ready" | "invalid" | "done";
 
@@ -116,7 +116,7 @@ export function PartnerWelcome({ home = "/b2b", homeLabel = "العودة لبو
 
   if (phase === "checking") {
     return (
-      <div className="grid place-items-center rounded-2xl border border-[#e2ebe7] bg-white p-10">
+      <div className="tv-card grid place-items-center rounded-2xl border p-10">
         <Loader2 className="size-6 animate-spin text-[#185045]" />
       </div>
     );
@@ -186,7 +186,7 @@ export function PartnerWelcome({ home = "/b2b", homeLabel = "العودة لبو
       className="rounded-2xl border border-[#e2ebe7] bg-white p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]"
     >
       <h2 className="text-base font-extrabold text-[#003c3a]">اختر كلمة المرور</h2>
-      <p className="mb-4 mt-1 text-[12px] font-semibold text-[#93aaa3]">
+      <p className="mb-4 mt-1 text-[12px] font-semibold text-tv-text-faint">
         هذه كلمتك أنت — لا يعرفها أحد في ترافليون ولا تُخزَّن لدينا.
       </p>
 
@@ -220,7 +220,7 @@ export function PartnerWelcome({ home = "/b2b", homeLabel = "العودة لبو
       <button
         type="submit"
         disabled={saving}
-        className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#185045] text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-[13px] font-bold disabled:opacity-60"
       >
         {saving ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
         حفظ والدخول

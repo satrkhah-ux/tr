@@ -19,7 +19,7 @@ export function MyCommission({ data, manage }: { data: Data; manage: boolean }) 
               عمولتي
               <StatusPill status={data.status} />
             </h1>
-            <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-6 text-[#93aaa3]">
+            <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-6 text-tv-text-faint">
               يدخل الملف في عمولة الشهر الذي اكتمل فيه سداد العميل، ويُحسب على ربحه الفعلي: المستلم من العميل ناقص ما دُفع للموردين وما بقي عليهم.
               {data.frozen ? " أرقام هذا الشهر مجمّدة ولن تتغير." : " الرقم تقديري ويتحدث حتى تعتمد الإدارة الشهر."}
             </p>
@@ -47,7 +47,7 @@ export function MyCommission({ data, manage }: { data: Data; manage: boolean }) 
 
         <Section title="ملفات الشهر">
           {data.files.length === 0 ? (
-            <p className="text-[12px] font-semibold text-[#93aaa3]">لا يوجد ملف اكتمل سداده في هذا الشهر.</p>
+            <p className="text-[12px] font-semibold text-tv-text-faint">لا يوجد ملف اكتمل سداده في هذا الشهر.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -93,7 +93,7 @@ export function MyCommission({ data, manage }: { data: Data; manage: boolean }) 
 
         <Section title="الأشهر السابقة">
           {data.history.length === 0 ? (
-            <p className="text-[12px] font-semibold text-[#93aaa3]">لا توجد أشهر معتمدة بعد.</p>
+            <p className="text-[12px] font-semibold text-tv-text-faint">لا توجد أشهر معتمدة بعد.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">

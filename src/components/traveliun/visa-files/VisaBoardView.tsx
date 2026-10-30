@@ -51,7 +51,7 @@ export function VisaBoardView({ phase, filter, countries, manager, now, refreshi
       <section className={`${card} flex flex-wrap items-center justify-between gap-3`}>
         <div className="min-w-0">
           <h1 className="text-xl font-extrabold text-[#003c3a]">لوحة التأشيرات</h1>
-          <p className="mt-1 text-[13px] font-semibold text-[#6f8f88]">الملفات الجاهزة وقيد التنفيذ، والمستندات الناقصة، والردود، والعملاء الذين لم يسددوا.</p>
+          <p className="mt-1 text-[13px] font-semibold text-tv-text-faint">الملفات الجاهزة وقيد التنفيذ، والمستندات الناقصة، والردود، والعملاء الذين لم يسددوا.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={btn} onClick={onRefresh} disabled={refreshing}>
@@ -134,7 +134,7 @@ export function VisaBoardView({ phase, filter, countries, manager, now, refreshi
           <label className={`${label} sm:col-span-2 xl:col-span-1`}>
             بحث
             <span className="relative block">
-              <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+              <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
               <input
                 type="search"
                 value={filter.search}
@@ -189,7 +189,7 @@ function Counter({ title, count, on, onPress, alert, note }: { title: string; co
         on
           ? "border-[#185045] bg-[#185045] text-white"
           : alert
-            ? "border-[#f3c9d3] bg-[#fdecef] text-[#c22850] hover:bg-[#fbdde4]"
+            ? "border-[#f3c9d3] bg-tv-status-danger-bg text-tv-status-danger hover:bg-[#fbdde4]"
             : "border-[#e2ebe7] bg-white text-[#185045] hover:bg-[#f4f8f6]"
       }`}
     >
@@ -244,7 +244,7 @@ function FileList({ board, filter, now, onFilter, refreshing }: { board: VisaBoa
       <div className={`${card} hidden overflow-x-auto !p-0 md:block`}>
         <table className="w-full min-w-[960px] text-sm">
           <thead>
-            <tr className="border-b border-[#eef2f0] text-start text-[12px] font-bold text-[#6f8f88]">
+            <tr className="border-b border-[#eef2f0] text-start text-[12px] font-bold text-tv-text-faint">
               {["الرقم", "العميل", "الدولة والنوع", "المسافرون", "الحالة", "السداد", "الرد المتوقع", "الإجراء التالي", "ناقص", "المسؤول"].map((h) => <th key={h} scope="col" className="px-3 py-3 text-start">{h}</th>)}
             </tr>
           </thead>
@@ -263,7 +263,7 @@ function FileList({ board, filter, now, onFilter, refreshing }: { board: VisaBoa
 /** the reply date as the row shows it: the date, and «تأخر يومان» in red when it is late */
 function Reply({ r, now }: { r: VisaRow; now: number }) {
   const late = rowFlags(r, now).replyLate;
-  if (!r.expectedReplyAt) return <span className="text-[#8aa29b]">—</span>;
+  if (!r.expectedReplyAt) return <span className="text-tv-text-faint">—</span>;
   return (
     <span className={late ? "font-extrabold text-[#c22850]" : "text-[#185045]"}>
       {fmtDate(r.expectedReplyAt)}
@@ -272,7 +272,7 @@ function Reply({ r, now }: { r: VisaRow; now: number }) {
   );
 }
 function NextAction({ r, now }: { r: VisaRow; now: number }) {
-  if (!r.nextAction && !r.nextActionAt) return <span className="text-[#8aa29b]">—</span>;
+  if (!r.nextAction && !r.nextActionAt) return <span className="text-tv-text-faint">—</span>;
   const due = rowFlags(r, now).actionDue;
   return (
     <span className={due ? "font-extrabold text-[#a86a10]" : "text-[#185045]"}>
@@ -296,20 +296,20 @@ function FileCard({ r, now, person }: { r: VisaRow; now: number; person: string 
   return (
     <Link href={`/visa-files/${r.id}`} className="block rounded-2xl border border-[#e2ebe7] bg-white p-3.5 shadow-[0_1px_2px_rgba(0,60,58,0.04)] hover:bg-[#f7faf8]">
       <span className="flex items-center justify-between gap-2">
-        <DirText className="text-xs font-bold text-[#6f8f88]">{r.serial}</DirText>
+        <DirText className="text-xs font-bold text-tv-text-faint">{r.serial}</DirText>
         <StatusChip status={r.status} />
       </span>
       <span className="mt-1 block font-extrabold text-[#003c3a]">{r.clientName}</span>
-      {r.clientPhone ? <DirText className="text-xs text-[#6f8f88]">{r.clientPhone}</DirText> : null}
+      {r.clientPhone ? <DirText className="text-xs text-tv-text-faint">{r.clientPhone}</DirText> : null}
       <span className="mt-1 block text-sm text-[#185045]">{typeLine(r)} · <span className="tv-tnum">{r.applicants}</span> مسافر</span>
       <span className="mt-2 block"><Owing r={r} now={now} /></span>
       <span className="mt-2 grid grid-cols-2 gap-2 text-[13px]">
-        <span><span className="block text-[11px] font-bold text-[#8aa29b]">الرد المتوقع</span><Reply r={r} now={now} /></span>
-        <span><span className="block text-[11px] font-bold text-[#8aa29b]">الإجراء التالي</span><NextAction r={r} now={now} /></span>
+        <span><span className="block text-[11px] font-bold text-tv-text-faint">الرد المتوقع</span><Reply r={r} now={now} /></span>
+        <span><span className="block text-[11px] font-bold text-tv-text-faint">الإجراء التالي</span><NextAction r={r} now={now} /></span>
       </span>
       <span className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
         {r.missingDocs > 0 ? <span className="rounded-full bg-[#fff8e8] px-3 py-0.5 font-bold text-[#a86a10]">ناقص <span className="tv-tnum">{r.missingDocs}</span> مستند</span> : <span />}
-        <span className="font-semibold text-[#6f8f88]">{person}</span>
+        <span className="font-semibold text-tv-text-faint">{person}</span>
       </span>
     </Link>
   );
@@ -322,7 +322,7 @@ function FileTableRow({ r, now, person }: { r: VisaRow; now: number; person: str
       <td className="px-3 py-1"><Link href={`/visa-files/${r.id}`} className={`${link} whitespace-nowrap font-bold text-[#185045]`}><DirText>{r.serial}</DirText></Link></td>
       <td className="px-3 py-1">
         <Link href={`/visa-files/${r.id}`} className={`${link} font-extrabold text-[#003c3a]`}>{r.clientName}</Link>
-        {r.clientPhone ? <DirText className="block text-xs text-[#6f8f88]">{r.clientPhone}</DirText> : null}
+        {r.clientPhone ? <DirText className="block text-xs text-tv-text-faint">{r.clientPhone}</DirText> : null}
       </td>
       <td className="px-3 py-3 text-[#185045]">{typeLine(r)}</td>
       <td className="tv-tnum px-3 py-3">{r.applicants}</td>
@@ -330,7 +330,7 @@ function FileTableRow({ r, now, person }: { r: VisaRow; now: number; person: str
       <td className="px-3 py-3"><Owing r={r} now={now} /></td>
       <td className="px-3 py-3"><Reply r={r} now={now} /></td>
       <td className="px-3 py-3"><NextAction r={r} now={now} /></td>
-      <td className="px-3 py-3">{r.missingDocs > 0 ? <span className="tv-tnum rounded-full bg-[#fff8e8] px-3 py-0.5 text-xs font-bold text-[#a86a10]">{r.missingDocs}</span> : <span className="text-[#8aa29b]">—</span>}</td>
+      <td className="px-3 py-3">{r.missingDocs > 0 ? <span className="tv-tnum rounded-full bg-[#fff8e8] px-3 py-0.5 text-xs font-bold text-[#a86a10]">{r.missingDocs}</span> : <span className="text-tv-text-faint">—</span>}</td>
       <td className="px-3 py-3 text-[#557d78]">{person}</td>
     </tr>
   );

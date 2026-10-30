@@ -60,7 +60,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
   return (
     <div className="space-y-[18px]" dir={dir}>
             <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="flex items-center justify-between border-b border-[#eef2f0] px-5 py-4">
                   <h2 className="text-lg font-extrabold text-[#003c3a]">{t("hub.readyOffer")}</h2>
                   <span className="rounded-full bg-[#e4f6ef] px-3 py-1 text-xs font-bold text-[#10966b]">{t("hub.latestBadge")}</span>
@@ -84,7 +84,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                 ) : null}
               </article>
 
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="mb-4 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <BrainCircuit className="size-5 text-[#2aa87a]" />
@@ -117,21 +117,21 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                     );
                   })}
                 </div>
-                <p className="mt-3 text-[11.5px] font-semibold text-[#93aaa3]">
+                <p className="mt-3 text-[11.5px] font-semibold text-tv-text-faint">
                   {t("hub.advisory")}
                 </p>
               </article>
             </section>
 
             <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="text-lg font-extrabold text-[#003c3a]">{t("hub.clientLink")}</h2>
                   <Sparkles className="size-5 text-[#f4b400]" />
                 </div>
                 <div className="rounded-md border border-[#dce7e2] bg-[#f7faf8] p-3 text-left text-sm font-semibold text-[#185045]" dir="ltr">{clientLink}</div>
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <button type="button" onClick={copyClientLink} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#c9d8d3] bg-white text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]">
+                  <button type="button" onClick={copyClientLink} className="tv-btn-secondary inline-flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-bold">
                     <Copy className="size-4" /> {copied ? t("copied") : t("copy")}
                   </button>
                   <Link href={`/client-offer/${offer.serial}`} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#2aa87a] text-sm font-bold text-white hover:bg-[#248d68]">
@@ -145,7 +145,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                 </div>
               </article>
 
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="mb-4 flex items-center gap-2">
                   <Activity className="size-5 text-[#00a7b2]" />
                   <h2 className="text-lg font-extrabold text-[#003c3a]">{t("hub.itinerary")}</h2>
@@ -160,7 +160,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="py-6 text-center text-sm text-[#93aaa3]">{t("hub.noCities")}</p>
+                  <p className="py-6 text-center text-sm text-tv-text-faint">{t("hub.noCities")}</p>
                 )}
               </article>
             </section>
@@ -178,7 +178,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
 function InfoBlock({ label, value, strong = false, numeric = false }: { label: string; value: string; strong?: boolean; numeric?: boolean }) {
   return (
     <div className="rounded-[11px] bg-[#f4f8f6] p-3">
-      <p className="text-[11px] font-bold text-[#93aaa3]">{label}</p>
+      <p className="text-[11px] font-bold text-tv-text-faint">{label}</p>
       <p className={`mt-1.5 text-[13.5px] ${numeric ? "tv-tnum" : ""} ${strong ? "font-extrabold text-[#0f7a52]" : "font-bold text-[#185045]"}`}>
         {numeric ? <DirText>{value}</DirText> : value}
       </p>
@@ -197,7 +197,7 @@ function Stage({ label }: { label: string }) {
 
 function ListPanel({ title, items, icon: Icon }: { title: string; items: string[]; icon: LucideIcon }) {
   return (
-    <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-4 flex items-center gap-2">
         <Icon className="size-5 text-[#557d78]" />
         <h2 className="text-lg font-extrabold text-[#003c3a]">{title}</h2>

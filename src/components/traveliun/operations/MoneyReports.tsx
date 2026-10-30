@@ -13,10 +13,10 @@ import { fmtMoney, marginText, profitTone } from "./CaseProfitCard";
 
 /** The internal money pages: «تقرير الربحية» and «التدفق النقدي». pricing.internal — the loaders check. */
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const back =
   "inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]";
-const th = "px-2.5 py-2 text-start text-[11px] font-bold text-[#93aaa3] whitespace-nowrap";
+const th = "px-2.5 py-2 text-start text-[11px] font-bold text-tv-text-faint whitespace-nowrap";
 const td = "px-2.5 py-2 text-[12px] font-bold text-[#0f3d38] whitespace-nowrap";
 
 function Page({ title, hint, icon, children }: { title: TranslationKey; hint: TranslationKey; icon: ReactNode; children: ReactNode }) {
@@ -34,7 +34,7 @@ function Page({ title, hint, icon, children }: { title: TranslationKey; hint: Tr
             {t(title)}
             <span className="rounded-full bg-[#fff8e8] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{t("ops.money.internal")}</span>
           </h1>
-          <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t(hint)}</p>
+          <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t(hint)}</p>
         </section>
         {children}
       </div>
@@ -74,7 +74,7 @@ export function MoneyLinks() {
 
 export function ProfitabilityReport({ report }: { report: ProfitReport }) {
   const { t } = useTraveliunUI();
-  const field = "h-10 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045]";
+  const field = "tv-field h-10 rounded-[10px] border px-3 text-[13px]";
   return (
     <Page title="ops.money.report" hint="ops.money.reportHint" icon={<TrendingUp className="size-5" />}>
       {/* a plain GET form: the range is in the URL, so a report can be bookmarked or sent */}
@@ -87,10 +87,10 @@ export function ProfitabilityReport({ report }: { report: ProfitReport }) {
           {t("ops.money.to")}
           <input type="month" name="to" defaultValue={report.to} dir="ltr" className={field} />
         </label>
-        <button type="submit" className="inline-flex h-10 items-center rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]">
+        <button type="submit" className="tv-btn-primary inline-flex h-10 items-center rounded-[10px] px-4 text-[12.5px] font-bold">
           {t("ops.money.show")}
         </button>
-        <span className="ms-auto text-[12px] font-bold text-[#93aaa3]">
+        <span className="ms-auto text-[12px] font-bold text-tv-text-faint">
           {t("ops.money.cases")}: <Num>{String(report.cases)}</Num>
         </span>
       </form>
@@ -109,7 +109,7 @@ function ProfitTable({ title, rows }: { title: string; rows: (ProfitRow & { key:
     <section className={card}>
       <h2 className="text-sm font-extrabold text-[#185045]">{title}</h2>
       {rows.length === 0 ? (
-        <p className="mt-2 text-[12px] font-semibold text-[#93aaa3]">{t("ops.money.noFigures")}</p>
+        <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">{t("ops.money.noFigures")}</p>
       ) : (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full border-collapse">
@@ -198,7 +198,7 @@ function Bucket({ bucket }: { bucket: CashBucket }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className={`tv-tnum text-sm font-extrabold ${overdue && bucket.items.length > 0 ? "text-[#c22850]" : "text-[#185045]"}`}>{title}</h2>
         {bucket.lines.length === 0 ? (
-          <span className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.money.nothingDue")}</span>
+          <span className="text-[12px] font-semibold text-tv-text-faint">{t("ops.money.nothingDue")}</span>
         ) : (
           <div className="grid gap-1">
             {bucket.lines.map((l) => (
@@ -236,10 +236,10 @@ function Bucket({ bucket }: { bucket: CashBucket }) {
                       {i.serial}
                     </DirText>
                   )}
-                  {i.title ? <span className="ms-2 font-semibold text-[#93aaa3]">{i.title}</span> : null}
+                  {i.title ? <span className="ms-2 font-semibold text-tv-text-faint">{i.title}</span> : null}
                 </span>
                 <span className="flex items-center gap-3">
-                  <Num tone="text-[#93aaa3]">{i.date ?? t("ops.money.noDate")}</Num>
+                  <Num tone="text-tv-text-faint">{i.date ?? t("ops.money.noDate")}</Num>
                   <Num tone="text-[#0f3d38]">{`${i.direction === "out" ? "−" : "+"}${fmtMoney(i.amount, i.currency)}`}</Num>
                 </span>
               </li>

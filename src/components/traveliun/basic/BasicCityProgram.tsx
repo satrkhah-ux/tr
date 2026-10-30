@@ -40,7 +40,7 @@ export function BasicCityProgram({
   catalog: TourCatalog;
 }) {
   const tx = useBasicLabels();
-  if (!city.check_in) return <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noCityDays")}</p>;
+  if (!city.check_in) return <p className="text-[12px] font-semibold text-tv-text-faint">{tx("noCityDays")}</p>;
   // the city's days: from its check-in to the day it leaves (the evening of an overnight flight, or the day home)
   const own = data.days.flatMap((d, i) =>
     d.kind !== "travel" && d.city_name === city.city_name && d.date && d.date >= city.check_in! && d.date <= (city.check_out ?? d.date) ? [i] : [],
@@ -131,7 +131,7 @@ export function BasicCityProgram({
                     <button
                       type="button"
                       onClick={onTours}
-                      className="inline-flex items-center gap-1 rounded-full border border-[#cfe0d9] px-2 py-0.5 text-[#185045] hover:bg-[#f0f7f4]"
+                      className="tv-btn-secondary inline-flex items-center gap-1 rounded-full border px-2 py-0.5 max-sm:min-h-10"
                     >
                       <Camera className="size-3" />
                       {tx("changeTour")}

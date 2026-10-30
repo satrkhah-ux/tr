@@ -89,14 +89,14 @@ export function StaySummary({
               {perNight != null ? (
                 <span className="text-[14px] font-extrabold text-[#0f3d38]">
                   <DirText dir="ltr">{`${perNight} ${currency}`}</DirText>
-                  <span className="text-[11px] font-bold text-[#93aaa3]"> / ليلة</span>
+                  <span className="text-[11px] font-bold text-tv-text-faint"> / ليلة</span>
                 </span>
               ) : null}
               <span className="text-[12px] font-bold text-[#557d78]">
                 <DirText dir="ltr">{`${Math.round(total)} ${currency}`}</DirText> إجمالي
               </span>
               {canInternal && s ? (
-                <span className="text-[11px] font-bold text-[#93aaa3]">
+                <span className="text-[11px] font-bold text-tv-text-faint">
                   {t("pg.supplier.net")}: <DirText dir="ltr">{`${s.net_base} SAR`}</DirText>
                   {s.margin_pct != null ? ` · ${t("pg.marginCol")} ${s.margin_pct}%` : ""}
                 </span>
@@ -130,7 +130,7 @@ export function StaySummary({
             <button
               type="button"
               onClick={onRefresh}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#557d78] hover:bg-white"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#557d78] hover:bg-white max-sm:min-h-10"
             >
               <RefreshCw className="size-3.5" />
               تحديث السعر
@@ -139,7 +139,7 @@ export function StaySummary({
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-white"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-white max-sm:min-h-10"
           >
             <Pencil className="size-3.5" />
             تعديل
@@ -147,7 +147,7 @@ export function StaySummary({
           <button
             type="button"
             onClick={onChange}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-2.5 text-[11.5px] font-bold text-white hover:bg-[#0f4439]"
+            className="tv-btn-primary inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
           >
             <Repeat2 className="size-3.5" />
             تغيير الفندق

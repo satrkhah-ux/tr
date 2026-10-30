@@ -41,7 +41,7 @@ export function DataAdditionsReview({ initial, enabled }: { initial: AdditionFor
         {pending ? `${pending} إضافة بانتظار المراجعة — صحّح الاسم إن لزم ثم اعتمده لكل الموظفين.` : "لا توجد إضافات بانتظار المراجعة."}
       </p>
       {error ? <p className="text-[12.5px] font-bold text-[#c22850]">{error}</p> : null}
-      <div className="overflow-x-auto rounded-2xl border border-[#dbe6e1] bg-white dark:border-[#294039] dark:bg-[#14231f]">
+      <div className="tv-card overflow-x-auto rounded-2xl border">
         <table className="w-full min-w-[720px] text-[12.5px]">
           <thead className="bg-[#f2f7f5] text-[#557d78] dark:bg-[#1b2d27]">
             <tr>
@@ -74,9 +74,9 @@ export function DataAdditionsReview({ initial, enabled }: { initial: AdditionFor
                     <span dir="auto">{r.name}</span>
                   )}
                 </td>
-                <td className="p-2 text-[#7a948f]" dir="auto">{r.typed_text}</td>
-                <td className="p-2 text-[#7a948f]">{[r.city, r.country].filter(Boolean).join(" — ") || "—"}</td>
-                <td className="p-2 text-[#7a948f]">
+                <td className="p-2 text-tv-text-faint" dir="auto">{r.typed_text}</td>
+                <td className="p-2 text-tv-text-faint">{[r.city, r.country].filter(Boolean).join(" — ") || "—"}</td>
+                <td className="p-2 text-tv-text-faint">
                   {r.author ?? "—"}
                   <div className="tv-tnum text-[11px]">{new Date(r.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })}</div>
                 </td>
@@ -84,10 +84,10 @@ export function DataAdditionsReview({ initial, enabled }: { initial: AdditionFor
                 <td className="p-2">
                   {r.status === "pending" ? (
                     <span className="flex gap-1">
-                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "approved")} className="inline-flex items-center gap-1 rounded-[8px] bg-[#185045] px-2 py-1 font-bold text-white disabled:opacity-60">
+                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "approved")} className="tv-btn-primary inline-flex items-center gap-1 rounded-[8px] px-2 py-1 font-bold disabled:opacity-60 max-sm:min-h-10">
                         <Check className="size-3.5" /> اعتمد
                       </button>
-                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "rejected")} className="inline-flex items-center gap-1 rounded-[8px] border border-[#f0c9d2] px-2 py-1 font-bold text-[#c22850] disabled:opacity-60">
+                      <button type="button" disabled={busy === r.id} onClick={() => void decide(r, "rejected")} className="inline-flex items-center gap-1 rounded-[8px] border border-[#f0c9d2] px-2 py-1 font-bold text-[#c22850] disabled:opacity-60 max-sm:min-h-10">
                         <X className="size-3.5" /> ارفض
                       </button>
                     </span>

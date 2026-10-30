@@ -71,7 +71,7 @@ export function TraveliunDashboardClient({ opsSummary, mine, latest = null, visa
         ) : dashboardView === "employee" ? (
           <EmployeeHome opsSummary={opsSummary} mine={mine} visaBoard={visaBoard} salesCard={salesCard} />
         ) : (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
           </section>
         )}
@@ -131,7 +131,7 @@ function ReadySections() {
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-extrabold text-[#003c3a]">{t("dash.readySections")}</h2>
-        <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.readyHint")}</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("dash.readyHint")}</p>
       </div>
 
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
@@ -146,14 +146,14 @@ function ReadySections() {
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[13.5px] font-extrabold text-[#0f3d38]">{t(a.labelKey)}</span>
-              <span className="block truncate text-[11.5px] font-semibold text-[#93aaa3]">{t(a.descKey)}</span>
+              <span className="block truncate text-[11.5px] font-semibold text-tv-text-faint">{t(a.descKey)}</span>
             </span>
           </Link>
         ))}
       </div>
 
       {prepared.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-[13px] border border-[#e8efeb] bg-white px-4 py-3">
+        <div className="tv-card flex flex-wrap items-center gap-2 rounded-[13px] border px-4 py-3">
           <span className="text-[11.5px] font-extrabold text-[#557d78]">{t("dash.preparedSettings")}</span>
           {prepared.map((p) => (
             <Link
@@ -193,14 +193,14 @@ function PreviousSections() {
   if (count === 0) return null;
 
   return (
-    <details className="group rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <details className="tv-card group rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-5 py-4 marker:content-none">
         <ChevronDown className="size-4 text-[#557d78] transition-transform duration-200 group-open:rotate-180" />
         <span className="text-sm font-extrabold text-[#185045]">{t("dash.previousSections")}</span>
         <span className="tv-tnum rounded-full bg-[#eef4f1] px-2 py-0.5 text-[11px] font-bold text-[#557d78]">
           <DirText dir="ltr">{String(count)}</DirText>
         </span>
-        <span className="ms-auto text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.previousHint")}</span>
+        <span className="ms-auto text-[11.5px] font-semibold text-tv-text-faint">{t("dash.previousHint")}</span>
       </summary>
       <div className="grid gap-4 border-t border-[#eef2f0] p-5 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
         {groups.map((group) => (
@@ -247,7 +247,7 @@ function AdminHome({ opsSummary, mine, latest, salesCard }: { opsSummary: OpsSum
 
   return (
     <div className="space-y-4">
-      <div className="flex max-w-full overflow-x-auto rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex">
+      <div className="tv-card flex max-w-full overflow-x-auto rounded-[12px] border p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex">
         <button type="button" onClick={() => setTab("mine")} className={tabClass(tab === "mine")}>
           <UserRound className="size-4" /> {t("dash.tab.mine")}
         </button>
@@ -305,22 +305,22 @@ function EmployeeHome({ opsSummary, mine, visaBoard, salesCard }: { opsSummary: 
 // ---------- KPI card primitives (shared visual) ----------
 function KpiCard({ label, value, detail, icon: Icon, color }: { label: string; value: string; detail?: string; icon: LucideIcon; color: string }) {
   return (
-    <article className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
+    <article className="tv-card rounded-[15px] border p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
       <div className="flex items-start justify-between">
-        <p className="text-[12.5px] font-bold text-[#6f8f88]">{label}</p>
+        <p className="text-[12.5px] font-bold text-tv-text-faint">{label}</p>
         <span className="flex size-[38px] items-center justify-center rounded-[11px]" style={{ color, background: `${color}1a` }}>
           <Icon className="size-5" />
         </span>
       </div>
       <p className="tv-tnum mt-2.5 text-[28px] font-extrabold text-[#003c3a]"><DirText>{value}</DirText></p>
-      {detail ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">{detail}</p> : null}
+      {detail ? <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">{detail}</p> : null}
     </article>
   );
 }
 
 function CardSkeleton() {
   return (
-    <div className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px]">
+    <div className="tv-card rounded-[15px] border p-[18px]">
       <div className="tv-shimmer mb-3 h-4 w-24 rounded-md" />
       <div className="tv-shimmer h-8 w-16 rounded-md" />
     </div>
@@ -428,14 +428,14 @@ function TeamOperations() {
   return (
     <div className="space-y-4">
       {/* toolbar: employee search + customize */}
-      <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+      <section className="tv-card flex flex-wrap items-center gap-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
         <div className="relative h-11 w-full max-w-[320px]">
-          <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" />
           <input
             value={selected ? selected.name : query}
             onChange={(e) => { setSelected(null); setQuery(e.target.value); }}
             placeholder={t("dash.searchEmployee")}
-            className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus:border-[#2aa87a]"
+            className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           {!selected && options.length > 0 ? (
             <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-[11px] border border-[#e2ebe7] bg-white shadow-lg">
@@ -448,7 +448,7 @@ function TeamOperations() {
           ) : null}
         </div>
         {selected ? (
-          <button type="button" onClick={() => { setSelected(null); setQuery(""); }} className="inline-flex h-9 items-center gap-1 rounded-full bg-[#e8f1ed] px-3 text-xs font-bold text-[#185045]">
+          <button type="button" onClick={() => { setSelected(null); setQuery(""); }} className="inline-flex h-9 items-center gap-1 rounded-full bg-[#e8f1ed] px-3 text-xs font-bold text-[#185045] max-sm:min-h-10">
             {selected.name} <X className="size-3.5" />
           </button>
         ) : null}
@@ -458,7 +458,7 @@ function TeamOperations() {
         <Popover open={customizing} onOpenChange={setCustomizing}>
           <PopoverTrigger
             render={
-              <button type="button" className="me-auto inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] outline-none hover:bg-[#f4f8f6] data-[popup-open]:border-[#2aa87a]">
+              <button type="button" className="tv-btn-secondary me-auto inline-flex h-11 items-center gap-2 rounded-[11px] border px-4 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus data-[popup-open]:border-[#2aa87a]">
                 <SlidersHorizontal className="size-4" /> {t("dash.customize")}
               </button>
             }
@@ -477,7 +477,7 @@ function TeamOperations() {
                 const isHidden = layout.hidden.includes(key);
                 return (
                   <div key={key} className="flex items-center justify-between rounded-[10px] border border-[#eef2f0] px-3 py-2 dark:border-[#294039]">
-                    <span className={`text-sm font-semibold ${isHidden ? "text-[#b6c4bf] line-through" : "text-[#185045] dark:text-[#d6e5df]"}`}>{t(def.label)}</span>
+                    <span className={`text-sm font-semibold ${isHidden ? "text-tv-text-faint line-through" : "text-[#185045] dark:text-[#d6e5df]"}`}>{t(def.label)}</span>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => move(key, -1)} disabled={index === 0} className="flex size-8 items-center justify-center rounded-md border border-[#e2ebe7] text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-40"><ChevronUp className="size-4" /></button>
                       <button type="button" onClick={() => move(key, 1)} disabled={index === layout.order.length - 1} className="flex size-8 items-center justify-center rounded-md border border-[#e2ebe7] text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-40"><ChevronDown className="size-4" /></button>
@@ -487,7 +487,7 @@ function TeamOperations() {
                 );
               })}
             </div>
-            <button type="button" onClick={() => setCustomizing(false)} className="mt-3 w-full rounded-md bg-[#185045] px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]">
+            <button type="button" onClick={() => setCustomizing(false)} className="tv-btn-primary mt-3 w-full rounded-md px-3 py-2 text-sm font-bold transition-colors">
               {t("done")}
             </button>
           </PopoverContent>
@@ -504,14 +504,14 @@ function TeamOperations() {
       </section>
 
       {visibleCards.length === 0 ? (
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <EmptyState icon={Contact} title={t("dash.allHidden")} description={t("dash.allHiddenDesc")} />
         </section>
       ) : null}
 
       {/* not-responded employees list */}
       {!loading && metrics && metrics.notRespondedNames.length > 0 ? (
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
             <AlertTriangle className="size-5 text-[#e0577f]" /> {t("dash.pendingList")}
           </h2>

@@ -6,10 +6,10 @@ import type { ClientPassportState } from "@/lib/operations/client-passport";
 
 const CHIP: Record<ClientPassportState, { text: string; cls: string } | null> = {
   needed: null,
-  received: { text: "تم الاستلام — قيد المراجعة", cls: "bg-[#e9f7f0] text-[#0f7a52]" },
-  on_file: { text: "تم الاستلام ✓", cls: "bg-[#e9f7f0] text-[#0f7a52]" },
-  retake: { text: "الصورة غير واضحة — ارفع صورة أخرى", cls: "bg-[#fff8e8] text-[#a86a10]" },
-  update: { text: "يحتاج تحديث — ارفع صورة جواز ساري", cls: "bg-[#fff8e8] text-[#a86a10]" },
+  received: { text: "تم الاستلام — قيد المراجعة", cls: "bg-tv-status-success-bg text-tv-status-success" },
+  on_file: { text: "تم الاستلام ✓", cls: "bg-tv-status-success-bg text-tv-status-success" },
+  retake: { text: "الصورة غير واضحة — ارفع صورة أخرى", cls: "bg-tv-status-warning-bg text-tv-status-warning" },
+  update: { text: "يحتاج تحديث — ارفع صورة جواز ساري", cls: "bg-tv-status-warning-bg text-tv-status-warning" },
 };
 
 /** One traveller's passport photo, from the client's phone. The answer is only «تم الاستلام» — nothing read is sent back. */

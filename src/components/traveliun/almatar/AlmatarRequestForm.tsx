@@ -7,7 +7,7 @@ import { LINE_KINDS, MAX_LINES, MAX_UNITS, outsideProgram, REQUEST_KINDS, unitPr
 import type { AlmatarService } from "@/lib/almatar/server";
 
 const card = "rounded-2xl border border-[#e7e5ef] bg-white p-5 shadow-[0_1px_2px_rgba(27,26,31,0.04)]";
-const field = "h-10 w-full rounded-[10px] border border-[#d9d9de] bg-white px-3 text-[13px] text-[#1b1a1f] outline-none focus:border-[var(--am)]";
+const field = "h-10 w-full rounded-[10px] border border-[#d9d9de] bg-white px-3 text-[13px] text-[#1b1a1f] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[var(--am)]";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#46455a]";
 const sar = (n: number) => `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n)} ر.س`;
 

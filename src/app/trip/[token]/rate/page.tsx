@@ -12,7 +12,7 @@ export default async function TripRatePage({ params }: { params: Promise<{ token
   if (!state.found) notFound();
   return (
     <main dir="rtl" className="min-h-screen bg-[#f4f8f6] px-4 py-10 text-[#0f3d38]">
-      <div className="mx-auto w-full max-w-[520px] rounded-2xl border border-[#e2ebe7] bg-white p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+      <div className="tv-card mx-auto w-full max-w-[520px] rounded-2xl border p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
         <h1 className="text-[20px] font-extrabold">كيف كانت رحلتكم؟</h1>
         <p className="mt-1 text-[13px] font-semibold text-[#557d78]">رأيكم يساعدنا أن نجعل الرحلة القادمة أفضل.</p>
         <TripRatingForm token={token} rated={state.score} />

@@ -55,7 +55,7 @@ export function ViewAsSwitcher() {
         value={current}
         disabled={pending || roles === null}
         onChange={(e) => go(e.target.value || null)}
-        className="h-10 rounded-md border border-[#dfe8e4] bg-white px-2 text-sm font-semibold text-[var(--tv-brand)] outline-none focus:border-[#2aa87a] disabled:opacity-60 dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]"
+        className="tv-field h-10 rounded-md border px-2 text-sm font-semibold text-[var(--tv-brand)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60"
       >
         <option value="">{t("viewAs.mine")}</option>
         {/* the role being viewed stays listed even if it vanished from the list since */}
@@ -86,7 +86,7 @@ export function ViewAsBanner() {
         type="button"
         disabled={pending}
         onClick={() => go(null)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#8a6a00] px-3 text-xs font-bold text-white hover:bg-[#6f5500] disabled:opacity-60"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#8a6a00] px-3 text-xs font-bold text-white hover:bg-[#6f5500] disabled:opacity-60 max-sm:min-h-10"
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
         {t("viewAs.back")}

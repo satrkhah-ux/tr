@@ -28,9 +28,9 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  * refuses the generic path outright (0030).
  */
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 type Draft = {
@@ -156,16 +156,16 @@ export function TeamMembers({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-extrabold text-[#003c3a]">{t("nav.employees")}</h1>
-              <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("team.subtitle")}</p>
+              <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("team.subtitle")}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
-                <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+                <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("searchPlaceholder")}
-                  className="h-10 w-56 rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+                  className="tv-field h-10 w-56 rounded-[10px] border px-3 pe-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
                 />
               </div>
               {canManage ? (
@@ -180,7 +180,7 @@ export function TeamMembers({
                   <button
                     type="button"
                     onClick={() => { setError(null); setDraft(toDraft()); }}
-                    className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]"
+                    className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold"
                   >
                     <UserPlus className="size-4" />
                     {t("add")}
@@ -190,7 +190,7 @@ export function TeamMembers({
             </div>
           </div>
           {canManage ? (
-            <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+            <p className="mt-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
               <KeyRound className="size-3.5" />
               {t("team.auditNote")}
             </p>
@@ -243,7 +243,7 @@ export function TeamMembers({
                 type="button"
                 onClick={save}
                 disabled={pending}
-                className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-[13px] font-bold disabled:opacity-60"
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                 {t("save")}
@@ -251,7 +251,7 @@ export function TeamMembers({
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="inline-flex h-11 items-center rounded-[10px] border border-[#d8e3de] px-5 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+                className="tv-btn-secondary inline-flex h-11 items-center rounded-[10px] border px-5 text-[13px] font-bold"
               >
                 {t("cancel")}
               </button>
@@ -276,7 +276,7 @@ export function TeamMembers({
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-extrabold text-[#003c3a]">{m.arabic_name}</span>
-                    <span className="block truncate text-[11px] font-semibold text-[#93aaa3]">
+                    <span className="block truncate text-[11px] font-semibold text-tv-text-faint">
                       <DirText dir="ltr">{m.email ?? m.mobile ?? "—"}</DirText>
                     </span>
                   </span>
@@ -301,15 +301,15 @@ export function TeamMembers({
                       type="button"
                       onClick={() => setTgFor(tgFor === m.id ? null : m.id)}
                       aria-expanded={tgFor === m.id}
-                      className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
-                        m.telegram_linked ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#93aaa3]"
+                      className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] max-sm:min-h-10 ${
+                        m.telegram_linked ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-tv-text-faint"
                       }`}
                     >
                       <Bell className="size-3.5" />
                       {m.telegram_linked ? t("team.tg.linked") : t("team.tg.notLinkedShort")}
                     </button>
                   ) : (
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${m.telegram_linked ? "bg-[#e7f6ef] text-[#0f7a52]" : "bg-[#eef4f1] text-[#93aaa3]"}`}>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${m.telegram_linked ? "bg-tv-status-success-bg text-tv-status-success" : "bg-[#eef4f1] text-tv-text-faint"}`}>
                       {m.telegram_linked ? t("team.tg.linked") : t("team.tg.notLinkedShort")}
                     </span>
                   )}
@@ -319,7 +319,7 @@ export function TeamMembers({
                       value={m.role_id ?? ""}
                       disabled={busyId === m.id}
                       onChange={(e) => void move(m.id, e.target.value)}
-                      className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-bold text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60"
+                      className="tv-field h-9 rounded-[9px] border px-2 text-[12px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60"
                     >
                       <option value="">{t("team.noRole")}</option>
                       {roles.map((r) => (
@@ -340,7 +340,7 @@ export function TeamMembers({
                         type="button"
                         onClick={() => setExtraFor(extraFor === m.id ? null : m.id)}
                         aria-expanded={extraFor === m.id}
-                        className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
+                        className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] max-sm:min-h-10 ${
                           m.extra_permission_keys.length + m.removed_permission_keys.length > 0 ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"
                         }`}
                       >
@@ -355,7 +355,7 @@ export function TeamMembers({
                           type="button"
                           onClick={() => { setPwDone(null); setPw(pw?.id === m.id ? null : { id: m.id, value: "" }); }}
                           aria-expanded={pw?.id === m.id}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10"
                         >
                           <KeyRound className="size-3.5" />
                           {t("emp.tempPassword")}
@@ -364,7 +364,7 @@ export function TeamMembers({
                       <button
                         type="button"
                         onClick={() => { setError(null); setDraft(toDraft(m)); }}
-                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
                         aria-label={t("edit")}
                       >
                         <Pencil className="size-4" />
@@ -373,7 +373,7 @@ export function TeamMembers({
                         type="button"
                         disabled={busyId === m.id}
                         onClick={() => void toggleSuspend(m)}
-                        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60"
+                        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60 max-sm:min-h-10"
                       >
                         {busyId === m.id ? <Loader2 className="size-3.5 animate-spin" /> : m.status === "Active" ? t("team.suspend") : t("team.reactivate")}
                       </button>
@@ -381,7 +381,7 @@ export function TeamMembers({
                         type="button"
                         disabled={busyId === m.id}
                         onClick={() => void remove(m)}
-                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#f0c4cf] text-[#c22850] hover:bg-[#fdf6f7] disabled:opacity-60"
+                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#f0c4cf] text-[#c22850] hover:bg-[#fdf6f7] disabled:opacity-60 max-sm:min-h-10 max-sm:min-w-10"
                         aria-label={t("team.delete")}
                         title={t("team.delete")}
                       >
@@ -430,7 +430,7 @@ function RoleSummary({ role }: { role?: TeamRole }) {
     <div className="mt-3 rounded-[10px] border border-[#e8efeb] bg-[#f8fbfa] px-3.5 py-2.5">
       <p className="text-[12px] font-extrabold text-[#185045]">{role.arabic_name}</p>
       {role.description ? <p className="mt-0.5 text-[11.5px] font-semibold text-[#557d78]">{role.description}</p> : null}
-      <p className="mt-1 text-[11px] font-bold text-[#93aaa3]">
+      <p className="mt-1 text-[11px] font-bold text-tv-text-faint">
         {role.permission_keys.length === 0
           ? t("team.grantsNone")
           : t("team.grants", { n: String(role.permission_keys.length), total: String(ALL_PERMISSIONS.length) })}
@@ -496,7 +496,7 @@ function ExtraSections({ member, roleKeys, onDone }: { member: TeamMember; roleK
                   {fromRole && !on ? (
                     <span className="text-[10.5px] font-bold text-[#c22850]">({t("team.removedFromRole")})</span>
                   ) : fromRole ? (
-                    <span className="text-[10.5px] font-semibold text-[#93aaa3]">({t("team.fromRole")})</span>
+                    <span className="text-[10.5px] font-semibold text-tv-text-faint">({t("team.fromRole")})</span>
                   ) : on ? (
                     <span className="text-[10.5px] font-bold text-[#0f7a52]">({t("team.addedForMember")})</span>
                   ) : null}
@@ -511,7 +511,7 @@ function ExtraSections({ member, roleKeys, onDone }: { member: TeamMember; roleK
           type="button"
           disabled={busy}
           onClick={() => void save()}
-          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-4 text-[12px] font-extrabold disabled:opacity-60 max-sm:min-h-10"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
           {t("save")}

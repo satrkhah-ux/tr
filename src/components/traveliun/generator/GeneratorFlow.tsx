@@ -245,10 +245,10 @@ export function GeneratorFlow({
               role="status"
               className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${
                 saveState === "error"
-                  ? "bg-[#fdeef2] text-[#c22850]"
+                  ? "bg-tv-status-danger-bg text-tv-status-danger"
                   : saveState === "saving"
-                    ? "bg-[#fff8e8] text-[#a86a10]"
-                    : "bg-[#e9f7f0] text-[#0f7a52]"
+                    ? "bg-tv-status-warning-bg text-tv-status-warning"
+                    : "bg-tv-status-success-bg text-tv-status-success"
               }`}
             >
               {saveState === "saving" ? (
@@ -264,7 +264,7 @@ export function GeneratorFlow({
               <button
                 type="button"
                 onClick={() => setPreviewOpen((v) => !v)}
-                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex"
+                className="hidden h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] transition-colors hover:bg-[#f4f8f6] xl:inline-flex max-sm:min-h-10"
               >
                 {previewOpen ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 {previewOpen ? t("pg.hidePreview") : t("pg.showPreview")}
@@ -324,7 +324,7 @@ export function GeneratorFlow({
                     <h2
                       data-flow-heading
                       tabIndex={-1}
-                      className="text-[13px] font-extrabold text-[#185045] outline-none"
+                      className="text-[13px] font-extrabold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
                     >
                       {t(meta.labelKey)}
                     </h2>
@@ -375,7 +375,7 @@ export function GeneratorFlow({
                         type="button"
                         onClick={() => next && blockers.length === 0 && open(next.key)}
                         disabled={blockers.length > 0}
-                        className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {nextLabel}
                         <ChevronLeft className="size-4 ltr:rotate-180 rtl:rotate-0" />
@@ -389,7 +389,7 @@ export function GeneratorFlow({
 
           {current !== "preview" && previewOpen ? (
             <aside className="order-2 hidden xl:block">
-              <div className="sticky top-[90px] overflow-hidden rounded-2xl border border-[#e2ebe7] bg-white p-3">
+              <div className="tv-card sticky top-[90px] overflow-hidden rounded-2xl border p-3">
                 <div className="origin-top scale-[0.62]" style={{ width: "161%" }}>
                   <OfferDocument
                     variant="client"
@@ -441,7 +441,7 @@ function ClosedCard({
       <span className="text-[13px] font-extrabold text-[#185045]">{label}</span>
       <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         {summary.length === 0 ? (
-          <span className="text-[11.5px] font-semibold text-[#b6c9c2]">{notStarted}</span>
+          <span className="text-[11.5px] font-semibold text-tv-text-faint">{notStarted}</span>
         ) : (
           summary.map((chip) => (
             <span
@@ -453,7 +453,7 @@ function ClosedCard({
           ))
         )}
       </span>
-      <span className="shrink-0 text-[11.5px] font-bold text-[#93aaa3]">{editLabel}</span>
+      <span className="shrink-0 text-[11.5px] font-bold text-tv-text-faint">{editLabel}</span>
     </button>
   );
 }
@@ -534,9 +534,9 @@ function ProduceBar({
   }
 
   return (
-    <div className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3">
+    <div className="tv-card rounded-2xl border px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[12px] font-semibold text-[#93aaa3]">{t("pg.previewNote")}</p>
+        <p className="text-[12px] font-semibold text-tv-text-faint">{t("pg.previewNote")}</p>
         <button
           type="button"
           onClick={() => void produce()}

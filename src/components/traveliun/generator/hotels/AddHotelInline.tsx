@@ -70,7 +70,7 @@ export function AddHotelInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4]"
+        className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] max-sm:min-h-10"
       >
         <Plus className="size-3.5" />
         {t("pg.addHotelHere", { city: cityName || "—" })}
@@ -110,14 +110,14 @@ export function AddHotelInline({
         />
       </div>
       {/* Said plainly: this is the agency's catalogue, not a note on one file. */}
-      <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">{t("pg.addHotelNote")}</p>
+      <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">{t("pg.addHotelNote")}</p>
       {error ? <p className="mt-1.5 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
       <div className="mt-2 flex gap-2">
         <button
           type="button"
           onClick={submit}
           disabled={pending || !name.trim()}
-          className="inline-flex h-9 items-center gap-2 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+          className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12px] font-bold disabled:opacity-50 max-sm:min-h-10"
         >
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
           {t("add")}
@@ -125,7 +125,7 @@ export function AddHotelInline({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3.5 text-[12px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+          className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3.5 text-[12px] font-bold text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10"
         >
           {t("cancel")}
         </button>

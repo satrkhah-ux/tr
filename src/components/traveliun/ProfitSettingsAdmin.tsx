@@ -36,9 +36,9 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
 
   return (
     <TraveliunShell title="nav.profitPolicy">
-      <section className="max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+      <section className="tv-card max-w-3xl rounded-[14px] border p-4">
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.profit.title")}</h2>
-        <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.profit.hint")}</p>
+        <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.profit.hint")}</p>
         <div role="radiogroup" aria-label={t("settings.profit.title")} className="flex flex-wrap gap-2">
           {(["staff", "managers"] as const).map((option) => (
             <button
@@ -72,19 +72,19 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
               value={pct ?? ""}
               placeholder="—"
               onChange={(e) => setPct(e.target.value === "" ? null : Number(e.target.value))}
-              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </label>
           <button
             type="button"
             onClick={() => void save({ by, default_pct: pct })}
             disabled={state === "saving"}
-            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-extrabold disabled:opacity-60"
           >
             {state === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
             {t("settings.profit.save")}
           </button>
-          <p className="basis-full text-[11.5px] font-semibold text-[#93aaa3]">{t("settings.profit.defaultHint")}</p>
+          <p className="basis-full text-[11.5px] font-semibold text-tv-text-faint">{t("settings.profit.defaultHint")}</p>
         </div>
 
         {state === "saved" ? (
@@ -94,9 +94,9 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
         ) : null}
       </section>
 
-      <section className="mt-4 max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+      <section className="tv-card mt-4 max-w-3xl rounded-[14px] border p-4">
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.usd.title")}</h2>
-        <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.usd.hint")}</p>
+        <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.usd.hint")}</p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="grid gap-1 text-[12px] font-bold text-[#185045]">
             {t("settings.usd.label")}
@@ -108,14 +108,14 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
               dir="ltr"
               value={usd}
               onChange={(e) => setUsd(Number(e.target.value))}
-              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+              className="h-10 w-32 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-center text-[13px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </label>
           <button
             type="button"
             onClick={() => void saveUsd()}
             disabled={usdState === "saving" || !(usd >= 3 && usd <= 5)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white disabled:opacity-60"
+            className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-extrabold disabled:opacity-60"
           >
             {usdState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
             {t("settings.profit.save")}

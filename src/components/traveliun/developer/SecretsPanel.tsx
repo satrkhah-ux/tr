@@ -6,6 +6,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { checkSecret, clearSecret, listSecrets, saveSecret, type SecretRow } from "@/lib/secrets/actions";
 import type { CheckResult } from "@/lib/developer/health";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «المفاتيح والتوكنات» (the owner, 2026-10-29: «مكان لاضافة التوكن او الـAPI
  * الجديد عند انشائه»): per allowed name — set or not, from where, the last
@@ -15,8 +16,8 @@ import type { CheckResult } from "@/lib/developer/health";
  */
 
 type Data = NonNullable<Awaited<ReturnType<typeof listSecrets>>>;
-const field = "rounded-lg border border-[#dbe6e1] bg-white p-2 text-sm";
-const btn = "rounded-lg border border-[#dbe6e1] px-2.5 py-1.5 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50";
+const field = "tv-field rounded-lg border p-2 text-sm";
+const btn = `${buttonTone({ variant: "secondary" })} rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 max-sm:min-h-10`;
 const SOURCE = { vault: "محفوظ هنا", env: "من الخادم" } as const;
 const TONE: Record<string, string> = { ok: "text-emerald-700", warn: "text-amber-700", down: "text-red-700", idle: "text-[#557d78]", unconfigured: "text-[#557d78]" };
 
@@ -49,13 +50,13 @@ function Row({ row, vault, onChanged }: { row: SecretRow; vault: boolean; onChan
     catch { setMsg("تعذّر الاتصال."); } finally { setBusy(null); }
   }
 
-  return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
+  return <div className="tv-card rounded-xl border p-3">
     <div className="flex flex-wrap items-center gap-2">
       <code dir="ltr" className="text-sm font-bold text-[#185045]">{row.name}</code>
-      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.set ? "bg-emerald-50 text-emerald-800" : "bg-[#f4f6f3] text-[#8ba09b]"}`}>
+      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.set ? "bg-emerald-50 text-emerald-800" : "bg-[#f4f6f3] text-tv-text-faint"}`}>
         {row.set ? `${SOURCE[row.source!]} · …${row.last4 ?? "????"}` : "غير مضبوط"}
       </span>
-      {row.updatedAt && <span className="text-[11px] text-[#8ba09b]">آخر تغيير: {row.updatedBy ?? "—"} · {new Date(row.updatedAt).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" })}</span>}
+      {row.updatedAt && <span className="text-[11px] text-tv-text-faint">آخر تغيير: {row.updatedBy ?? "—"} · {new Date(row.updatedAt).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" })}</span>}
     </div>
     <div className="mt-2 flex flex-wrap items-center gap-2">
       {/* write-only: a password field, never filled from the server, emptied after sending */}

@@ -28,7 +28,7 @@ export type MoneyFields = {
 };
 
 const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-const field = "tv-tnum h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-bold text-[#185045]";
+const field = "tv-field tv-tnum h-9 rounded-[9px] border px-2 text-[12px] font-bold";
 
 /** «إجمالي البكج · سدّد العميل · المتبقي», and after the payments ticked here. */
 export function MoneySummary({ total, paid, ticked, currency }: { total: number | null; paid: number; ticked: number; currency: string }) {

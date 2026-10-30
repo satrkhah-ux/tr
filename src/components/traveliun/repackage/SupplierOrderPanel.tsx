@@ -122,7 +122,7 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
         <div className="space-y-3">
           <p className="text-[12.5px] font-bold text-[#185045]">
             {t("rp.order.supplier")}: <span className="text-[#0f3d38]">{draft.to_label}</span>{" "}
-            <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${draft.supplier.registered ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
+            <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${draft.supplier.registered ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
               {draft.supplier.registered ? t("rp.order.registered") : t("rp.order.unregistered")}
             </span>
           </p>
@@ -177,7 +177,7 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
 
           <label className={labelClass}>
             {t("rp.order.body")}
-            <textarea dir="auto" rows={16} value={body} onChange={(e) => setBody(e.target.value)} className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2.5 text-[13px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]" />
+            <textarea dir="auto" rows={16} value={body} onChange={(e) => setBody(e.target.value)} className="tv-field block w-full rounded-[10px] border px-3 py-2.5 text-[13px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus" />
           </label>
 
           {draft.sentAt ? <p className="text-[12px] font-bold text-[#0f7a52]">{t("rp.order.sentOn", { date: draft.sentAt.slice(0, 10) })}</p> : null}
@@ -189,13 +189,13 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
                 type="button"
                 onClick={() => void send("whatsapp")}
                 disabled={busy !== null || !body.trim()}
-                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold disabled:opacity-60"
               >
                 {busy === "whatsapp" ? <Loader2 className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
                 {busy === "whatsapp" ? t("rp.order.sending") : t("rp.order.sendWhatsapp")}
               </button>
             ) : null}
-            <button type="button" onClick={() => void copy()} className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-4 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
+            <button type="button" onClick={() => void copy()} className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-4 text-[13px] font-bold">
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               {copied ? t("rp.order.copied") : t("rp.order.copy")}
             </button>
@@ -209,13 +209,13 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
               type="button"
               onClick={() => void send("manual")}
               disabled={busy !== null || !body.trim()}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#185045] bg-white px-4 text-[13px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+              className="tv-btn-secondary inline-flex h-10 items-center gap-2 rounded-[10px] border px-4 text-[13px] font-bold disabled:opacity-60"
             >
               {busy === "manual" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               {t("rp.order.manual")}
             </button>
           </div>
-          {!draft.canSendWhatsapp ? <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.order.noWhatsapp")}</p> : null}
+          {!draft.canSendWhatsapp ? <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("rp.order.noWhatsapp")}</p> : null}
         </div>
       ) : null}
     </section>

@@ -13,6 +13,7 @@ import {
 } from "@/lib/data/admin-decisions";
 import type { ArchiveFilter, Audience } from "@/lib/decisions/core";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «القرارات الإدارية» (the owner, 2026-10-29: «اريد ارشيف القرارات الإدارية يكون موجود ونرجع له: الموظف متى وقّع وعلى
  * ماذا استلم خطاب»): issue a decision (kind, whom, text, the suggested wording or the text as written, the PDF preview,
@@ -20,13 +21,13 @@ import type { ArchiveFilter, Audience } from "@/lib/decisions/core";
  */
 
 const card =
-  "rounded-2xl border border-[#E3E8E4] bg-white p-4 dark:border-[#294039] dark:bg-[#14231f]";
+  "tv-card rounded-2xl border p-4";
 const btn =
-  "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#D5DED9] bg-white px-3 text-sm font-bold text-[#185045] hover:bg-[#F4F6F3] disabled:opacity-40 dark:bg-[#0f1c19] dark:text-[#eaf3ef]";
+  `${buttonTone({ variant: "secondary" })} inline-flex min-h-10 items-center justify-center rounded-xl border px-3 text-sm font-bold disabled:opacity-40`;
 const primary =
-  "inline-flex min-h-10 items-center justify-center rounded-xl bg-[#185045] px-4 text-sm font-bold text-white disabled:opacity-40";
+  `${buttonTone({ variant: "default" })} inline-flex min-h-10 items-center justify-center rounded-xl px-4 text-sm font-bold disabled:opacity-40`;
 const field =
-  "mt-1 w-full rounded-xl border border-[#D5DED9] bg-white p-2.5 text-sm text-slate-900 dark:bg-[#0f1c19] dark:text-[#eaf3ef]";
+  "tv-field mt-1 w-full rounded-xl border p-2.5 text-sm";
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-xs font-bold ${on ? "border-[#185045] bg-[#185045] text-white" : "border-[#D5DED9] bg-white text-[#185045] dark:bg-[#0f1c19] dark:text-[#eaf3ef]"}`;
 const when = (iso: string | null) =>

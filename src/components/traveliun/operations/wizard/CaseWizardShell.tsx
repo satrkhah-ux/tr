@@ -44,10 +44,10 @@ const SCREENS: Record<WizardStep, ComponentType<StepProps>> = {
 
 /** A tile's colour is its readiness (index.ts stepTone): red blocks «جاهز للسفر», yellow warns, green is done. */
 const TONE: Record<StepTone, string> = {
-  red: "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]",
-  yellow: "border-[#f0d9a8] bg-[#fff8e8] text-[#a86a10]",
-  green: "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]",
-  grey: "border-[#eef2f0] bg-[#f6f8f7] text-[#93aaa3]",
+  red: "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger",
+  yellow: "border-[#f0d9a8] bg-tv-status-warning-bg text-tv-status-warning",
+  green: "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success",
+  grey: "border-[#eef2f0] bg-[#f6f8f7] text-tv-text-faint",
 };
 
 /** An item's own colour under its tile (index.ts itemTone) — a done one is green even under a red tile. */
@@ -99,11 +99,11 @@ export function CaseWizardShell({
           </Link>
         </div>
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <h1 className="truncate text-[16px] font-extrabold text-[#003c3a]">{op.customer_name || "—"}</h1>
-              <p className="tv-tnum mt-0.5 text-[12px] font-bold text-[#93aaa3]">
+              <p className="tv-tnum mt-0.5 text-[12px] font-bold text-tv-text-faint">
                 <DirText>{op.serial}</DirText>
                 {op.destination ? <span className="ms-2 font-semibold">{op.destination}</span> : null}
               </p>
@@ -127,7 +127,7 @@ export function CaseWizardShell({
               type="button"
               onClick={() => setUploading((v) => !v)}
               aria-expanded={uploading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-extrabold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-10 items-center justify-center gap-2 rounded-[10px] px-4 text-[13px] font-extrabold"
             >
               <FileUp className="size-4" />
               {t("wz.up.button")}
@@ -154,10 +154,10 @@ export function CaseWizardShell({
         <CasePresence operationId={op.id} />
         <AutoIssue data={data} />
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <h2 className="text-[15px] font-extrabold text-[#003c3a]">
-              <span className="tv-tnum me-1.5 text-[#93aaa3]">{index + 1}.</span>
+              <span className="tv-tnum me-1.5 text-tv-text-faint">{index + 1}.</span>
               {t(`wz.step.${step}` as TranslationKey)}
             </h2>
             {states[step] === "done" || states[step] === "na" ? null : (
@@ -179,7 +179,7 @@ export function CaseWizardShell({
               type="button"
               disabled={index === WIZARD_STEPS.length - 1}
               onClick={() => setStep(WIZARD_STEPS[index + 1])}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white disabled:opacity-40"
+              className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-40"
             >
               {t("wz.next")}
               <ArrowLeft className="size-4 ltr:rotate-180" />
@@ -224,7 +224,7 @@ function CalmGate({ data, step, onOpenStep }: { data: WizardCase; step: WizardSt
             urgent ? "border-[#f4c9d4] bg-[#fdf4f6]" : "border-[#cfe0d9] bg-[#f4faf7]"
           }`}
         >
-          <p className={`text-[11px] font-bold ${urgent ? "text-[#c22850]" : "text-[#6d8a84]"}`}>
+          <p className={`text-[11px] font-bold ${urgent ? "text-[#c22850]" : "text-tv-text-faint"}`}>
             {t("wz.calm.next")}
             {urgent ? <span className="ms-1.5">{t(urgency === "late" ? "wz.calm.late" : "wz.calm.soon")}</span> : null}
           </p>
@@ -233,7 +233,7 @@ function CalmGate({ data, step, onOpenStep }: { data: WizardCase; step: WizardSt
           </p>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {next.step === step ? (
-              <span className="text-[12px] font-bold text-[#6d8a84]">{t("wz.calm.below")}</span>
+              <span className="text-[12px] font-bold text-tv-text-faint">{t("wz.calm.below")}</span>
             ) : (
               <button
                 type="button"
@@ -270,13 +270,13 @@ function CalmGate({ data, step, onOpenStep }: { data: WizardCase; step: WizardSt
                 <span className="min-w-0 flex-1">
                   <span className="block text-[13px] font-extrabold text-[#0f3d38]">{t(`wz.step.${r.step}` as TranslationKey)}</span>
                   {r.first ? (
-                    <span className={`block truncate text-[11.5px] font-semibold ${r.warning ? "text-[#a86a10]" : "text-[#93aaa3]"}`}>
+                    <span className={`block truncate text-[11.5px] font-semibold ${r.warning ? "text-[#a86a10]" : "text-tv-text-faint"}`}>
                       {t(readyLabel(r.first))}
                       {r.more > 0 ? <span className="tv-tnum ms-1">+{r.more}</span> : null}
                     </span>
                   ) : null}
                 </span>
-                {r.state === "waiting" ? <span className="shrink-0 text-[11px] font-bold text-[#93aaa3]">{t("wz.state.waiting")}</span> : null}
+                {r.state === "waiting" ? <span className="shrink-0 text-[11px] font-bold text-tv-text-faint">{t("wz.state.waiting")}</span> : null}
               </button>
             </li>
           ))}
@@ -287,7 +287,7 @@ function CalmGate({ data, step, onOpenStep }: { data: WizardCase; step: WizardSt
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] font-bold text-[#557d78]">
           {done.map((d) => (
             <button key={d.step} type="button" onClick={() => onOpenStep(d.step)} className="inline-flex items-center gap-1 hover:underline">
-              <Check className={`size-3.5 ${d.na ? "text-[#b9c8c3]" : "text-[#0f7a52]"}`} />
+              <Check className={`size-3.5 ${d.na ? "text-tv-text-faint" : "text-[#0f7a52]"}`} />
               {t(`wz.step.${d.step}` as TranslationKey)}
             </button>
           ))}

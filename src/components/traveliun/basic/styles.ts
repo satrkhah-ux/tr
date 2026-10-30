@@ -1,8 +1,8 @@
 /** The basic screen's compact fields — smaller than the generator's, so a whole file fits in one view. */
 export const basicField =
-  "tv-field h-9 w-full rounded-[8px] border px-2.5 text-[12.5px] outline-none transition-colors";
+  "tv-field h-9 w-full rounded-[8px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors";
 export const basicLabel = "grid gap-1 text-[10.5px] font-bold text-tv-text-muted";
-export const basicCard = "rounded-[14px] border border-[#d8e6e0] bg-white p-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+export const basicCard = "tv-card rounded-[14px] border p-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 
 /**
  * A typed number, without the leading zeros a «0» already in the field keeps:

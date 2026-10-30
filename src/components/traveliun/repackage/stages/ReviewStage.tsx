@@ -109,7 +109,7 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
               }}
             />
             {pkg.arrival_date && nights > 0 ? (
-              <span className="text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.client.departureHint", { nights })}</span>
+              <span className="text-[11.5px] font-semibold text-tv-text-faint">{t("rp.client.departureHint", { nights })}</span>
             ) : null}
           </label>
         </div>
@@ -218,17 +218,17 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
 
         {/* original file side-by-side */}
         <div className="space-y-2">
-          <p className="flex items-center gap-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]"><FileText className="size-4" />{t("rp.review.original")}</p>
+          <p className="flex items-center gap-2 text-[11px] font-extrabold tracking-wide text-tv-text-faint"><FileText className="size-4" />{t("rp.review.original")}</p>
           {fileUrl ? (
             <iframe title={t("rp.review.original")} src={fileUrl} className="h-[560px] w-full rounded-[14px] border border-[#e2ebe7] bg-white" />
           ) : (
-            <div className="flex h-[200px] items-center justify-center rounded-[14px] border border-dashed border-[#dbe6e1] text-[13px] text-[#93aaa3]">{t("rp.review.openFile")}</div>
+            <div className="flex h-[200px] items-center justify-center rounded-[14px] border border-dashed border-[#dbe6e1] text-[13px] text-tv-text-faint">{t("rp.review.openFile")}</div>
           )}
         </div>
       </div>
 
       <div className="flex justify-end">
-        <button type="button" onClick={() => router.push(stageHref(draftId, "edit"))} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]">
+        <button type="button" onClick={() => router.push(stageHref(draftId, "edit"))} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-bold transition-colors">
           {t("rp.stage.edit")}
         </button>
       </div>
@@ -242,11 +242,11 @@ function FieldHead({ label, confident, confirmLabel, onConfirm }: { label: strin
     <div className="flex items-center justify-between">
       <span className="text-[13px] font-bold text-[#185045]">{label}</span>
       <span className="flex items-center gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${confident ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${confident ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
           {confident ? t("rp.review.confident") : t("rp.review.uncertain")}
         </span>
         {!confident ? (
-          <button type="button" onClick={onConfirm} className="inline-flex items-center gap-1 rounded-md bg-[#f0f7f4] px-2 py-0.5 text-[10.5px] font-extrabold text-[#185045] hover:bg-[#e2ede9]">
+          <button type="button" onClick={onConfirm} className="inline-flex items-center gap-1 rounded-md bg-[#f0f7f4] px-2 py-0.5 text-[10.5px] font-extrabold text-[#185045] hover:bg-[#e2ede9] max-sm:min-h-10">
             <CheckCircle2 className="size-3" />{confirmLabel}
           </button>
         ) : null}

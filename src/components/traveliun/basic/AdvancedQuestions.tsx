@@ -253,7 +253,7 @@ export function AdvancedQuestions({
             {missing ? `${missing} ناقص` : ""}
           </span>
         ) : null}
-        <button type="button" onClick={() => setEditing(true)} className="ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#185045]">
+        <button type="button" onClick={() => setEditing(true)} className="ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#185045] max-sm:min-h-10">
           <Pencil className="size-3.5" /> تعديل
         </button>
       </section>
@@ -394,12 +394,12 @@ export function AdvancedQuestions({
         {adv.self_items.map((item, i) => (
           <span key={i} className="flex gap-1.5">
             <input className={small} value={item} placeholder="مثل: ليلة في فندق بريزا، الانتقال إلى الحدود" onChange={(e) => set({ self_items: adv.self_items.map((x, k) => (k === i ? e.target.value : x)) })} />
-            <button type="button" aria-label="حذف" className="inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#c22850] hover:bg-[#fdeef2]" onClick={() => set({ self_items: adv.self_items.filter((_, k) => k !== i) })}>
+            <button type="button" aria-label="حذف" className="inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#c22850] hover:bg-[#fdeef2] max-sm:min-h-10 max-sm:min-w-10" onClick={() => set({ self_items: adv.self_items.filter((_, k) => k !== i) })}>
               <X className="size-4" />
             </button>
           </span>
         ))}
-        <button type="button" className="inline-flex h-8 w-fit items-center gap-1 rounded-[8px] border border-dashed border-[#2aa87a] px-2.5 text-[11.5px] font-bold text-[#0f7a52]" onClick={() => set({ self_items: [...adv.self_items, ""] })}>
+        <button type="button" className="inline-flex h-8 w-fit items-center gap-1 rounded-[8px] border border-dashed border-[#2aa87a] px-2.5 text-[11.5px] font-bold text-[#0f7a52] max-sm:min-h-10" onClick={() => set({ self_items: [...adv.self_items, ""] })}>
           <Plus className="size-3.5" /> إضافة
         </button>
       </div>
@@ -432,7 +432,7 @@ export function AdvancedQuestions({
       {result}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setEditing(false)} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]">
+        <button type="button" onClick={() => setEditing(false)} className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-bold max-sm:min-h-10">
           <Check className="size-4" /> تطبيق
         </button>
         <span className={`text-[11.5px] ${errors ? "font-bold text-[#c22850]" : "text-[#557d78]"}`}>

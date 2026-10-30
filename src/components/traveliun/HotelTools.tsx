@@ -205,7 +205,7 @@ export function HotelMergeDialog({
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" aria-labelledby="hotel-merge-title" dir={dir}>
-      <div className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[720px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+      <div className="tv-card max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[720px] overflow-y-auto rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <h2 id="hotel-merge-title" className="flex items-center gap-2 text-lg font-extrabold">
             <GitMerge className="size-5" aria-hidden /> {t("data.tools.merge.title")}
@@ -222,21 +222,21 @@ export function HotelMergeDialog({
               <label key={String(c.id)} className="flex cursor-pointer items-center gap-2 rounded-[10px] border border-[#e2ebe7] px-3 py-2 text-sm hover:bg-[#f6faf8]">
                 <input type="radio" name="merge-keep" checked={target?.id === c.id} onChange={() => pick(c)} />
                 <span className="font-semibold">{String(c.arabic_name ?? "")}</span>
-                <span className="text-[#8aa29b]">{cityLabel(cities, c.city_id)}</span>
+                <span className="text-tv-text-faint">{cityLabel(cities, c.city_id)}</span>
               </label>
             ))}
           </div>
         ) : null}
 
         <div className="relative mb-2">
-          <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" aria-hidden />
+          <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" aria-hidden />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("data.tools.merge.searchTarget")}
             aria-label={t("data.tools.merge.searchTarget")}
-            className="h-10 w-full rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] pe-9 ps-3 text-sm outline-none focus:border-[#185045]"
+            className="h-10 w-full rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] pe-9 ps-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#185045]"
           />
         </div>
         {query.trim().length >= 2 && found.length > 0 ? (
@@ -252,42 +252,42 @@ export function HotelMergeDialog({
                   className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-start text-sm hover:bg-[#eef5f2] ${target?.id === h.id ? "bg-[#e2ede9] font-bold" : ""}`}
                 >
                   <span>{String(h.arabic_name ?? "")}</span>
-                  <span className="text-[#8aa29b]">{cityLabel(cities, h.city_id)}</span>
+                  <span className="text-tv-text-faint">{cityLabel(cities, h.city_id)}</span>
                 </button>
               </li>
             ))}
           </ul>
         ) : null}
 
-        {target && sources.length === 0 ? <p className="mb-3 text-sm text-[#8aa29b]">{t("data.tools.merge.pickOther")}</p> : null}
+        {target && sources.length === 0 ? <p className="mb-3 text-sm text-tv-text-faint">{t("data.tools.merge.pickOther")}</p> : null}
 
         {target && sources.length > 0 ? (
           shown ? (
             <div className="mb-4 grid gap-2 text-sm">
               <div className={panel}>
-                <p className="text-xs font-bold text-[#93aaa3]">{t("data.tools.merge.stays")}</p>
-                <p className="font-extrabold">{shown.keep.arabic_name} <span className="font-normal text-[#8aa29b]">· {cityLabel(cities, shown.keep.city_id)}</span></p>
+                <p className="text-xs font-bold text-tv-text-faint">{t("data.tools.merge.stays")}</p>
+                <p className="font-extrabold">{shown.keep.arabic_name} <span className="font-normal text-tv-text-faint">· {cityLabel(cities, shown.keep.city_id)}</span></p>
                 {shown.keep.english_name ? <p dir="ltr" className="text-start text-[#557d78]">{shown.keep.english_name}</p> : null}
               </div>
               <div className={panel}>
-                <p className="text-xs font-bold text-[#93aaa3]">{t("data.tools.merge.goes")}</p>
+                <p className="text-xs font-bold text-tv-text-faint">{t("data.tools.merge.goes")}</p>
                 <ul className="grid gap-0.5">
                   {shown.drops.map((d) => (
                     <li key={d.id}>
-                      {d.arabic_name} <span className="text-[#8aa29b]">· {cityLabel(cities, d.city_id)}</span>
+                      {d.arabic_name} <span className="text-tv-text-faint">· {cityLabel(cities, d.city_id)}</span>
                     </li>
                   ))}
                 </ul>
               </div>
               <div className={panel}>
-                <p className="text-xs font-bold text-[#93aaa3]">{t("data.tools.merge.moves")}</p>
+                <p className="text-xs font-bold text-tv-text-faint">{t("data.tools.merge.moves")}</p>
                 <p>{t("data.tools.usage.line", { offers: shown.usage.offers, drafts: shown.usage.drafts, rates: shown.usage.rates, bookings: shown.usage.bookings })}</p>
                 <p>{t("data.tools.merge.rooms", { moved: shown.rooms.moved, merged: shown.rooms.merged })}</p>
-                {shown.usage.bookings > 0 ? <p className="text-[12px] text-[#8aa29b]">{t("data.tools.merge.bookingsNote")}</p> : null}
+                {shown.usage.bookings > 0 ? <p className="text-[12px] text-tv-text-faint">{t("data.tools.merge.bookingsNote")}</p> : null}
               </div>
             </div>
           ) : error ? null : (
-            <p className="mb-4 flex items-center gap-2 text-sm text-[#8aa29b]">
+            <p className="mb-4 flex items-center gap-2 text-sm text-tv-text-faint">
               <Loader2 className="size-4 animate-spin" aria-hidden /> {t("data.tools.merge.counting")}
             </p>
           )
@@ -305,7 +305,7 @@ export function HotelMergeDialog({
             type="button"
             disabled={!shown || merging || sources.length === 0}
             onClick={confirm}
-            className="flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+            className="tv-btn-primary flex h-10 items-center gap-2 rounded-[10px] px-6 text-sm font-bold disabled:opacity-50"
           >
             {merging ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <GitMerge className="size-4" aria-hidden />}
             {t("data.tools.merge.confirm")}

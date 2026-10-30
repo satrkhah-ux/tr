@@ -52,7 +52,7 @@ export function HotelResultRow({
           {best ? (
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold text-[#557d78]">
               <span>{best.room}</span>
-              {best.board ? <span className="text-[#93aaa3]">· {t(BOARD_LABEL_KEYS[best.board])}</span> : null}
+              {best.board ? <span className="text-tv-text-faint">· {t(BOARD_LABEL_KEYS[best.board])}</span> : null}
               {/* Refundability is a promise we repeat to the client, so it is
                   shown as words when we have them and omitted when we do not —
                   never guessed. */}
@@ -61,7 +61,7 @@ export function HotelResultRow({
               ) : best.refundable === false ? (
                 <span className="text-[#c22850]">· {t("pg.supplier.nonRefundable")}</span>
               ) : null}
-              {best.note ? <span className="text-[#93aaa3]">· {best.note}</span> : null}
+              {best.note ? <span className="text-tv-text-faint">· {best.note}</span> : null}
             </p>
           ) : (
             <p className="mt-0.5 text-[11px] font-bold text-[#a86a10]">لا يوجد سعر سابق — يُدخَل يدوياً</p>
@@ -72,7 +72,7 @@ export function HotelResultRow({
           <div className="text-end">
             <p className="tv-tnum text-[13px] font-extrabold text-[#0f3d38]">
               <DirText dir="ltr">{`${best.per_night} ${best.currency}`}</DirText>
-              <span className="text-[11px] font-bold text-[#93aaa3]"> / ليلة</span>
+              <span className="text-[11px] font-bold text-tv-text-faint"> / ليلة</span>
             </p>
             <p className="tv-tnum text-[11px] font-bold text-[#557d78]">
               <DirText dir="ltr">{`${Math.round(best.total)} ${best.currency}`}</DirText> إجمالي
@@ -84,7 +84,7 @@ export function HotelResultRow({
           type="button"
           disabled={busyKey !== null}
           onClick={() => onSelect(hotel, best)}
-          className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[11.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-8 items-center gap-1 rounded-[8px] px-3 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10"
         >
           {busyKey === (best?.key ?? hotel.id) ? <Loader2 className="size-3 animate-spin" /> : null}
           {t("pg.supplier.select")}
@@ -95,7 +95,7 @@ export function HotelResultRow({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-label="بقية الغرف"
-            className={`inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] transition-transform hover:bg-[#f4f8f6] ${open ? "rotate-180" : ""}`}
+            className={`inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] transition-transform hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10 ${open ? "rotate-180" : ""}`}
           >
             <ChevronDown className="size-3.5" />
           </button>
@@ -120,19 +120,19 @@ export function HotelResultRow({
               ) : null}
               <span className="tv-tnum font-extrabold text-[#0f3d38]">
                 <DirText dir="ltr">{`${rate.per_night} ${rate.currency}`}</DirText>
-                <span className="font-bold text-[#93aaa3]"> / ليلة</span>
+                <span className="font-bold text-tv-text-faint"> / ليلة</span>
               </span>
               <button
                 type="button"
                 disabled={busyKey !== null}
                 onClick={() => onSelect(hotel, rate)}
-                className="ms-auto inline-flex h-7 items-center gap-1 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+                className="tv-btn-secondary ms-auto inline-flex h-7 items-center gap-1 rounded-[8px] border px-2.5 text-[11px] font-bold disabled:opacity-60 max-sm:min-h-10"
               >
                 {busyKey === rate.key ? <Loader2 className="size-3 animate-spin" /> : null}
                 {t("pg.supplier.select")}
               </button>
               {rate.policy ? (
-                <p className="basis-full text-[11px] font-semibold text-[#93aaa3]">{rate.policy}</p>
+                <p className="basis-full text-[11px] font-semibold text-tv-text-faint">{rate.policy}</p>
               ) : null}
             </div>
           ))}
@@ -141,7 +141,7 @@ export function HotelResultRow({
 
       {/* the terms of the rate on the row itself — the client will be told these */}
       {best?.policy ? (
-        <p className="border-t border-[#eef4f1] px-2.5 py-1.5 text-[11px] font-semibold text-[#93aaa3]">
+        <p className="border-t border-[#eef4f1] px-2.5 py-1.5 text-[11px] font-semibold text-tv-text-faint">
           {best.policy}
         </p>
       ) : null}

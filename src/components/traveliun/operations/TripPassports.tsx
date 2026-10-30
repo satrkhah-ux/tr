@@ -11,7 +11,7 @@ export async function TripPassports({ token }: { token: string }) {
   if (!rows || rows.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <h2 className="text-[15px] font-extrabold">جوازات المسافرين</h2>
       <p className="mt-1 text-[12.5px] font-semibold text-[#557d78]">
         صوّر صفحة البيانات في جواز كل مسافر كاملة وواضحة (صورة أو PDF، حتى 8 ميجابايت) — نراجعها ونكمل بها حجوزاتكم.

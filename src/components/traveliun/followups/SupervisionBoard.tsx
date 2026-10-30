@@ -9,6 +9,7 @@ import {
 } from "@/lib/followups/supervision/actions";
 import { LEVEL_LABEL, PRIORITY_LABEL, PROOF_LABEL, type Priority } from "@/lib/followups/supervision/core";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «إشراف المتابعة» — the cases, the neediest first (at the management, then the
  * supervisor; high priority; the longest delay), with filters and the
@@ -16,10 +17,10 @@ import { LEVEL_LABEL, PRIORITY_LABEL, PROOF_LABEL, type Priority } from "@/lib/f
  * the supervisor's and the management's.
  */
 
-const field = "rounded-lg border border-[#dbe6e1] bg-white p-2 text-sm";
-const btn = "rounded-lg border border-[#dbe6e1] px-2.5 py-1 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50";
+const field = "tv-field rounded-lg border p-2 text-sm";
+const btn = `${buttonTone({ variant: "secondary" })} rounded-lg border px-2.5 py-1 text-xs font-bold disabled:opacity-50 max-sm:min-h-10`;
 const LEVEL_TONE = { manager: "bg-red-100 text-red-800", supervisor: "bg-amber-100 text-amber-800", employee: "bg-[#eef3f1] text-[#185045]" } as const;
-const PRIO_TONE = { high: "text-red-700", normal: "text-[#185045]", low: "text-[#8ba09b]" } as const;
+const PRIO_TONE = { high: "text-red-700", normal: "text-[#185045]", low: "text-tv-text-faint" } as const;
 
 const duration = (m: number) => (m < 60 ? `${m} د` : m < 24 * 60 ? `${Math.floor(m / 60)} س ${m % 60} د` : `${Math.floor(m / 1440)} ي ${Math.floor((m % 1440) / 60)} س`);
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" }) : "—");
@@ -108,7 +109,7 @@ export function SupervisionBoard({ initial }: { initial: Board }) {
     </div>
 
     {!board.rows.length ? <p className="rounded-xl border border-[#dfe8e4] bg-white p-4 text-sm text-[#185045]">لا حالات {filters.status === "closed" ? "مغلقة في هذه الفترة" : "تحتاج إشرافاً الآن"} ✅</p> :
-    <div className="overflow-x-auto rounded-xl border border-[#dfe8e4] bg-white">
+    <div className="tv-card overflow-x-auto rounded-xl border">
       <table className="w-full min-w-[980px] text-start text-sm">
         <thead className="bg-[#f4f8f6] text-xs text-[#557d78]">
           <tr>{["العميل", "السبب", "التأخير", "الموظف / المشرف", "آخر رسالة للعميل", "آخر إجراء / الموعد", "الأولوية", canAct ? "الإجراء" : "الحالة"].map((h) => <th key={h} className="p-2 text-start font-bold">{h}</th>)}</tr>
@@ -119,8 +120,8 @@ export function SupervisionBoard({ initial }: { initial: Board }) {
             {cell(<>{r.reasonLabel}{r.directive && <p className="mt-1 text-xs text-[#8a5a00]">📌 {r.directive} — حتى {when(r.directiveDueAt)}</p>}</>)}
             {cell(<span className="tabular-nums font-bold">{duration(r.delayMinutes)}</span>)}
             {cell(<><div>{r.employee}</div><div className="text-xs text-[#557d78]">{r.supervisor}</div></>)}
-            {cell(<><p className="line-clamp-2 text-xs">{r.lastClientLine ?? "—"}</p><p className="text-[10px] text-[#8ba09b]">{when(r.lastClientAt)}</p></>)}
-            {cell(<><p className="text-xs">{when(r.lastActionAt)}</p><p className="text-[10px] text-[#8ba09b]">الموعد: {when(r.nextFollowupAt)}</p></>)}
+            {cell(<><p className="line-clamp-2 text-xs">{r.lastClientLine ?? "—"}</p><p className="text-[10px] text-tv-text-faint">{when(r.lastClientAt)}</p></>)}
+            {cell(<><p className="text-xs">{when(r.lastActionAt)}</p><p className="text-[10px] text-tv-text-faint">الموعد: {when(r.nextFollowupAt)}</p></>)}
             {cell(<span className={`text-xs font-bold ${PRIO_TONE[r.priority]}`}>{PRIORITY_LABEL[r.priority]}</span>)}
             {cell(r.status === "closed"
               ? <p className="text-xs text-emerald-800">✓ {r.proof ? PROOF_LABEL[r.proof] : "أُغلقت"}{r.closeNote ? ` — ${r.closeNote}` : ""}</p>

@@ -123,7 +123,7 @@ export function OfferSend({
         <div className="w-full basis-full space-y-2 rounded-[12px] border border-[#cfe0d9] bg-[#f7fbf9] p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[11.5px] font-bold text-[#557d78]">{tx("sendReview")}</p>
-            <button type="button" onClick={() => setDraft(null)} aria-label={tx("cancelEdit")} className="rounded-[7px] p-1 text-[#7a948f] hover:bg-white">
+            <button type="button" onClick={() => setDraft(null)} aria-label={tx("cancelEdit")} className="rounded-[7px] p-1 text-tv-text-faint hover:bg-white">
               <X className="size-4" />
             </button>
           </div>
@@ -152,19 +152,19 @@ export function OfferSend({
             onChange={(e) => setBody(e.target.value)}
             rows={Math.min(Math.max(body.split("\n").length + 1, 6), 14)}
             aria-label={tx("sendTitle")}
-            className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus:border-[#2aa87a]"
+            className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           {blockedText ? (
             <p className="text-[11.5px] font-bold text-[#a86a10]">{blockedText}</p>
           ) : (
-            <p className="text-[11px] font-semibold text-[#7a948f]">{tx("sendTemplateHint")}</p>
+            <p className="text-[11px] font-semibold text-tv-text-faint">{tx("sendTemplateHint")}</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void send(false)}
               disabled={!canSend}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "send" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               {tx("sendNow")}
@@ -186,7 +186,7 @@ export function OfferSend({
               type="button"
               onClick={() => void send(true)}
               disabled={busy !== null}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "manual" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
               {tx("sendManual")}
@@ -198,7 +198,7 @@ export function OfferSend({
           type="button"
           onClick={() => void open()}
           disabled={busy !== null}
-          className={`inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12.5px] font-extrabold disabled:opacity-60 ${filled ? "bg-[#1f8a5b] text-white hover:bg-[#18744c]" : "border border-[#1f8a5b] bg-white text-[#1f8a5b] hover:bg-[#eef8f3]"}`}
+          className={`inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10 ${filled ? "bg-[#1f8a5b] text-white hover:bg-[#18744c]" : "border border-[#1f8a5b] bg-white text-[#1f8a5b] hover:bg-[#eef8f3]"}`}
         >
           {busy === "prepare" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           {again ? tx("sendAgain") : tx("sendTitle")}

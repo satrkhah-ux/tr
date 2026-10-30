@@ -21,10 +21,10 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
-const field = "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+const field = "tv-field h-10 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 const chip = (on: boolean) =>
-  `inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-[#e9f7f0] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"}`;
+  `inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-tv-status-success-bg text-tv-status-success" : "border-[#dbe6e1] text-[#557d78]"}`;
 
 const BED_STATUSES: BedStatus[] = ["guaranteed", "on_request", "unspecified"];
 const num = (v: string) => (v.trim() === "" ? null : Math.trunc(Number(v)));
@@ -106,7 +106,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
 
   return (
     <div className="mt-2 grid gap-3 rounded-[9px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-      <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.room.hint")}</p>
+      <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("ops.room.hint")}</p>
 
       {lines.length > 1 ? (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -190,7 +190,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
         <button
           type="button"
           onClick={() => setGroups([...groups, { id: newId(), beds: [{ bed_type_id: "double", quantity: 1 }] }])}
-          className="inline-flex h-8 items-center gap-1.5 justify-self-start rounded-[8px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+          className="inline-flex h-8 items-center gap-1.5 justify-self-start rounded-[8px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
         >
           <Plus className="size-3.5" />
           {t("ops.room.addOption")}
@@ -287,7 +287,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
             </label>
           </div>
         ))}
-        <p className="text-[11px] font-semibold text-[#93aaa3] sm:col-span-2">{t("ops.room.customHint")}</p>
+        <p className="text-[11px] font-semibold text-tv-text-faint sm:col-span-2">{t("ops.room.customHint")}</p>
       </div>
 
       <label className={`${label} sm:max-w-xs`}>
@@ -313,7 +313,7 @@ export function RoomDetails({ booking, onDone }: { booking: OperationBooking; on
         type="button"
         disabled={pending}
         onClick={save}
-        className="inline-flex h-10 items-center gap-2 justify-self-start rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary inline-flex h-10 items-center gap-2 justify-self-start rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60"
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
         {t("save")}

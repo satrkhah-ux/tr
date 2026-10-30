@@ -13,7 +13,7 @@ import { TraveliunShell } from "../TraveliunShell";
  * Teletel conversations nobody answers, and the closings themselves — who
  * closed each one and where it went when the client wrote again.
  */
-const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const CARD = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const H = "text-[14px] font-extrabold text-[#0f3d38]";
 const BTN = "inline-flex h-9 items-center gap-1.5 rounded-[8px] px-3 text-[12.5px] font-bold disabled:opacity-50";
@@ -145,7 +145,7 @@ export function ConversationsAdmin({ initial }: { initial: Data }) {
               {list.map((o) => {
                 const on = (exempt[k] as (string | number)[]).includes(o.id);
                 return (
-                  <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(k, o.id as never)} className={`h-7 rounded-full border px-2.5 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-[#e8f6ef] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]"}`}>
+                  <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(k, o.id as never)} className={`h-7 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10 ${on ? "border-[#2aa87a] bg-[#e8f6ef] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]"}`}>
                     {o.name}
                   </button>
                 );

@@ -29,7 +29,7 @@ export function PartnerProfile({ email, terms, team }: { email: string; terms: s
   return (
     <TraveliunShell title="nav.myProfile">
       <div className="max-w-3xl space-y-4">
-        <section className="overflow-hidden rounded-[14px] border border-[#e2ebe7] bg-white dark:border-[#22443b] dark:bg-[#12241f]">
+        <section className="tv-card overflow-hidden rounded-[14px] border">
           <div className="flex items-center gap-4 bg-[var(--tv-brand)] p-5">
             {partner.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, no loader
@@ -57,7 +57,7 @@ export function PartnerProfile({ email, terms, team }: { email: string; terms: s
               return (
                 <div key={row.label} className="flex items-center gap-3 px-5 py-3">
                   <Icon className="size-4 shrink-0 text-[var(--tv-brand)]" />
-                  <dt className="w-32 shrink-0 text-[12px] font-bold text-[#93aaa3]">{row.label}</dt>
+                  <dt className="w-32 shrink-0 text-[12px] font-bold text-tv-text-faint">{row.label}</dt>
                   <dd className="text-[13px] font-bold text-[#0f3d38] dark:text-[#d6e5df]">{row.value}</dd>
                 </div>
               );
@@ -65,7 +65,7 @@ export function PartnerProfile({ email, terms, team }: { email: string; terms: s
           </dl>
         </section>
 
-        <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-5 dark:border-[#22443b] dark:bg-[#12241f]">
+        <section className="tv-card rounded-[14px] border p-5">
           <h2 className="text-[14px] font-extrabold text-[var(--tv-brand)]">هويتكم على الملفات</h2>
           <p className="mt-1 text-[12.5px] font-semibold text-[#557d78]">
             هذان اللونان وهذا الشعار يظهران في لوحتكم وفي مستند العميل الذي تصدرونه.
@@ -84,7 +84,7 @@ export function PartnerProfile({ email, terms, team }: { email: string; terms: s
                   style={{ background: swatch.value }}
                 />
                 <span>
-                  <span className="block text-[11.5px] font-bold text-[#93aaa3]">{swatch.label}</span>
+                  <span className="block text-[11.5px] font-bold text-tv-text-faint">{swatch.label}</span>
                   <span className="block text-[12px] font-extrabold text-[#0f3d38] uppercase dark:text-[#d6e5df]">
                     {swatch.value}
                   </span>

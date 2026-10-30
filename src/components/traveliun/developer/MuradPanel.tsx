@@ -8,6 +8,7 @@ import { whenText } from "@/lib/developer/health";
 import { setMuradAutoPhones } from "@/lib/data/app-settings";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «مُراد» on /developer: which model answers, today's calls against the cap,
  * the numbers he may answer himself, and what he did last. His two switches
@@ -16,11 +17,11 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const MODE: Record<string, TranslationKey> = { auto: "murad.mode.auto", suggest: "murad.mode.suggest", skipped: "murad.mode.skipped" };
 const chip = "rounded-full px-2 py-0.5 text-[10.5px] font-extrabold";
-const onChip = "bg-[#e3f6ee] text-[#0f7a52] dark:bg-[#123a2c] dark:text-[#6fe0b0]";
-const offChip = "bg-[#fdeaef] text-[#c22850] dark:bg-[#3d1621] dark:text-[#f68aa5]";
-const warnChip = "bg-[#fdf3e1] text-[#a86a10] dark:bg-[#3a2c10] dark:text-[#f2c46b]";
+const onChip = "bg-tv-status-success-bg text-tv-status-success";
+const offChip = "bg-tv-status-danger-bg text-tv-status-danger";
+const warnChip = "bg-tv-status-warning-bg text-tv-status-warning";
 const button =
-  "inline-flex h-8 items-center rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center rounded-[9px] border px-2.5 text-[11.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 
 export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { suggest: boolean; auto: boolean } }) {
   const { t } = useTraveliunUI();
@@ -54,9 +55,9 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
   const provider = data.provider ? `${data.provider.provider === "claude" ? "Claude" : "OpenAI"} · ${data.provider.model}` : t("murad.provider.none");
 
   return (
-    <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("murad.title")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("murad.hint")}</p>
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("murad.hint")}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-bold text-[#557d78]">
         <span>
@@ -81,7 +82,7 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
       </p>
 
       <h3 className="mt-4 border-t border-dashed border-[#dce7e2] pt-3 text-[12.5px] font-extrabold text-[#557d78]">{t("murad.phones")}</h3>
-      <p className="mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">{t("murad.phones.hint")}</p>
+      <p className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{t("murad.phones.hint")}</p>
       {data.testPhone ? (
         <p className="mt-1.5 text-[12px] font-semibold text-[#557d78]">
           {t("murad.phones.test")}{" "}
@@ -89,7 +90,7 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
         </p>
       ) : null}
       <ul className="mt-1.5 grid gap-1">
-        {phones.length === 0 ? <li className="text-[12px] font-semibold text-[#93aaa3]">{t("murad.phones.empty")}</li> : null}
+        {phones.length === 0 ? <li className="text-[12px] font-semibold text-tv-text-faint">{t("murad.phones.empty")}</li> : null}
         {phones.map((p) => (
           <li key={p} className="flex items-center justify-between gap-2 text-[12.5px] font-bold text-[#0f3d38]">
             <bdi dir="ltr" className="font-mono">
@@ -129,13 +130,13 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
 
       <h3 className="mt-4 border-t border-dashed border-[#dce7e2] pt-3 text-[12.5px] font-extrabold text-[#557d78]">{t("murad.log")}</h3>
       {data.logs.length === 0 ? (
-        <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("murad.log.empty")}</p>
+        <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("murad.log.empty")}</p>
       ) : (
         <ul className="mt-1.5 grid gap-1.5">
           {data.logs.map((l) => (
             <li key={l.id} className="rounded-[10px] bg-[#f7faf8] px-3 py-2 text-[12px] font-semibold text-[#557d78] dark:bg-[#0f1f1b]">
               <div className="flex flex-wrap items-center gap-2">
-                <time dateTime={l.at} dir="ltr" className="text-[11px] font-bold text-[#93aaa3]">
+                <time dateTime={l.at} dir="ltr" className="text-[11px] font-bold text-tv-text-faint">
                   {whenText(l.at, true)}
                 </time>
                 <bdi dir="ltr" className="font-mono text-[#0f3d38]">

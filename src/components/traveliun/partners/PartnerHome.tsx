@@ -66,15 +66,15 @@ function Stat({
   hint?: string;
 }) {
   return (
-    <div className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
-      <div className="flex items-center gap-2 text-[12px] font-bold text-[#78948f]">
+    <div className="tv-card rounded-[14px] border p-4">
+      <div className="flex items-center gap-2 text-[12px] font-bold text-tv-text-faint">
         <Icon className="size-4 text-[var(--tv-brand)]" />
         {label}
       </div>
       <div className="tv-tnum mt-2 text-2xl font-extrabold text-[var(--tv-brand)]">
         <DirText dir="ltr">{value}</DirText>
       </div>
-      {hint ? <div className="mt-0.5 text-[11px] font-semibold text-[#93aaa3]">{hint}</div> : null}
+      {hint ? <div className="mt-0.5 text-[11px] font-semibold text-tv-text-faint">{hint}</div> : null}
     </div>
   );
 }
@@ -147,9 +147,9 @@ export function PartnerHome({
         </section>
 
         {data.awaiting.length > 0 ? (
-          <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+          <section className="tv-card rounded-[14px] border p-4">
             <h2 className="text-[14px] font-extrabold text-[var(--tv-brand)]">بانتظار تأكيد العميل</h2>
-            <p className="mb-3 mt-0.5 text-[12px] font-semibold text-[#78948f]">
+            <p className="mb-3 mt-0.5 text-[12px] font-semibold text-tv-text-faint">
               حين يوافق عميلكم سجّلوا ذلك هنا — يصل الطلب لقسم العمليات عندنا فوراً ويبدأ الحجز.
             </p>
             <ul className="space-y-1.5">
@@ -163,12 +163,12 @@ export function PartnerHome({
         {data.reports.length > 0 ? <MonthlyReports reports={data.reports} /> : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+          <section className="tv-card rounded-[14px] border p-4">
             <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">
               الدول المستهدفة ومرات استخدامها
             </h2>
             {data.destinations.length === 0 ? (
-              <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-[#93aaa3]">
+              <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
                 لا وجهات بعد — تظهر هنا تلقائياً مع أول بكج.
               </p>
             ) : (
@@ -188,10 +188,10 @@ export function PartnerHome({
             )}
           </section>
 
-          <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+          <section className="tv-card rounded-[14px] border p-4">
             <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">الطلبات قيد التنفيذ</h2>
             {data.requests.length === 0 ? (
-              <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-[#93aaa3]">
+              <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
                 لا طلبات مؤكَّدة بعد. يظهر الطلب هنا حين يوافق العميل ويبدأ التنفيذ.
               </p>
             ) : (
@@ -212,7 +212,7 @@ export function PartnerHome({
                         {EXECUTION_STATUS[r.execution_status] ?? r.execution_status}
                       </span>
                       {r.travel_start ? (
-                        <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                        <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                           <DirText dir="ltr">{r.travel_start}</DirText>
                         </span>
                       ) : null}
@@ -233,17 +233,17 @@ export function PartnerHome({
 
         {statement ? <StatementView statement={statement} title="كشف حسابكم معنا" /> : null}
 
-        <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+        <section className="tv-card rounded-[14px] border p-4">
           <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">سجل الحسابات المالية</h2>
           {data.ledger.length === 0 ? (
-            <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-[#93aaa3]">
+            <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
               لا حركات مالية مسجَّلة بعد.
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-right">
                 <thead>
-                  <tr className="text-[11.5px] font-bold text-[#93aaa3]">
+                  <tr className="text-[11.5px] font-bold text-tv-text-faint">
                     <th className="pb-2 font-bold">التاريخ</th>
                     <th className="pb-2 font-bold">البكج</th>
                     <th className="pb-2 font-bold">النوع</th>
@@ -280,7 +280,7 @@ export function PartnerHome({
           )}
         </section>
 
-        <p className="text-center text-[11px] font-semibold text-[#93aaa3]">
+        <p className="text-center text-[11px] font-semibold text-tv-text-faint">
           الحجز الفعلي لدى الفنادق يتم من قسم العمليات — يظهر تقدّمه في «الطلبات قيد التنفيذ» أعلاه.{" "}
           <Link href="/package-generator" className="font-bold text-[var(--tv-brand)] underline">
             بكجاتي
@@ -332,17 +332,17 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
         </span>
         {item.destination ? <span className="text-[12px] font-bold text-[#557d78]">{item.destination}</span> : null}
         {item.valid_until ? (
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.expired ? "bg-[#fdeef2] text-[#c22850]" : "bg-[#eef4f1] text-[#557d78]"}`}>
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.expired ? "bg-tv-status-danger-bg text-tv-status-danger" : "bg-[#eef4f1] text-[#557d78]"}`}>
             {item.expired ? (item.renewed ? "منتهٍ — جُدّد" : "انتهت صلاحية الأسعار") : <>صالح حتى <DirText dir="ltr">{item.valid_until}</DirText></>}
           </span>
         ) : null}
         {item.was && item.total != null && item.was.total != null ? (
-          <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+          <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
             كان <DirText dir="ltr">{`${item.was.total.toLocaleString("en-US")} ${item.was.currency ?? ""}`}</DirText> · الآن{" "}
             <DirText dir="ltr">{`${item.total.toLocaleString("en-US")} ${item.currency ?? ""}`}</DirText>
           </span>
         ) : null}
-        <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+        <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
           <DirText dir="ltr">{String(item.travelers)}</DirText> مسافر
           {item.travel_date ? (
             <>
@@ -374,7 +374,7 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
                 type="button"
                 disabled={pending}
                 onClick={confirm}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-3 text-[12px] font-bold text-white disabled:opacity-60 max-sm:min-h-10"
               >
                 {pending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 نعم، أكّد
@@ -383,7 +383,7 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
                 type="button"
                 disabled={pending}
                 onClick={() => setAsking(false)}
-                className="inline-flex h-8 items-center rounded-[8px] border border-[#d8e4df] px-3 text-[12px] font-bold text-[#557d78]"
+                className="inline-flex h-8 items-center rounded-[8px] border border-[#d8e4df] px-3 text-[12px] font-bold text-[#557d78] max-sm:min-h-10"
               >
                 تراجع
               </button>
@@ -392,7 +392,7 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
             <button
               type="button"
               onClick={() => setAsking(true)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white hover:opacity-90"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white hover:opacity-90 max-sm:min-h-10"
             >
               <CheckCircle2 className="size-3.5" />
               العميل أكّد
@@ -440,7 +440,7 @@ function RequestDocuments({ request }: { request: PartnerRequest }) {
         <button
           type="button"
           onClick={() => copy(`/trip/${token}`)}
-          className="inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#eef4f1] px-2.5 text-[11.5px] font-bold text-[var(--tv-brand)] dark:bg-[#17302a]"
+          className="inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#eef4f1] px-2.5 text-[11.5px] font-bold text-[var(--tv-brand)] dark:bg-[#17302a] max-sm:min-h-10"
         >
           <Copy className="size-3.5" />
           نسخ رابط العميل
@@ -504,7 +504,7 @@ function RenewButton({ item }: { item: PartnerAwaiting }) {
 /** «تقريركم الشهري»: this month beside the last one. */
 function MonthlyReports({ reports }: { reports: PartnerHomeData["reports"] }) {
   return (
-    <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">تقريركم الشهري</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         {reports.map((r, i) => (
@@ -515,15 +515,15 @@ function MonthlyReports({ reports }: { reports: PartnerHomeData["reports"] }) {
             </div>
             <dl className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <dt className="text-[11px] font-bold text-[#93aaa3]">عروض</dt>
+                <dt className="text-[11px] font-bold text-tv-text-faint">عروض</dt>
                 <dd className="tv-tnum text-[18px] font-extrabold text-[var(--tv-brand)]">{r.issued}</dd>
               </div>
               <div>
-                <dt className="text-[11px] font-bold text-[#93aaa3]">أكّدها العملاء</dt>
+                <dt className="text-[11px] font-bold text-tv-text-faint">أكّدها العملاء</dt>
                 <dd className="tv-tnum text-[18px] font-extrabold text-[var(--tv-brand)]">{r.confirmed}</dd>
               </div>
               <div>
-                <dt className="text-[11px] font-bold text-[#93aaa3]">نسبة التحويل</dt>
+                <dt className="text-[11px] font-bold text-tv-text-faint">نسبة التحويل</dt>
                 <dd className="tv-tnum text-[18px] font-extrabold text-[var(--tv-brand)]">{r.conversion == null ? "—" : `${r.conversion}%`}</dd>
               </div>
             </dl>

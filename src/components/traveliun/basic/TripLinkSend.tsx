@@ -43,7 +43,7 @@ export function TripLinkSend({ operationId }: { operationId: string }) {
     if (!list) return null;
     const went = list.delivered.includes("trip_link");
     const why = went ? tx("tripLinkSent") : !list.to_phone ? t("ops.err.clientNoPhone") : tx("tripLinkPending");
-    return <p className={`text-[12px] font-bold ${went ? "text-[#0f7a52]" : "text-[#7a948f]"}`}>{why}</p>;
+    return <p className={`text-[12px] font-bold ${went ? "text-[#0f7a52]" : "text-tv-text-faint"}`}>{why}</p>;
   }
 
   async function send() {
@@ -73,14 +73,14 @@ export function TripLinkSend({ operationId }: { operationId: string }) {
             onChange={(e) => setBody(e.target.value)}
             rows={Math.min(Math.max(body.split("\n").length + 1, 6), 14)}
             aria-label={tx("tripLinkSend")}
-            className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus:border-[#2aa87a]"
+            className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void send()}
               disabled={busy || !body.trim() || Boolean(list?.blocked)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-50 max-sm:min-h-10"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               {tx("sendNow")}
@@ -98,7 +98,7 @@ export function TripLinkSend({ operationId }: { operationId: string }) {
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               {copied ? tx("sendCopied") : tx("sendCopy")}
             </button>
-            <button type="button" onClick={() => setOpen(false)} className="h-9 px-2 text-[12px] font-bold text-[#557d78]">
+            <button type="button" onClick={() => setOpen(false)} className="h-9 px-2 text-[12px] font-bold text-[#557d78] max-sm:min-h-10">
               {tx("cancelEdit")}
             </button>
           </div>

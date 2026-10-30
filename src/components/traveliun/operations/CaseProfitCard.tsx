@@ -25,7 +25,7 @@ const amountIn = (list: Money[], currency: string) => list.find((m) => m.currenc
 export function CaseProfitCard({ profit, showReport }: { profit: CaseProfitView; showReport: boolean }) {
   const { t } = useTraveliunUI();
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-extrabold text-[#185045]">
           <TrendingUp className="size-4" />
@@ -38,7 +38,7 @@ export function CaseProfitCard({ profit, showReport }: { profit: CaseProfitView;
           </Link>
         ) : null}
       </div>
-      <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.money.caseHint")}</p>
+      <p className="mt-1 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.money.caseHint")}</p>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <Side
@@ -64,8 +64,8 @@ function Side({ title, lines, rows }: { title: string; lines: MoneyLine[]; rows:
   const { t } = useTraveliunUI();
   return (
     <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-      <p className="text-[11.5px] font-bold text-[#93aaa3]">{title}</p>
-      {lines.length === 0 ? <p className="mt-2 text-[12px] font-semibold text-[#93aaa3]">{t("ops.money.noFigures")}</p> : null}
+      <p className="text-[11.5px] font-bold text-tv-text-faint">{title}</p>
+      {lines.length === 0 ? <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">{t("ops.money.noFigures")}</p> : null}
       {lines.map((l) => (
         <dl key={l.currency} className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[12px] font-bold text-[#557d78]">
           {rows(l).map(([label, amount]) => (

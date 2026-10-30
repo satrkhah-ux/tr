@@ -10,7 +10,7 @@ export async function TripReceipts({ token }: { token: string }) {
   if (receipts.length === 0) return null;
 
   return (
-    <section className="mt-4 rounded-2xl border border-[#e2ebe7] bg-white p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card mt-4 rounded-2xl border p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <h2 className="text-[15px] font-extrabold">سندات القبض</h2>
       <ul className="mt-3 space-y-2">
         {receipts.map((r) => (
@@ -25,7 +25,7 @@ export async function TripReceipts({ token }: { token: string }) {
                 <span className="block text-[14px] font-extrabold">
                   <bdi dir="ltr">{`${r.amount.toLocaleString("en-US")} ${r.currency}`}</bdi>
                 </span>
-                <span className="mt-0.5 block text-[11.5px] font-semibold text-[#93aaa3]">
+                <span className="mt-0.5 block text-[11.5px] font-semibold text-tv-text-faint">
                   <bdi dir="ltr">{`${r.receipt_no} · ${r.paid_at}`}</bdi>
                 </span>
               </span>

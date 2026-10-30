@@ -11,7 +11,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const field =
-  "h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-9 rounded-[9px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1 text-[11px] font-bold text-[#557d78]";
 
 /** The list's filters: travel date, destination, owner, status. Closed cases need their status picked. */
@@ -78,13 +78,13 @@ export function OperationsFilters({
         <button
           type="button"
           onClick={() => onChange(NO_FILTERS)}
-          className="inline-flex h-9 items-center gap-1 rounded-[9px] px-2 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1]"
+          className="inline-flex h-9 items-center gap-1 rounded-[9px] px-2 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] max-sm:min-h-10"
         >
           <X className="size-3.5" />
           {t("ops.list.clear")}
         </button>
       ) : null}
-      {!filters.status ? <p className="w-full text-[11px] font-semibold text-[#93aaa3]">{t("ops.list.closedHidden")}</p> : null}
+      {!filters.status ? <p className="w-full text-[11px] font-semibold text-tv-text-faint">{t("ops.list.closedHidden")}</p> : null}
     </div>
   );
 }
@@ -101,7 +101,7 @@ export function ArrivalsCalendar<T extends ListedCase & { id: string }>({ operat
   ];
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-[#185045]">
           <CalendarDays className="size-4" />
@@ -113,7 +113,7 @@ export function ArrivalsCalendar<T extends ListedCase & { id: string }>({ operat
               key={s.key}
               type="button"
               onClick={() => setSpan(s.key)}
-              className={`rounded-full border px-3 py-1 text-[12px] font-bold transition-colors ${
+              className={`rounded-full border px-3 py-1 text-[12px] font-bold transition-colors max-sm:min-h-10 ${
                 span === s.key ? "border-[#185045] bg-[#185045] text-white" : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
               }`}
             >
@@ -153,10 +153,10 @@ function Movement<T extends ListedCase & { id: string }>({
       <p className="mb-1.5 flex items-center gap-1.5 text-[12px] font-extrabold text-[#557d78]">
         {icon}
         {title}
-        <span className="tv-tnum text-[#93aaa3]">({rows.length})</span>
+        <span className="tv-tnum text-tv-text-faint">({rows.length})</span>
       </p>
       {rows.length === 0 ? (
-        <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.list.nothing")}</p>
+        <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.list.nothing")}</p>
       ) : (
         <ul className="space-y-1">
           {rows.map((o) => (
@@ -166,7 +166,7 @@ function Movement<T extends ListedCase & { id: string }>({
                   {o.customer_name || "—"}
                   {o.destination ? <span className="font-semibold text-[#557d78]"> — {o.destination}</span> : null}
                 </span>
-                <span className="tv-tnum text-[11px] text-[#93aaa3]">
+                <span className="tv-tnum text-[11px] text-tv-text-faint">
                   <DirText dir="ltr">{`${o.serial} · ${dateOf(o) ?? ""}`}</DirText>
                 </span>
               </Link>

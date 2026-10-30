@@ -15,7 +15,7 @@ import { PaymentLinkPanel } from "../PaymentLinkPanel";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
 
-const PAID_TONE = { paid: "bg-[#e9f7f0] text-[#0f7a52]", partial: "bg-[#fff8e8] text-[#a86a10]", unpaid: "bg-[#fdecef] text-[#c22850]" } as const;
+const PAID_TONE = { paid: "bg-tv-status-success-bg text-tv-status-success", partial: "bg-tv-status-warning-bg text-tv-status-warning", unpaid: "bg-tv-status-danger-bg text-tv-status-danger" } as const;
 
 /**
  * Step 5 — «الدفع»: the amount owed next is already in the form (the deposit,
@@ -59,7 +59,7 @@ export function PaymentStep({ data, canManage }: StepProps) {
                 }`}
               >
                 <span className="block text-[13px] font-extrabold text-[#0f3d38]">{t(`wz.pay.choice.${c}` as TranslationKey)}</span>
-                <span className="tv-tnum mt-0.5 block text-[11.5px] font-semibold text-[#6d8a84]">
+                <span className="tv-tnum mt-0.5 block text-[11.5px] font-semibold text-tv-text-faint">
                   {c === "plan"
                     ? t("wz.pay.choice.planHint")
                     : `${(c === "full" ? choices.full : choices.installment).amount.toLocaleString("en-US")} ${op.currency ?? "SAR"}`}
@@ -67,7 +67,7 @@ export function PaymentStep({ data, canManage }: StepProps) {
               </button>
             ))}
           </div>
-          {choice === "plan" && !canManage ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.pay.choice.planManager")}</p> : null}
+          {choice === "plan" && !canManage ? <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">{t("wz.pay.choice.planManager")}</p> : null}
         </div>
       ) : null}
 
@@ -137,7 +137,7 @@ function AgreedPrice({ data, canManage }: Pick<StepProps, "data" | "canManage">)
             value={value}
             onChange={(e) => setValue(e.target.value)}
             aria-label={t("wz.pay.agreed.title")}
-            className="tv-tnum h-10 w-40 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-center text-[14px] font-extrabold text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="tv-tnum h-10 w-40 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-center text-[14px] font-extrabold text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <span className="text-[12px] font-bold text-[#557d78]">{currency}</span>
           {changed ? (
@@ -145,7 +145,7 @@ function AgreedPrice({ data, canManage }: Pick<StepProps, "data" | "canManage">)
               type="button"
               disabled={pending}
               onClick={() => save(typed)}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-3.5 text-[12px] font-bold text-white disabled:opacity-60"
+              className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-3.5 text-[12px] font-bold disabled:opacity-60"
             >
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {t("save")}
@@ -162,7 +162,7 @@ function AgreedPrice({ data, canManage }: Pick<StepProps, "data" | "canManage">)
           <DirText dir="ltr">{op.total == null ? "—" : `${fmt(op.total)} ${currency}`}</DirText>
         </p>
       )}
-      <p className="tv-tnum mt-1.5 text-[11px] font-semibold text-[#93aaa3]">
+      <p className="tv-tnum mt-1.5 text-[11px] font-semibold text-tv-text-faint">
         {agreed != null && offerTotal != null
           ? t("wz.pay.agreed.fromOffer", { offer: fmt(offerTotal), currency })
           : t("wz.pay.agreed.hint")}
@@ -212,7 +212,7 @@ function PaymentException({ data, canManage }: Pick<StepProps, "data" | "canMana
           <span className="tv-tnum">{granted.at.slice(0, 10)}</span>
           {granted.note ? <span>— {granted.note}</span> : null}
           {canManage ? (
-            <button type="button" disabled={pending} onClick={() => save(null)} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 font-bold text-[#c43d3d] disabled:opacity-60">
+            <button type="button" disabled={pending} onClick={() => save(null)} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 font-bold text-[#c43d3d] disabled:opacity-60 max-sm:min-h-10">
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {t("wz.pay.exception.remove")}
             </button>
@@ -227,7 +227,7 @@ function PaymentException({ data, canManage }: Pick<StepProps, "data" | "canMana
             placeholder={t("wz.pay.exception.note")}
             className="h-10 min-w-0 flex-1 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045]"
           />
-          <button type="button" disabled={pending || !note.trim()} onClick={() => save(note)} className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-3.5 text-[12px] font-bold text-white disabled:opacity-60">
+          <button type="button" disabled={pending || !note.trim()} onClick={() => save(note)} className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-3.5 text-[12px] font-bold disabled:opacity-60">
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
             {t("wz.pay.exception.grant")}
           </button>

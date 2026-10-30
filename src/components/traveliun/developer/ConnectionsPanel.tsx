@@ -9,6 +9,7 @@ import { recheckAllConnections, recheckConnection, testFlightLookupApi } from "@
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «الارتباطات الخارجية» — one card per connection, as the server last saw it.
  * The page streams the first round in; each card re-checks on its own, and the
@@ -23,9 +24,9 @@ const GROUPS: { group: CheckGroup; label: TranslationKey }[] = [
 ];
 
 const TONES: Record<CheckStatus, { label: TranslationKey; badge: string; dot: string }> = {
-  ok: { label: "dev.status.ok", badge: "bg-[#e3f6ee] text-[#0f7a52] dark:bg-[#123a2c] dark:text-[#6fe0b0]", dot: "bg-[#0f7a52] dark:bg-[#6fe0b0]" },
-  warn: { label: "dev.status.warn", badge: "bg-[#fdf3e1] text-[#a86a10] dark:bg-[#3a2c10] dark:text-[#f2c46b]", dot: "bg-[#a86a10] dark:bg-[#f2c46b]" },
-  down: { label: "dev.status.down", badge: "bg-[#fdeaef] text-[#c22850] dark:bg-[#3d1621] dark:text-[#f68aa5]", dot: "bg-[#c22850] dark:bg-[#f68aa5]" },
+  ok: { label: "dev.status.ok", badge: "bg-tv-status-success-bg text-tv-status-success", dot: "bg-[#0f7a52] dark:bg-[#6fe0b0]" },
+  warn: { label: "dev.status.warn", badge: "bg-tv-status-warning-bg text-tv-status-warning", dot: "bg-[#a86a10] dark:bg-[#f2c46b]" },
+  down: { label: "dev.status.down", badge: "bg-tv-status-danger-bg text-tv-status-danger", dot: "bg-[#c22850] dark:bg-[#f68aa5]" },
   unconfigured: { label: "dev.status.unconfigured", badge: "bg-[#eef1f4] text-[#5b6b78] dark:bg-[#1b2d27] dark:text-[#9fb3ac]", dot: "bg-[#5b6b78] dark:bg-[#9fb3ac]" },
   idle: { label: "dev.status.idle", badge: "bg-[#dff1f4] text-[#0e7490] dark:bg-[#0f3440] dark:text-[#7fd0e0]", dot: "bg-[#0e7490] dark:bg-[#7fd0e0]" },
 };
@@ -33,7 +34,7 @@ const TONES: Record<CheckStatus, { label: TranslationKey; badge: string; dot: st
 const sectionClass = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const cardClass = "flex min-w-0 flex-col gap-1.5 rounded-[12px] border border-[#e2ebe7] bg-[#f7faf8] p-3.5";
 const smallButton =
-  "inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center gap-1.5 rounded-[9px] border px-2.5 text-[11.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 
 function StatusBadge({ status }: { status: CheckStatus }) {
   const { t } = useTraveliunUI();
@@ -56,11 +57,11 @@ function ConnectionCard({ result, busy, onRecheck }: { result: CheckResult; busy
       </div>
       <p className="break-words text-[12px] font-semibold text-[#557d78]">{t(result.detail.key, result.detail.params)}</p>
       {result.extra?.map((line, i) => (
-        <p key={i} className="break-words text-[11.5px] font-semibold text-[#93aaa3]">
+        <p key={i} className="break-words text-[11.5px] font-semibold text-tv-text-faint">
           {t(line.key, line.params)}
         </p>
       ))}
-      <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-[#dce7e2] pt-2 text-[11px] font-bold text-[#93aaa3]">
+      <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-[#dce7e2] pt-2 text-[11px] font-bold text-tv-text-faint">
         <span dir="ltr">{result.latencyMs === null ? "— ms" : `${result.latencyMs} ms`}</span>
         <span>
           {result.lastRunAt
@@ -101,7 +102,7 @@ function ServerCard({ info }: { info: ServerInfo }) {
       <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-            <dt className="text-[11.5px] font-bold text-[#93aaa3]">{t(label)}</dt>
+            <dt className="text-[11.5px] font-bold text-tv-text-faint">{t(label)}</dt>
             <dd dir="ltr" className="min-w-0 break-all text-[12px] font-bold text-[#0f3d38]">
               {value}
             </dd>
@@ -118,7 +119,7 @@ function SectionHeader({ action }: { action?: React.ReactNode }) {
     <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
       <div>
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.connections")}</h2>
-        <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.connections.hint")}</p>
+        <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.connections.hint")}</p>
       </div>
       {action}
     </header>

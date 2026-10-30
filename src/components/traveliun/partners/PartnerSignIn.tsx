@@ -19,7 +19,7 @@ import { loginEmail } from "@/lib/almatar/rules";
  * leaving them on a screen that will not load.
  */
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 export function PartnerSignIn() {
   const router = useRouter();
@@ -68,10 +68,10 @@ export function PartnerSignIn() {
     <div className="mx-auto grid w-full max-w-4xl gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <form
         onSubmit={onSubmit}
-        className="rounded-2xl border border-[#e2ebe7] bg-white p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]"
+        className="tv-card rounded-2xl border p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]"
       >
         <h2 className="text-base font-extrabold text-[#003c3a]">دخول الشركات</h2>
-        <p className="mb-4 mt-1 text-[12px] font-semibold text-[#93aaa3]">
+        <p className="mb-4 mt-1 text-[12px] font-semibold text-tv-text-faint">
           للشركات المعتمدة التي أُصدر لها حساب.
         </p>
 
@@ -105,7 +105,7 @@ export function PartnerSignIn() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#185045] text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-[13px] font-bold disabled:opacity-60"
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
           دخول

@@ -36,11 +36,11 @@ export default async function MuradSettingsPage() {
       routingDefaults={<ReceptionRoutes setup={reception} />}
       knowledge={<>
         {teaching ? <MuradInstructions data={teaching} /> : null}
-        <details className="rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-6 dark:border-[#294039] dark:bg-[#12241f]">
+        <details className="tv-card rounded-2xl border p-4 sm:p-6">
           <summary className="cursor-pointer font-bold">أسئلة وأجوبة التأشيرات</summary>
           <div className="mt-4"><MuradPolicies initial={visaFaq} setting="murad_visa_faq" /></div>
         </details>
-        <details className="rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-6 dark:border-[#294039] dark:bg-[#12241f]">
+        <details className="tv-card rounded-2xl border p-4 sm:p-6">
           <summary className="cursor-pointer font-bold">سياسات الشركة والردود</summary>
           <div className="mt-4"><MuradPolicies initial={policies} /></div>
         </details>

@@ -80,7 +80,7 @@ export function TraveliunSignIn() {
                 dir="ltr"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="h-[48px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-start text-sm outline-none transition-colors focus:border-[#185045]"
+                className="h-[48px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]"
                 type="email"
                 autoComplete="username"
                 disabled={loading}
@@ -95,7 +95,7 @@ export function TraveliunSignIn() {
                 dir="ltr"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="h-[48px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-start text-sm outline-none transition-colors focus:border-[#185045]"
+                className="h-[48px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]"
                 type="password"
                 autoComplete="current-password"
                 disabled={loading}
@@ -114,7 +114,7 @@ export function TraveliunSignIn() {
             <button
               type="submit"
               disabled={loading}
-              className="flex h-[50px] w-full items-center justify-center gap-2 rounded-[8px] bg-[#185045] text-[15px] font-semibold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-70"
+              className="tv-btn-primary flex h-[50px] w-full items-center justify-center gap-2 rounded-[8px] text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70"
             >
               {loading ? (
                 <>

@@ -57,9 +57,9 @@ import { RoomDetails } from "./RoomDetails";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 const BOOKING_KINDS: BookingKind[] = ["hotel", "flight", "transport", "visa", "service"];
@@ -194,7 +194,7 @@ export function DocumentsPanel({
             <button
               type="button"
               onClick={() => setAdding((v) => !v)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
             >
               <Plus className="size-3.5" />
               {t("ops.booking.add")}
@@ -204,7 +204,7 @@ export function DocumentsPanel({
                 type="button"
                 onClick={() => setConfirmingAll((v) => !v)}
                 aria-expanded={confirmingAll}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                className="tv-btn-secondary inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold max-sm:min-h-10"
               >
                 <ListChecks className="size-3.5" />
                 {t("ops.confirmAll")}
@@ -212,7 +212,7 @@ export function DocumentsPanel({
             ) : null}
           </div>
         </div>
-        <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.seedHint")}</p>
+        <p className="mb-3 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.seedHint")}</p>
 
         {/* the two counts an ops agent is actually tracking */}
         <div className="mb-3 flex flex-wrap gap-2 text-[11.5px] font-bold">
@@ -240,7 +240,7 @@ export function DocumentsPanel({
 
         {/* no booking at all is not «no booking API» — it is nothing pulled yet */}
         {bookings.length === 0 ? (
-          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">
             {t("ops.booking.none")}
           </p>
         ) : (
@@ -259,14 +259,14 @@ export function DocumentsPanel({
           </ul>
         )}
         {/* said where it is true: an open booking no supplier API books (the API is TBO's, hotels only) */}
-        {outstanding.some((b) => b.kind !== "hotel") ? <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.booking.noApiHint")}</p> : null}
+        {outstanding.some((b) => b.kind !== "hotel") ? <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.booking.noApiHint")}</p> : null}
 
         {sentRequests.length > 0 ? (
           <div className="mt-3 border-t border-[#f0f4f2] pt-3">
             <p className="mb-2 text-[11.5px] font-extrabold text-[#557d78]">{t("ops.request.sentLog")}</p>
             <ul className="space-y-1.5">
               {sentRequests.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold text-[#93aaa3]">
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold text-tv-text-faint">
                   <span className="text-[#0f3d38]">{r.to_label}</span>
                   <span>
                     {r.channel === "whatsapp" ? t("ops.dispatch.whatsapp") : t("ops.dispatch.manual")}
@@ -302,7 +302,7 @@ export function DocumentsPanel({
                 onClick={() => issue(kind)}
                 className={`inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3.5 text-[12.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                   already
-                    ? "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]"
+                    ? "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success"
                     : "border-[#b7d0c7] bg-white text-[#185045] hover:bg-[#f0f7f4]"
                 }`}
               >
@@ -328,7 +328,7 @@ export function DocumentsPanel({
               className={field}
             />
           </label>
-          <p className="mt-1 text-[11px] font-semibold text-[#93aaa3]">{t("ops.doc.welcomeHint")}</p>
+          <p className="mt-1 text-[11px] font-semibold text-tv-text-faint">{t("ops.doc.welcomeHint")}</p>
         </div>
 
         {confirmed.some((b) => b.kind === "hotel") ? (
@@ -345,7 +345,7 @@ export function DocumentsPanel({
         ) : null}
 
         {live.length === 0 ? (
-          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">
             {t("ops.doc.issue")}
           </p>
         ) : (
@@ -360,12 +360,12 @@ export function DocumentsPanel({
                 <div className="min-w-0">
                   <p className="text-[13px] font-extrabold text-[#0f3d38]">
                     {t(`ops.doc.${d.kind}` as TranslationKey)}
-                    <span className="tv-tnum ms-2 text-[11px] font-bold text-[#93aaa3]">
+                    <span className="tv-tnum ms-2 text-[11px] font-bold text-tv-text-faint">
                       <DirText dir="ltr">{`v${d.version}`}</DirText>
                     </span>
                     {d.revoked_at ? <span className="ms-2 text-[11px] font-bold text-[#c22850]">{t("ops.doc.revoked")}</span> : null}
                   </p>
-                  <p className="tv-tnum mt-0.5 text-[11px] font-semibold text-[#93aaa3]">
+                  <p className="tv-tnum mt-0.5 text-[11px] font-semibold text-tv-text-faint">
                     <DirText dir="ltr">{d.created_at.slice(0, 10)}</DirText>
                   </p>
                 </div>
@@ -437,7 +437,7 @@ export function ClientLinkBlock({ operationId, token }: { operationId: string; t
             readOnly
             dir="ltr"
             value={url}
-            className="h-9 min-w-0 flex-1 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] text-[#185045]"
+            className="tv-field h-9 min-w-0 flex-1 rounded-[9px] border px-3 text-[12px]"
           />
           <button
             type="button"
@@ -729,7 +729,7 @@ function BookingRow({
             {booking.title}
             {booking.city_name ? <span className="font-semibold text-[#557d78]"> — {booking.city_name}</span> : null}
           </p>
-          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#93aaa3]">
+          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-tv-text-faint">
             <span>{t(`ops.booking.${booking.kind}` as TranslationKey)}</span>
             {booking.start_date ? (
               <DirText dir="ltr">
@@ -758,7 +758,7 @@ function BookingRow({
               type="button"
               onClick={() => setRooming((v) => !v)}
               aria-expanded={rooming}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
             >
               <BedDouble className="size-3.5" />
               {t("ops.room.details")}
@@ -771,7 +771,7 @@ function BookingRow({
             type="button"
             onClick={() => setEditing((v) => !v)}
             aria-label={t("edit")}
-            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
           >
             <Pencil className="size-3.5" />
           </button>
@@ -799,7 +799,7 @@ function BookingRow({
           <button
             type="button"
             onClick={() => setConfirming((v) => !v)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold max-sm:min-h-10"
           >
             {t("ops.booking.manual")}
           </button>
@@ -822,7 +822,7 @@ function BookingRow({
                 })
               }
               className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold transition-colors disabled:opacity-60 ${
-                booking.is_paid ? "bg-[#185045] text-white" : "border border-[#f2e2b4] bg-[#fff8e8] text-[#a86a10]"
+                booking.is_paid ? "bg-[#185045] text-white" : "border border-[#f2e2b4] bg-tv-status-warning-bg text-tv-status-warning"
               }`}
             >
               <Ticket className="size-3.5" />

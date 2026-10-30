@@ -32,7 +32,7 @@ export function RefundControl({
             className={`h-8 px-2.5 transition-colors ${
               refundable === v
                 ? v
-                  ? "bg-[#e4f6ef] text-[#0f7a52]"
+                  ? "bg-tv-status-success-bg text-tv-status-success"
                   : "bg-[#fdeeee] text-[#c43d3d]"
                 : "bg-white text-[#557d78] hover:bg-[#f4f8f6]"
             }`}

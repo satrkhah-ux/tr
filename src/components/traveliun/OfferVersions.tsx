@@ -96,11 +96,11 @@ export function OfferVersions({
     new Date(iso).toLocaleString(language === "ar" ? "ar-SA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" });
 
   return (
-    <section className="mt-3 rounded-[12px] border border-[#dbe6e1] bg-white">
+    <section className="tv-card mt-3 rounded-[12px] border">
       <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 px-3 py-2 text-start">
         <History className="size-4 text-[#185045]" />
         <span className="text-[12.5px] font-extrabold text-[#185045]">{t("pg.versions.title")}</span>
-        {versions ? <span className="text-[11px] font-bold text-[#93aaa3]">({versions.length})</span> : null}
+        {versions ? <span className="text-[11px] font-bold text-tv-text-faint">({versions.length})</span> : null}
         <ChevronDown className={`ms-auto size-4 text-[#557d78] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
@@ -155,7 +155,7 @@ export function OfferVersions({
                         ))}
                       </ul>
                     ) : (
-                      <p className="mt-1 text-[11px] text-[#93aaa3]">{t("pg.versions.sameAsBefore")}</p>
+                      <p className="mt-1 text-[11px] text-tv-text-faint">{t("pg.versions.sameAsBefore")}</p>
                     )
                   ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -174,13 +174,13 @@ export function OfferVersions({
                             type="button"
                             disabled={busy != null}
                             onClick={() => void restore(v.version)}
-                            className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#c25a28] px-2.5 text-[11.5px] font-bold text-white disabled:opacity-60"
+                            className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#c25a28] px-2.5 text-[11.5px] font-bold text-white disabled:opacity-60 max-sm:min-h-10"
                           >
                             {busy === v.version ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
                             {busy === v.version ? t("pg.versions.restoring") : t("pg.versions.confirm", { n: v.version, next: latest + 1 })}
                           </button>
                           {busy == null ? (
-                            <button type="button" onClick={() => setConfirming(null)} className="h-8 rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78]">
+                            <button type="button" onClick={() => setConfirming(null)} className="h-8 rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] max-sm:min-h-10">
                               {t("pg.versions.cancel")}
                             </button>
                           ) : null}
@@ -190,13 +190,13 @@ export function OfferVersions({
                           type="button"
                           disabled={busy != null}
                           onClick={() => setConfirming(v.version)}
-                          className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#c25a28] px-2.5 text-[11.5px] font-bold text-[#c25a28] hover:bg-[#fdf3ee] disabled:opacity-60"
+                          className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#c25a28] px-2.5 text-[11.5px] font-bold text-[#c25a28] hover:bg-[#fdf3ee] disabled:opacity-60 max-sm:min-h-10"
                         >
                           <RotateCcw className="size-3.5" /> {t("pg.versions.restore")}
                         </button>
                       )
                     ) : !v.current ? (
-                      <span className="text-[11px] text-[#93aaa3]">{t("pg.versions.noDraft")}</span>
+                      <span className="text-[11px] text-tv-text-faint">{t("pg.versions.noDraft")}</span>
                     ) : null}
                   </div>
                 </li>

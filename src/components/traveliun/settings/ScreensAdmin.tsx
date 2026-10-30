@@ -12,7 +12,7 @@ import { TraveliunShell } from "../TraveliunShell";
  * their ads, their links — and a monitor that shows every screen live, side by
  * side like security cameras, in the order they hang on the wall.
  */
-const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const CARD = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const H = "text-[14px] font-extrabold text-[#0f3d38]";
 
@@ -117,12 +117,12 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               type="button"
               disabled={busy !== null}
               onClick={() => save({ ...cfg, order })}
-              className="inline-flex h-9 items-center gap-2 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-bold text-white disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[9px] px-4 text-[12.5px] font-bold disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
               حفظ
             </button>
-            <span className="text-[11.5px] text-[#78948f]">بلا صوت — عرض فقط. عرض الدول الأكثر طلبًا يظهر مرة كل فترة لعبور واحد على كل الشاشات، ومرة فوراً حين تتغير الدول الأكثر طلباً</span>
+            <span className="text-[11.5px] text-tv-text-faint">بلا صوت — عرض فقط. عرض الدول الأكثر طلبًا يظهر مرة كل فترة لعبور واحد على كل الشاشات، ومرة فوراً حين تتغير الدول الأكثر طلباً</span>
           </div>
         </section>
 
@@ -210,7 +210,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {demoOn ? (
-              <button type="button" disabled={busy !== null} onClick={() => save({ ...cfg, demoUntil: new Date(openedAt - 1000).toISOString() }, "أُوقفت التجربة")} className="h-9 rounded-[9px] border border-[#f0c9d2] px-3 text-[12.5px] font-bold text-[#a3263f] hover:bg-[#fdecef] disabled:opacity-50">
+              <button type="button" disabled={busy !== null} onClick={() => save({ ...cfg, demoUntil: new Date(openedAt - 1000).toISOString() }, "أُوقفت التجربة")} className="h-9 rounded-[9px] border border-[#f0c9d2] px-3 text-[12.5px] font-bold text-[#a3263f] hover:bg-[#fdecef] disabled:opacity-50 max-sm:min-h-10">
                 إيقاف التجربة
               </button>
             ) : null}
@@ -218,7 +218,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               type="button"
               disabled={busy !== null}
               onClick={() => save({ ...cfg, demoUntil: new Date(Math.max(Date.now(), Date.parse(cfg.demoUntil)) + 86_400_000).toISOString() }, "مُدّدت التجربة يوماً")}
-              className="h-9 rounded-[9px] border border-[#2aa87a] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50"
+              className="tv-btn-secondary h-9 rounded-[9px] border px-3 text-[12.5px] font-bold disabled:opacity-50 max-sm:min-h-10"
             >
               تمديد يوماً
             </button>
@@ -236,13 +236,13 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               type="button"
               disabled={busy !== null}
               onClick={() => run("test", () => sendScreensTest(testDest), "أُرسل — يظهر على كل الشاشات بعد ثوانٍ، مكتوباً عليه «تجربة»")}
-              className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#2aa87a] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50"
+              className="tv-btn-secondary inline-flex h-9 items-center gap-2 rounded-[9px] border px-3 text-[12.5px] font-bold disabled:opacity-50 max-sm:min-h-10"
             >
               {busy === "test" ? <Loader2 className="size-4 animate-spin" /> : <Bell className="size-4" />}
               أرسل تجربة
             </button>
           </div>
-          <p className="mt-2 text-[11.5px] text-[#78948f]">يظهر اسم العميل المسجّل ونوع طلبه والوجهة لمدة 20 ثانية، فوق صورة معلم من الوجهة مع حركة الطائرة. تُعرض الخدمات المحددة فقط؛ الطلبات غير الواضحة تدخل المتابعة. يُعرض الطلب مرة لكل محادثة ووجهة في اليوم؛ وتستعيد الشاشة الإشعارات التي فاتتها خلال آخر 5 دقائق عند عودة الاتصال.</p>
+          <p className="mt-2 text-[11.5px] text-tv-text-faint">يظهر اسم العميل المسجّل ونوع طلبه والوجهة لمدة 20 ثانية، فوق صورة معلم من الوجهة مع حركة الطائرة. تُعرض الخدمات المحددة فقط؛ الطلبات غير الواضحة تدخل المتابعة. يُعرض الطلب مرة لكل محادثة ووجهة في اليوم؛ وتستعيد الشاشة الإشعارات التي فاتتها خلال آخر 5 دقائق عند عودة الاتصال.</p>
         </section>
 
         <section className={CARD}>

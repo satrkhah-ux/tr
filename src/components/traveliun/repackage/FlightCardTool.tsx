@@ -158,13 +158,13 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
   return (
     <TraveliunShell title="fc.title">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <Link href="/repackage" className="mb-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#557d78] hover:text-[#185045]">
             <ArrowRight className="size-3.5" />
             {t("nav.repackage")}
           </Link>
           <h1 className="text-lg font-extrabold text-[#003c3a]">{t("fc.title")}</h1>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("fc.subtitle")}</p>
+          <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("fc.subtitle")}</p>
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -194,7 +194,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   );
                 })}
               </div>
-              <p className="text-[12px] text-[#93aaa3]">{t(source.hintKey)}</p>
+              <p className="text-[12px] text-tv-text-faint">{t(source.hintKey)}</p>
 
               {kind === "text" ? (
                 <textarea
@@ -205,7 +205,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   dir="auto"
                   aria-label={t("fc.src.text")}
                   placeholder={t("fc.src.textPlaceholder")}
-                  className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2.5 font-mono text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+                  className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2.5 font-mono text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
                 />
               ) : (
                 <input
@@ -225,7 +225,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   type="button"
                   onClick={() => void onRead()}
                   disabled={!ready || reading}
-                  className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {reading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                   {reading ? t("fc.reading") : t("fc.read")}
@@ -236,7 +236,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   </button>
                 ) : null}
               </div>
-              <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+              <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-tv-text-faint">
                 <ShieldCheck className="size-3.5" />
                 {t("fc.privacy")}
               </p>
@@ -364,7 +364,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                   </div>
                 </div>
               ) : (
-                <p className="rounded-[10px] border border-dashed border-[#d7e4e0] px-4 py-10 text-center text-[12.5px] text-[#93aaa3]">
+                <p className="rounded-[10px] border border-dashed border-[#d7e4e0] px-4 py-10 text-center text-[12.5px] text-tv-text-faint">
                   {t("fc.previewEmpty")}
                 </p>
               )}

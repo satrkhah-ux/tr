@@ -180,7 +180,7 @@ function Turns({ l, now }: { l: Lead; now: number }) {
       {l.auto_wait_sec != null ? <span className="text-[#557d78]"> · ردّ بعد {l.auto_wait_sec} ث من رسالته</span> : null}
     </li>
   ) : null;
-  if (!l.handoffs?.length) return routed ? <ol className="text-[11px] font-semibold leading-5">{routed}</ol> : <span className="text-[#93aaa3]">—</span>;
+  if (!l.handoffs?.length) return routed ? <ol className="text-[11px] font-semibold leading-5">{routed}</ol> : <span className="text-tv-text-faint">—</span>;
   return (
     <ol className="space-y-0.5 text-[11px] font-semibold leading-5" suppressHydrationWarning>
       {routed}
@@ -193,7 +193,7 @@ function Turns({ l, now }: { l: Lead; now: number }) {
           ) : l.status === "open" && s.handed == null ? (
             <span className="text-[#a86a10]">لم يردّ — منذ {secs(s.from, now / 1000)}</span>
           ) : (
-            <span className="text-[#93aaa3]">لم يردّ</span>
+            <span className="text-tv-text-faint">لم يردّ</span>
           )}
           {s.handed ? <span className="text-[#557d78]"> · أسندها بعد {secs(s.from, s.handed)}</span> : null}
         </li>
@@ -224,7 +224,7 @@ function Performance({ rows }: { rows: Lead[] }) {
   return (
     <div className="mt-3 overflow-x-auto rounded-[12px] border border-[#e3ece8]">
       <table className="w-full min-w-[640px] text-start text-[12px]">
-        <thead className="bg-[#f8fbfa] text-[11px] font-extrabold text-[#78948f]">
+        <thead className="bg-[#f8fbfa] text-[11px] font-extrabold text-tv-text-faint">
           <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-start">
             <th>الموظف</th>
             <th>وصلته</th>
@@ -237,7 +237,7 @@ function Performance({ rows }: { rows: Lead[] }) {
         <tbody>
           {list.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-3 py-4 text-center font-semibold text-[#93aaa3]">
+              <td colSpan={6} className="px-3 py-4 text-center font-semibold text-tv-text-faint">
                 لا بيانات بعد — يُقرأ مسار كل محادثة من Teletel مع السحب
               </td>
             </tr>
@@ -290,7 +290,7 @@ function Bars({ title, rows, tone }: { title: string; rows: { label: string; cou
   return (
     <div className="rounded-[12px] border border-[#e3ece8] p-3">
       <h3 className="mb-2 text-[12px] font-extrabold text-[#185045]">{title}</h3>
-      {rows.length === 0 ? <p className="text-[11.5px] font-semibold text-[#93aaa3]">لا بيانات</p> : null}
+      {rows.length === 0 ? <p className="text-[11.5px] font-semibold text-tv-text-faint">لا بيانات</p> : null}
       <ul className="space-y-1.5">
         {rows.map((r) => (
           <li key={r.label} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2rem] items-center gap-2 text-[11.5px] font-semibold text-[#185045]">
@@ -488,7 +488,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               onClick={() => goPane(key)}
               aria-current={pane === key ? "page" : undefined}
               className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-bold transition-colors ${
-                pane === key ? "border-[var(--tv-brand)] text-[var(--tv-brand)]" : "border-transparent text-[#6b7f7a] hover:text-[var(--tv-brand)]"
+                pane === key ? "border-[var(--tv-brand)] text-[var(--tv-brand)]" : "border-transparent text-tv-text-faint hover:text-[var(--tv-brand)]"
               }`}
             >
               {label}
@@ -496,22 +496,22 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
           ))}
           {/* «الأشخاص» — the issued files' clients, a page of its own (settings.manage) */}
           {opens({ href: "/customers" }) ? (
-            <Link href="/customers" className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-bold text-[#6b7f7a] hover:text-[var(--tv-brand)]">
+            <Link href="/customers" className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-bold text-tv-text-faint hover:text-[var(--tv-brand)]">
               الأشخاص
             </Link>
           ) : null}
           {/* «المتابعة» — a tab of «العملاء» since the menu lost its own link (8b0ff52); its page's own gate */}
           {opens({ href: "/followups" }) ? (
-            <Link href="/followups" className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-bold text-[#6b7f7a] hover:text-[var(--tv-brand)]">
+            <Link href="/followups" className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-bold text-tv-text-faint hover:text-[var(--tv-brand)]">
               المتابعة
             </Link>
           ) : null}
         </nav>
         {pane !== "clients" && pane !== "report" ? (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11.5px] font-bold text-[#78948f]">المدة:</span>
+            <span className="text-[11.5px] font-bold text-tv-text-faint">المدة:</span>
             {RANGES.map(([r, label]) => (
-              <button key={r} type="button" onClick={() => setRange(r)} className={`h-7 rounded-full px-3 text-[11.5px] font-bold ${range === r ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045]"}`}>
+              <button key={r} type="button" onClick={() => setRange(r)} className={`h-7 rounded-full px-3 text-[11.5px] font-bold max-sm:min-h-10 ${range === r ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045]"}`}>
                 {label}
               </button>
             ))}
@@ -521,7 +521,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
         {pane === "clients" ? (
         <>
         {/* ---------- «لوحة اليوم» (the owner's list, 2026-10-18): requests, bookings, the follow-up queue ---------- */}
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <h2 className="text-[15px] font-extrabold text-[#003c3a]">لوحة اليوم</h2>
           <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             {(
@@ -535,47 +535,47 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               ] as const
             ).map(([label, value, note, color]) => (
               <div key={label} className="rounded-[12px] border border-[#e3ece8] bg-[#f8fbfa] p-3">
-                <div className="text-[11px] font-extrabold text-[#78948f]">{label}</div>
+                <div className="text-[11px] font-extrabold text-tv-text-faint">{label}</div>
                 <div className="tv-tnum text-2xl font-extrabold" style={{ color }}>
                   {value}
                 </div>
-                <div className="text-[10.5px] font-semibold text-[#93aaa3]">{note}</div>
+                <div className="text-[10.5px] font-semibold text-tv-text-faint">{note}</div>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
+          <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">
             الطلب = محادثة واتساب جديدة. الحجز = عرض صدر من النظام وتأكّد في يومه (يُحسب مرة واحدة، وما أُلغي بعده لا يُحسب).{" "}
             <Link href="/sla" className="font-bold text-[#185045] hover:underline">قسم المتابعة ←</Link>
           </p>
         </section>
 
         {/* ---------- the daily classification («اجماليات المحادثات») ---------- */}
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
               <Users className="size-5 text-[#0f7a52]" />
               العملاء والمحادثات
             </h1>
             <div className="flex items-center gap-1.5">
-              <button type="button" aria-label="اليوم السابق" onClick={() => setDay(shiftDay(day, -1))} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6]">
+              <button type="button" aria-label="اليوم السابق" onClick={() => setDay(shiftDay(day, -1))} className="tv-btn-secondary inline-flex size-8 items-center justify-center rounded-[8px] border max-sm:min-h-10 max-sm:min-w-10">
                 <ChevronRight className="size-4" />
               </button>
               <input type="date" value={day} max={today} onChange={(e) => e.target.value && setDay(e.target.value)} className={`${CELL} w-36`} />
-              <button type="button" aria-label="اليوم التالي" disabled={day >= today} onClick={() => setDay(shiftDay(day, 1))} className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-40">
+              <button type="button" aria-label="اليوم التالي" disabled={day >= today} onClick={() => setDay(shiftDay(day, 1))} className="tv-btn-secondary inline-flex size-8 items-center justify-center rounded-[8px] border disabled:opacity-40 max-sm:min-h-10 max-sm:min-w-10">
                 <ChevronLeft className="size-4" />
               </button>
               <button
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void run("pull", pullLeadsNow)}
-                className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[8px] border border-[#cfe0d9] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+                className="tv-btn-secondary inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
               >
                 {busy === "pull" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {live ? "تحديث الآن" : "تحديث من الشيت"}
               </button>
             </div>
           </div>
-          <p className="mt-1 text-[12px] font-semibold text-[#78948f]">
+          <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">
             {live
               ? "تلقائي بالكامل: كل محادثة واتساب في Teletel تظهر هنا وحدها كل ٥ دقائق — اسم العميل ورقمه، الموظف، التاريخ، نوع الطلب والدولة من كلامه، وتُغلق حين تُغلق هناك."
               : twoWay
@@ -613,8 +613,8 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               <div className="tv-tnum text-xl font-extrabold">{dayReturning}</div>
             </button>
           </div>
-          {kind ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#78948f]">الجدول يعرض «{kind}» ليوم {day} — اضغط الخانة مرة أخرى للإلغاء.</p> : null}
-          {returningOnly ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#78948f]">الجدول يعرض «عميل سابق» ليوم {day} — اضغط الخانة مرة أخرى للإلغاء.</p> : null}
+          {kind ? <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">الجدول يعرض «{kind}» ليوم {day} — اضغط الخانة مرة أخرى للإلغاء.</p> : null}
+          {returningOnly ? <p className="mt-1.5 text-[11.5px] font-semibold text-tv-text-faint">الجدول يعرض «عميل سابق» ليوم {day} — اضغط الخانة مرة أخرى للإلغاء.</p> : null}
         </section>
 
         </>
@@ -622,7 +622,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- «رؤية للإعلانات»: the range's clients, kinds, receivers and the 14-day trend ---------- */}
         {pane === "ads" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <h2 className="inline-flex items-center gap-2 text-[15px] font-extrabold text-[#003c3a]">
             <BarChart3 className="size-4 text-[#0f7a52]" />
             رؤية للإعلانات
@@ -636,7 +636,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               ["تحوّلت إلى برنامج", `${inRange.length ? Math.round((withFile / inRange.length) * 100) : 0}%`],
             ].map(([label, value]) => (
               <div key={label} className="rounded-[12px] border border-[#e3ece8] bg-[#f8fbfa] p-3">
-                <div className="text-[11px] font-extrabold text-[#78948f]">{label}</div>
+                <div className="text-[11px] font-extrabold text-tv-text-faint">{label}</div>
                 <div className="tv-tnum text-2xl font-extrabold text-[#003c3a]">{value}</div>
               </div>
             ))}
@@ -660,19 +660,19 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                   }} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
                   <span className="tv-tnum text-[10px] font-bold text-[#557d78]">{t.count || ""}</span>
                   <span className={`w-full rounded-t-[4px] ${t.day === day ? "bg-[#003c3a]" : "bg-[#0f7a52]/70"}`} style={{ height: `${(t.count / trendMax) * 100}%`, minHeight: t.count ? 4 : 1 }} />
-                  <span className="tv-tnum text-[9.5px] font-semibold text-[#93aaa3]">{t.day.slice(8)}</span>
+                  <span className="tv-tnum text-[9.5px] font-semibold text-tv-text-faint">{t.day.slice(8)}</span>
                 </button>
               ))}
             </div>
           </div>
-          {unresolved ? <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">غير محدد: {unresolved} محادثة لم تُفهم وجهتها (أو «لم يحدد طلب»)، ولا تدخل في الدول والمدن.</p> : null}
+          {unresolved ? <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">غير محدد: {unresolved} محادثة لم تُفهم وجهتها (أو «لم يحدد طلب»)، ولا تدخل في الدول والمدن.</p> : null}
 
           {/* ---------- the Google Ads side (dashboard.admin) ---------- */}
           {ads ? (
             <div className="mt-4 space-y-3 border-t border-dashed border-[#DCE9E5] pt-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-[14px] font-extrabold text-[#003c3a]">إعلانات Google × المحادثات</h3>
-                <span className={`text-[11px] font-bold ${adsStale ? "text-[#c22850]" : "text-[#78948f]"}`}>
+                <span className={`text-[11px] font-bold ${adsStale ? "text-[#c22850]" : "text-tv-text-faint"}`}>
                   {ads.updatedAt ? `آخر بيانات من Google: ${new Date(ads.updatedAt).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" })}` : "لم تصل بيانات من Google بعد"}
                   {adsStale ? " — متأخرة، تحقق من سكربت Google Ads" : ""}
                 </span>
@@ -686,7 +686,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                   ["تكلفة المحادثة", inRange.length ? money(adTotal.cost / inRange.length, ads.currency) : "—"],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-[12px] border border-[#e3ece8] bg-[#f8fbfa] p-3">
-                    <div className="text-[11px] font-extrabold text-[#78948f]">{label}</div>
+                    <div className="text-[11px] font-extrabold text-tv-text-faint">{label}</div>
                     <div className="tv-tnum text-xl font-extrabold text-[#003c3a]">{value}</div>
                   </div>
                 ))}
@@ -695,7 +695,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               <div className="overflow-x-auto rounded-[12px] border border-[#e3ece8]">
                 <table className="w-full min-w-[640px] text-start text-[11.5px]">
                   <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حسب الوجهة — أي دولة أكثر طلباً وكم كلّفت</caption>
-                  <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                  <thead className="text-[10.5px] font-extrabold text-tv-text-faint">
                     <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
                       <th>الوجهة</th><th>الإنفاق</th><th>النقرات</th><th>المحادثات</th><th>تكلفة المحادثة</th><th>تحوّلت إلى برنامج</th>
                     </tr>
@@ -718,7 +718,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               <div className="overflow-x-auto rounded-[12px] border border-[#e3ece8]">
                 <table className="w-full min-w-[640px] text-start text-[11.5px]">
                   <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حسب اليوم</caption>
-                  <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                  <thead className="text-[10.5px] font-extrabold text-tv-text-faint">
                     <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
                       <th>اليوم</th><th>الإنفاق</th><th>النقرات</th><th>تحويلات Google</th><th>المحادثات</th><th>تكلفة المحادثة</th><th>تحوّلت إلى برنامج</th>
                     </tr>
@@ -746,7 +746,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               <div className="overflow-x-auto rounded-[12px] border border-[#e3ece8]">
                 <table className="w-full min-w-[640px] text-start text-[11.5px]">
                   <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حسب الحملة</caption>
-                  <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                  <thead className="text-[10.5px] font-extrabold text-tv-text-faint">
                     <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
                       <th>الحملة</th><th>الوجهة</th><th>الإنفاق</th><th>النقرات</th><th>تحويلات Google</th><th>تكلفة التحويل</th>
                     </tr>
@@ -766,7 +766,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                 </table>
               </div>
 
-              <p className="text-[11px] font-semibold text-[#93aaa3]">«المحادثات» من كل المصادر (الإعلانات وغيرها)، فتكلفة المحادثة تقريبية — ووجهة الحملة من اسمها، و«عام» حملات بلا وجهة.</p>
+              <p className="text-[11px] font-semibold text-tv-text-faint">«المحادثات» من كل المصادر (الإعلانات وغيرها)، فتكلفة المحادثة تقريبية — ووجهة الحملة من اسمها، و«عام» حملات بلا وجهة.</p>
 
               {/* phase 2 — the new script's: where the clicks were, what was searched, the hour (the last 30 days) */}
               {ads.countries.length || ads.terms.length ? (
@@ -776,7 +776,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                   <Bars title="ماذا بحثوا (30 يوماً)" rows={ads.terms.map((x) => ({ label: x.label, count: x.clicks }))} tone={() => "#a86a10"} />
                 </div>
               ) : (
-                <p className="text-[11px] font-semibold text-[#93aaa3]">أين كان من نقر، وماذا بحثوا، وساعات النقر: تظهر هنا بعد تفعيل سكربت Google Ads الجديد.</p>
+                <p className="text-[11px] font-semibold text-tv-text-faint">أين كان من نقر، وماذا بحثوا، وساعات النقر: تظهر هنا بعد تفعيل سكربت Google Ads الجديد.</p>
               )}
               {ads.hours.some((h) => h > 0) ? (
                 <div className="rounded-[12px] border border-[#e3ece8] p-3">
@@ -785,7 +785,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                     {ads.hours.map((h, i) => (
                       <div key={i} title={`${i}:00 — ${h}`} className="flex h-full flex-1 flex-col items-center justify-end">
                         <span className="w-full rounded-t-[3px] bg-[#2f7fc0]/70" style={{ height: `${(h / Math.max(1, ...ads.hours)) * 100}%`, minHeight: h ? 3 : 1 }} />
-                        <span className="tv-tnum text-[9px] text-[#93aaa3]">{i}</span>
+                        <span className="tv-tnum text-[9px] text-tv-text-faint">{i}</span>
                       </div>
                     ))}
                   </div>
@@ -798,11 +798,11 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- «حصر الطلبات اليومية»: the last 14 days by kind ---------- */}
         {pane === "daily" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <div className="mt-3 overflow-x-auto rounded-[12px] border border-[#e3ece8]">
             <table className="w-full min-w-[640px] text-start text-[11.5px]">
               <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حصر الطلبات اليومية — آخر 14 يوماً حسب نوع الطلب</caption>
-              <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+              <thead className="text-[10.5px] font-extrabold text-tv-text-faint">
                 <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
                   <th>اليوم</th>
                   <th>المجموع</th>
@@ -835,20 +835,20 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- «وقت الذروة» ---------- */}
         {pane === "peak" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <PeakHours rows={inRange} />
         </section>
         ) : null}
 
         {/* ---------- «أداء الموظفين» ---------- */}
         {pane === "team" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <h3 className="mt-4 text-[13px] font-extrabold text-[#003c3a]">أداء الموظفين</h3>
-          <p className="text-[11px] font-semibold text-[#93aaa3]">
+          <p className="text-[11px] font-semibold text-tv-text-faint">
             لكل موظف: كم محادثة وصلته، وكم احتاج حتى ردّ عليها، وكم احتاج حتى أسندها لغيره — من سجل الإسناد في Teletel، للمدة المختارة أعلاه.
           </p>
           <Performance rows={inRange} />
-          <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
+          <p className="mt-2 text-[11px] font-semibold text-tv-text-faint">
             {live ? "يوم المحادثة يوم بدئها في واتساب" : "يوم المحادثة يوم وصولها إلى النظام (الشيت لا يحمل تاريخاً)"}، والدولة من البرنامج المصدَر إن وُجد وإلا من خانة الدولة.
           </p>
         </section>
@@ -863,7 +863,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- a new conversation, and the conversations ---------- */}
         {pane === "clients" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
+        <section className="tv-card rounded-[16px] border p-3 sm:p-4">
           <form
             className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_9rem_minmax(0,1fr)_auto]"
             onSubmit={(e) => {
@@ -878,7 +878,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               {INQUIRIES.map((i) => <option key={i.label}>{i.label}</option>)}
             </select>
             <input placeholder={HEADERS.destination} value={draft.destination} onChange={(e) => setDraft({ ...draft, destination: e.target.value })} className={CELL} />
-            <button type="submit" disabled={busy !== null} className="inline-flex h-8 items-center justify-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
+            <button type="submit" disabled={busy !== null} className="tv-btn-primary inline-flex h-8 items-center justify-center gap-1 rounded-[8px] px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10">
               {busy === "add" ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
               تسجيل محادثة
             </button>
@@ -891,20 +891,20 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                 key={k}
                 type="button"
                 onClick={() => setTab(k)}
-                className={`h-8 rounded-full px-3 text-[12px] font-bold ${tab === k ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6]"}`}
+                className={`h-8 rounded-full px-3 text-[12px] font-bold max-sm:min-h-10 ${tab === k ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6]"}`}
               >
                 {label} <span className="tv-tnum opacity-70">{count(k)}</span>
               </button>
             ))}
             <label className="relative ms-auto w-full sm:w-64">
-              <Search className="pointer-events-none absolute start-2 top-2 size-4 text-[#93aaa3]" />
+              <Search className="pointer-events-none absolute start-2 top-2 size-4 text-tv-text-faint" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث: رقم، اسم، دولة، موظف" className={`${CELL} ps-8`} />
             </label>
           </div>
 
           {/* the table is wider than the screen: arrows, or drag it with the mouse; the name stays in place */}
           <div className="mt-3 flex items-center justify-end gap-1.5">
-            <span className="me-auto text-[11px] font-semibold text-[#93aaa3]">اسحب الجدول بالماوس أو استخدم الأسهم لرؤية بقية الأعمدة</span>
+            <span className="me-auto text-[11px] font-semibold text-tv-text-faint">اسحب الجدول بالماوس أو استخدم الأسهم لرؤية بقية الأعمدة</span>
             {([
               ["الأعمدة السابقة", -1, <ChevronRight key="r" className="size-4" />],
               ["الأعمدة التالية", 1, <ChevronLeft key="l" className="size-4" />],
@@ -939,7 +939,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
             onPointerLeave={() => (drag.current = null)}
           >
             <table className="w-full min-w-[2650px] border-separate border-spacing-y-1 text-start text-[12px]">
-              <thead className="sticky top-0 z-20 bg-white text-[10.5px] font-extrabold text-[#78948f]">
+              <thead className="sticky top-0 z-20 bg-white text-[10.5px] font-extrabold text-tv-text-faint">
                 <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-start">
                   {/* the owner's order (2026-10-18); the three times are computed, never typed */}
                   <th className="sticky start-0 z-10 bg-white">اسم العميل</th>
@@ -966,7 +966,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                   const tone = TONE.get(l.inquiry ?? "");
                   const times = timing(l, now);
                   return (
-                    <tr key={l.id} className={`[&>td]:px-2 [&>td]:py-1.5 ${l.status === "closed" ? "bg-[#f5f7fa] text-[#78948f]" : "bg-[#f8fbfa]"}`}>
+                    <tr key={l.id} className={`[&>td]:px-2 [&>td]:py-1.5 ${l.status === "closed" ? "bg-[#f5f7fa] text-tv-text-faint" : "bg-[#f8fbfa]"}`}>
                       <td className="sticky start-0 z-10 w-44 min-w-[11rem] rounded-s-[10px] border-s-4 bg-inherit" style={{ borderInlineStartColor: tone?.color ?? "#cfe0d9" }}>
                         {text(l, "name", "اسم العميل")}
                       </td>
@@ -980,7 +980,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                             <DirText>{l.phone}</DirText>
                           </button>
                         </span>
-                        <span className="block text-[10px] font-semibold text-[#93aaa3]">
+                        <span className="block text-[10px] font-semibold text-tv-text-faint">
                           <DirText>{dayOf.get(l.id)}</DirText>
                           {l.returning ? (
                             <span className="ms-1 rounded-full px-1.5 font-bold" style={{ background: RETURNING.color, color: RETURNING.ink }}>
@@ -996,7 +996,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                           <option value="" disabled>جارٍ قراءة الطلب</option>
                           {[...new Set([...INQUIRIES.map((i) => i.label), l.inquiry ?? ""])].filter(Boolean).map((i) => <option key={i}>{i}</option>)}
                         </select>
-                        <span className="mt-1 block text-[10px] text-[#647c76]">{l.inquiry_source === "manual" ? "اختيار موظف" : l.inquiry_source === "auto" ? "تصنيف تلقائي" : l.inquiry_source === "murad" ? "تصنيف مُراد" : l.inquiry_source === "sheet" ? "من الشيت" : l.inquiry ? "تصنيف سابق · المصدر غير موثّق" : "بانتظار التصنيف"}</span>
+                        <span className="mt-1 block text-[10px] text-tv-text-faint">{l.inquiry_source === "manual" ? "اختيار موظف" : l.inquiry_source === "auto" ? "تصنيف تلقائي" : l.inquiry_source === "murad" ? "تصنيف مُراد" : l.inquiry_source === "sheet" ? "من الشيت" : l.inquiry ? "تصنيف سابق · المصدر غير موثّق" : "بانتظار التصنيف"}</span>
                       </td>
                       <td className="min-w-[9rem]">
                         <DestinationCell key={`${l.id}-${l.destination ?? ""}`} value={l.destination ?? ""} items={placeItems} save={(v) => save(l, { destination: v })} />
@@ -1022,7 +1022,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                           type="button"
                           disabled={busy !== null}
                           onClick={() => save(l, { status: l.status === "open" ? "closed" : "open" })}
-                          className={`h-8 w-full rounded-[8px] text-[11.5px] font-bold ${l.status === "open" ? "bg-[#2f7fc0] text-white hover:bg-[#256aa3]" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
+                          className={`h-8 w-full rounded-[8px] text-[11.5px] font-bold max-sm:min-h-10 ${l.status === "open" ? "bg-[#2f7fc0] text-white hover:bg-[#256aa3]" : "border border-[#cfe0d9] bg-white text-[#557d78]"}`}
                         >
                           {l.status === "open" ? "مفتوحة · أغلق" : "مغلقة · افتح"}
                         </button>
@@ -1036,7 +1036,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                           type="button"
                           disabled={busy !== null}
                           onClick={() => void open(l)}
-                          className={`inline-flex h-8 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold ${l.file ? "border border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#185045] text-white hover:bg-[#0f4439]"}`}
+                          className={`inline-flex h-8 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold max-sm:min-h-10 ${l.file ? "border border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success" : "bg-[#185045] text-white hover:bg-[#0f4439]"}`}
                         >
                           {busy === `p-${l.id}` ? <Loader2 className="size-3.5 animate-spin" /> : null}
                           {l.file ? l.file.destination || "فتح البرنامج" : "ابدأ برنامج"}
@@ -1047,19 +1047,19 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                 })}
               </tbody>
             </table>
-            {list.length === 0 ? <p className="py-8 text-center text-[12px] font-semibold text-[#93aaa3]">لا محادثات هنا.</p> : null}
+            {list.length === 0 ? <p className="py-8 text-center text-[12px] font-semibold text-tv-text-faint">لا محادثات هنا.</p> : null}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] font-semibold text-[#78948f]">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] font-semibold text-tv-text-faint">
             <span>
               {list.length} من {leads.length}
               {pages > 1 ? ` — الصفحة ${page + 1} من ${pages}` : ""}
             </span>
             {pages > 1 ? (
               <span className="ms-auto inline-flex items-center gap-1">
-                <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40">
+                <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40 max-sm:min-h-10">
                   السابق
                 </button>
-                <button type="button" disabled={page >= pages - 1} onClick={() => goPage(page + 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40">
+                <button type="button" disabled={page >= pages - 1} onClick={() => goPage(page + 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40 max-sm:min-h-10">
                   التالي
                 </button>
               </span>
@@ -1089,7 +1089,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
           ) : (
             <>
               <ul className="space-y-2">
-                {thread.result.messages.length === 0 ? <li className="py-6 text-center text-[12px] font-semibold text-[#93aaa3]">لا رسائل</li> : null}
+                {thread.result.messages.length === 0 ? <li className="py-6 text-center text-[12px] font-semibold text-tv-text-faint">لا رسائل</li> : null}
                 {thread.result.messages.map((m) => (
                   <li key={m.id} className={`flex ${m.fromClient ? "justify-start" : "justify-end"}`}>
                     <div
@@ -1098,7 +1098,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{m.text || "—"}</p>
-                      <p className="mt-1 text-[10px] font-semibold text-[#93aaa3]">
+                      <p className="mt-1 text-[10px] font-semibold text-tv-text-faint">
                         {m.fromClient ? "العميل" : m.isPrivate ? `ملاحظة داخلية · ${m.sender ?? ""}` : (m.sender ?? "نحن")} ·{" "}
                         <DirText>{new Date(m.at * 1000).toLocaleString("en-GB", { timeZone: "Asia/Riyadh", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</DirText>
                       </p>

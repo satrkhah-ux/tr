@@ -21,7 +21,7 @@ export function EmptyState({ icon: Icon = Inbox, title, description, action, cla
       </div>
       <div className="text-[17px] font-extrabold text-[#003c3a]">{title}</div>
       {description ? (
-        <div className="mt-1.5 max-w-[320px] text-[13.5px] leading-relaxed text-[#8aa29b]">{description}</div>
+        <div className="mt-1.5 max-w-[320px] text-[13.5px] leading-relaxed text-tv-text-faint">{description}</div>
       ) : null}
       {action ? (
         <button

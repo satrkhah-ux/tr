@@ -36,7 +36,7 @@ export type TourCatalog = {
 
 /** The compact field both screens' tour rows use. */
 export const tourField = basicField;
-const caption = "text-[10.5px] font-bold text-[#7a948f]";
+const caption = "text-[10.5px] font-bold text-tv-text-faint";
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 /** A car in a tour's name — the old list filed a tour once per car: «جولة البسفور (فيتو)»، «… (باص كبير)». */
@@ -288,7 +288,7 @@ export function TourRow({
             // a tour from the price list arrives priced for the tours car (or the car its price is for); a typed one keeps what was there
             onChange(chosenTour(catalog, value, pick));
           }}
-          className={`${field} ${pick.free ? "text-[#7a948f]" : ""}`}
+          className={`${field} ${pick.free ? "text-tv-text-faint" : ""}`}
         />,
       )}
       {compact && !carOpen && !pick.free ? (
@@ -365,7 +365,7 @@ export function TourRow({
               disabled={pick.free}
               onChange={(e) => onChange({ text: e.target.value })}
               rows={2}
-              className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none transition-colors focus:border-[#2aa87a] disabled:bg-[#f4f7f6]"
+              className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a] disabled:bg-[#f4f7f6]"
             />,
             true,
           )
@@ -392,7 +392,7 @@ export function TourRow({
               value={pick.text}
               onChange={(e) => onChange({ text: e.target.value })}
               rows={3}
-              className="mt-1 w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[12.5px] leading-6 text-[#185045] outline-none focus:border-[#2aa87a]"
+              className="tv-field mt-1 w-full rounded-[10px] border p-2.5 text-[12.5px] leading-6 outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
             />
           ) : null}
         </div>

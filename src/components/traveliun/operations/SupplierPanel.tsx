@@ -25,14 +25,15 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 import { OpsLinkButton } from "./OpsLinkButton";
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+import { buttonTone } from "@/components/ui/button-variants";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 const chipBtn =
-  "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold disabled:opacity-60 max-sm:min-h-10`;
 const primary =
-  "inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60";
+  `${buttonTone({ variant: "default" })} inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60`;
 
 type Fail = { ok: false; error: TranslationKey };
 
@@ -97,7 +98,7 @@ export function SupplierPanel({
           </Link>
         ) : null}
       </div>
-      <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.sup.hint")}</p>
+      <p className="mb-3 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.sup.hint")}</p>
 
       <div className="space-y-3">
         {work.suppliers.map((s) => (
@@ -125,7 +126,7 @@ export function SupplierPanel({
           </p>
           {unassigned.length > 0 ? (
             <>
-              <p className="mb-1.5 text-[11.5px] font-bold text-[#93aaa3]">{t("ops.sup.unassigned")}</p>
+              <p className="mb-1.5 text-[11.5px] font-bold text-tv-text-faint">{t("ops.sup.unassigned")}</p>
               <ul className="space-y-1.5">
                 {unassigned.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[9px] border border-[#eef3f1] px-3 py-2">
@@ -284,10 +285,10 @@ function SupplierGroup({
 
 const STATE_STYLE: Record<CaseBookingSupplier["state"], string> = {
   none: "bg-[#eef4f1] text-[#557d78]",
-  sent: "bg-[#fff8e8] text-[#a86a10]",
-  overdue: "bg-[#fdecef] text-[#c22850]",
-  confirmed: "bg-[#e9f7f0] text-[#0f7a52]",
-  declined: "bg-[#fdecef] text-[#c22850]",
+  sent: "bg-tv-status-warning-bg text-tv-status-warning",
+  overdue: "bg-tv-status-danger-bg text-tv-status-danger",
+  confirmed: "bg-tv-status-success-bg text-tv-status-success",
+  declined: "bg-tv-status-danger-bg text-tv-status-danger",
 };
 
 function SupplierBookingRow({ booking, info, work }: { booking: OperationBooking; info: CaseBookingSupplier | undefined; work: SupplierWork }) {
@@ -316,7 +317,7 @@ function SupplierBookingRow({ booking, info, work }: { booking: OperationBooking
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[12.5px] font-extrabold text-[#0f3d38]">{booking.title}</p>
-          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#93aaa3]">
+          <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-tv-text-faint">
             {booking.start_date ? <DirText dir="ltr">{booking.start_date}</DirText> : null}
             <span className={`rounded-full px-2 py-0.5 ${STATE_STYLE[state]}`}>{t(`ops.sup.state.${state}`, { h: hours })}</span>
             {booking.status === "confirmed" ? (
@@ -564,7 +565,7 @@ export function PaymentList({ payments }: { payments: CaseSupplierPayment[] }) {
           <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold">
             <span className="text-[#557d78]">
               {t(`ops.sup.pay.kind.${p.kind}`)} · {t(`ops.sup.pay.method.${p.method as (typeof METHODS)[number]}`)}
-              <span className="tv-tnum ms-2 font-semibold text-[#93aaa3]">
+              <span className="tv-tnum ms-2 font-semibold text-tv-text-faint">
                 <DirText dir="ltr">{`${p.paid_on}${p.reference ? ` · ${p.reference}` : ""}`}</DirText>
               </span>
             </span>

@@ -558,7 +558,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
       <section className={sectionClass}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.citiesTitle")}</h2>
-          <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.datesAuto")}</p>
+          <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("pg.datesAuto")}</p>
         </div>
         <FieldIssue field="cities" className="mb-3" />
         <FieldIssue field="hotels" className="mb-3" />
@@ -573,7 +573,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
             <button
               type="button"
               onClick={takeCitiesFromFlights}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold max-sm:min-h-10"
             >
               {t("pg.citiesFromFlightsTake")}
             </button>
@@ -581,7 +581,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
         ) : null}
 
         {data.cities.length === 0 ? (
-          <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+          <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">
             {t("pg.err.noCities")}
           </p>
         ) : (
@@ -631,7 +631,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                         <DirText dir="ltr">{new Intl.NumberFormat("en-US").format(price)}</DirText>
                       </span>
                     ) : null}
-                    <span className="shrink-0 text-[11.5px] font-bold text-[#93aaa3]">{t("pg.flow.edit")}</span>
+                    <span className="shrink-0 text-[11.5px] font-bold text-tv-text-faint">{t("pg.flow.edit")}</span>
                   </button>
                 );
               }
@@ -720,7 +720,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           type="button"
                           disabled={cityBusy || !newCityName.trim()}
                           onClick={() => void saveNewCity(cityIndex)}
-                          className="inline-flex h-11 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50"
+                          className="tv-btn-primary inline-flex h-11 items-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold transition-colors disabled:opacity-50"
                         >
                           {cityBusy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
                           {t("pg.saveCity")}
@@ -735,7 +735,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           </button>
                         ) : null}
                       </div>
-                      <p className="mt-1.5 text-[11px] font-semibold text-[#93aaa3]">
+                      <p className="mt-1.5 text-[11px] font-semibold text-tv-text-faint">
                         {t("pg.newCityHint", { country: data.trip.country || "—" })}
                       </p>
                       {cityError ? (
@@ -766,7 +766,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           {cov ? (
                             <span
                               className={`tv-tnum rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                                short ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
+                                short ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"
                               }`}
                             >
                               <DirText dir="ltr">{`${cov.covered - cov.extra}/${cov.needed}`}</DirText> ليالٍ مغطّاة
@@ -785,7 +785,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           )}
                         </>
                       ) : (
-                        <span className="text-[11.5px] font-bold text-[#93aaa3]">{t("pg.chooseCityFirst")}</span>
+                        <span className="text-[11.5px] font-bold text-tv-text-faint">{t("pg.chooseCityFirst")}</span>
                       )}
                     </div>
                   ) : null}
@@ -795,7 +795,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                       <button
                         type="button"
                         onClick={() => setExpanded(null)}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#bfe5d4] bg-[#e9f7f0] px-3.5 text-[12px] font-bold text-[#0f7a52] transition-colors hover:bg-[#dff3ea]"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#bfe5d4] bg-[#e9f7f0] px-3.5 text-[12px] font-bold text-[#0f7a52] transition-colors hover:bg-[#dff3ea] max-sm:min-h-10"
                       >
                         <CheckCircle2 className="size-3.5" />
                         {t("pg.cityDone")}
@@ -831,7 +831,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
               // No coverage means the city has no name or no nights yet — nothing
               // to pick a hotel for. (Also narrows `cov` for the block below.)
               if (!cov) {
-                return <p className="text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.chooseCityFirst")}</p>;
+                return <p className="text-[12.5px] font-semibold text-tv-text-faint">{t("pg.chooseCityFirst")}</p>;
               }
               return (
                 <div className="space-y-3">
@@ -921,7 +921,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                     <button
                       type="button"
                       onClick={() => void saveHotels()}
-                      className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-5 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439]"
+                      className="tv-btn-primary inline-flex h-10 items-center gap-1.5 rounded-[10px] px-5 text-[12.5px] font-bold transition-colors"
                     >
                       <Check className="size-4" />
                       {t("pg.saveHotels")}
@@ -956,18 +956,18 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
             <Sparkles className="size-4 text-[#2aa87a]" />
             {t("pg.reuseTitle")}
           </h3>
-          <p className="mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("pg.reuseHint")}</p>
+          <p className="mb-3 text-[12px] font-semibold text-tv-text-faint">{t("pg.reuseHint")}</p>
           {copied ? (
             <p className="mb-3 rounded-[10px] border border-[#bfe5d4] bg-[#e9f7f0] px-4 py-2.5 text-[12.5px] font-bold text-[#0f7a52]">
               {t("pg.reuseCopied")}
             </p>
           ) : null}
           {!reuseEligible ? (
-            <p className="text-[12.5px] text-[#93aaa3]">{t("pg.reuseNoMatches")}</p>
+            <p className="text-[12.5px] text-tv-text-faint">{t("pg.reuseNoMatches")}</p>
           ) : programs === null ? (
             <div className="tv-shimmer h-16 rounded-[10px]" />
           ) : programs.length === 0 ? (
-            <p className="text-[12.5px] text-[#93aaa3]">{t("pg.reuseNoMatches")}</p>
+            <p className="text-[12.5px] text-tv-text-faint">{t("pg.reuseNoMatches")}</p>
           ) : (
             <ul className="space-y-2">
               {programs.map((program) => (
@@ -992,7 +992,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                     type="button"
                     disabled={copying !== null}
                     onClick={() => void copyProgram(program.serial)}
-                    className="inline-flex h-9 items-center gap-2 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-60"
+                    className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12px] font-bold transition-colors disabled:opacity-60 max-sm:min-h-10"
                   >
                     {copying === program.serial ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
                     {t("pg.reuseCopy")}

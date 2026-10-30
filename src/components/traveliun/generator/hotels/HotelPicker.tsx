@@ -167,7 +167,7 @@ export function HotelPicker({
           <button
             type="button"
             onClick={() => setShowOptions((v) => !v)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold transition-colors ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold transition-colors max-sm:min-h-10 ${
               showOptions ? "border-[#185045] bg-[#f0f7f4] text-[#185045]" : "border-[#dbe6e1] text-[#557d78]"
             }`}
           >
@@ -249,12 +249,12 @@ export function HotelPicker({
             ) : error ? (
               <p className="py-2 text-[12.5px] font-bold text-[#c22850]">{error}</p>
             ) : results === null ? (
-              <p className="py-3 text-center text-[12px] font-bold text-[#93aaa3]">
+              <p className="py-3 text-center text-[12px] font-bold text-tv-text-faint">
                 اضغط «بحث» لعرض الفنادق المتاحة لهذه الليالي.
               </p>
             ) : visible.length > 0 ? (
               <div className="space-y-1.5">
-                <p className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                <p className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                   <DirText dir="ltr">{visible.length}</DirText> فندق
                 </p>
                 {visible.slice(0, shown).map((hotel) => (
@@ -264,7 +264,7 @@ export function HotelPicker({
                   <button
                     type="button"
                     onClick={() => setShown((n) => n + PAGE)}
-                    className="tv-tnum w-full rounded-[9px] border border-[#cfe0d9] py-2 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                    className="tv-btn-secondary tv-tnum w-full rounded-[9px] border py-2 text-[11.5px] font-bold"
                   >
                     عرض المزيد ({visible.length - shown})
                   </button>
@@ -276,7 +276,7 @@ export function HotelPicker({
                 ) : null}
               </div>
             ) : (
-              <div className="py-2 text-[12.5px] text-[#93aaa3]">
+              <div className="py-2 text-[12.5px] text-tv-text-faint">
                 <p>{t("pg.supplier.noResults")}</p>
                 {source === "internal" ? (
                   <AddHotelInline countryName={countryName} cityName={stay.cityName} onCreated={onHotelCreated} />

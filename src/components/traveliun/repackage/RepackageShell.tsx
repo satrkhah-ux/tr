@@ -131,7 +131,7 @@ export function RepackageShell({
               <UserRound className="size-3.5 shrink-0" />
               <span className="truncate">{data.customer.customer_name || data.customer.customer_phone}</span>
               {data.customer.customer_name && data.customer.customer_phone ? (
-                <span className="tv-tnum text-[#78948f]"><DirText dir="ltr">{data.customer.customer_phone}</DirText></span>
+                <span className="tv-tnum text-tv-text-faint"><DirText dir="ltr">{data.customer.customer_phone}</DirText></span>
               ) : null}
             </span>
           ) : (
@@ -147,10 +147,10 @@ export function RepackageShell({
             role="status"
             className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${
               saveState === "error"
-                ? "bg-[#fdeef2] text-[#c22850]"
+                ? "bg-tv-status-danger-bg text-tv-status-danger"
                 : saveState === "saving"
-                  ? "bg-[#fff8e8] text-[#a86a10]"
-                  : "bg-[#e9f7f0] text-[#0f7a52]"
+                  ? "bg-tv-status-warning-bg text-tv-status-warning"
+                  : "bg-tv-status-success-bg text-tv-status-success"
             }`}
           >
             {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : saveState === "error" ? <XCircle className="size-3.5" /> : <Check className="size-3.5" />}
@@ -161,7 +161,7 @@ export function RepackageShell({
         <div className="grid items-start gap-4 xl:grid-cols-[230px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <nav className="rounded-2xl border border-[#e2ebe7] bg-white p-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-              <p className="mb-2 px-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]">{t("pg.progress")}</p>
+              <p className="mb-2 px-2 text-[11px] font-extrabold tracking-wide text-tv-text-faint">{t("pg.progress")}</p>
               <ol className="space-y-0.5">
                 {visibleStages.map((meta, index) => {
                   const status = validation.stages[meta.key];
@@ -177,7 +177,7 @@ export function RepackageShell({
                       >
                         <StatusIcon status={status} active={active} />
                         <span className="flex-1">{t(meta.labelKey)}</span>
-                        <span className={`tv-tnum text-[10px] font-extrabold ${active ? "text-[#8fe3c4]" : "text-[#b6c9c2]"}`}>
+                        <span className={`tv-tnum text-[10px] font-extrabold ${active ? "text-[#8fe3c4]" : "text-tv-text-faint"}`}>
                           <DirText dir="ltr">{String(index + 1)}</DirText>
                         </span>
                       </Link>
@@ -206,8 +206,8 @@ export function RepackageShell({
               </div>
             ) : null}
 
-            <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-              <p className="mb-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]">{t("pg.validationPanel")}</p>
+            <div className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <p className="mb-2 text-[11px] font-extrabold tracking-wide text-tv-text-faint">{t("pg.validationPanel")}</p>
               {validation.blocking.length === 0 && validation.warnings.length === 0 ? (
                 <p className="flex items-start gap-2 text-[12px] font-bold text-[#0f7a52]">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
@@ -240,7 +240,7 @@ function StatusIcon({ status, active }: { status: StageStatus; active: boolean }
   if (status === "complete") return <CheckCircle2 className={`size-4 shrink-0 ${base || "text-[#0f7a52]"}`} />;
   if (status === "error") return <XCircle className={`size-4 shrink-0 ${base || "text-[#c22850]"}`} />;
   if (status === "partial") return <CircleDot className={`size-4 shrink-0 ${base || "text-[#d99a00]"}`} />;
-  return <Circle className={`size-4 shrink-0 ${base || "text-[#c2cfca]"}`} />;
+  return <Circle className={`size-4 shrink-0 ${base || "text-tv-text-faint"}`} />;
 }
 
 function IssueList({

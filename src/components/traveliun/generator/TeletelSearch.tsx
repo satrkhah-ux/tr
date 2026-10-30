@@ -58,9 +58,9 @@ export function TeletelSearch({ onPick }: { onPick: (hit: TeletelCustomerHit) =>
       <span className="mb-1.5 block text-[12px] font-bold text-[#557d78]">{t("tl.search")}</span>
       <div className="relative">
         {searching && active ? (
-          <Loader2 className="absolute end-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-[#8aa29b]" />
+          <Loader2 className="absolute end-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-tv-text-faint" />
         ) : (
-          <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
         )}
         <input
           value={query}
@@ -86,7 +86,7 @@ export function TeletelSearch({ onPick }: { onPick: (hit: TeletelCustomerHit) =>
       {open && configured && reachable && active ? (
         <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-[11px] border border-[#e2ebe7] bg-white shadow-lg dark:border-[#294039] dark:bg-[#0f1f1b]">
           {hits.length === 0 && !searching ? (
-            <p className="px-4 py-3 text-[12.5px] font-semibold text-[#93aaa3]">{t("tl.noResults")}</p>
+            <p className="px-4 py-3 text-[12.5px] font-semibold text-tv-text-faint">{t("tl.noResults")}</p>
           ) : (
             hits.map((hit) => (
               <button
@@ -102,7 +102,7 @@ export function TeletelSearch({ onPick }: { onPick: (hit: TeletelCustomerHit) =>
                   <span className="block truncate text-[13.5px] font-extrabold text-[#0f3d38] dark:text-[#eaf3ef]">
                     {hit.name || t("tl.unnamed")}
                   </span>
-                  <span className="block truncate text-[12px] font-semibold text-[#8aa29b]">
+                  <span className="block truncate text-[12px] font-semibold text-tv-text-faint">
                     <DirText dir="ltr">{hit.phone || hit.email}</DirText>
                   </span>
                 </span>

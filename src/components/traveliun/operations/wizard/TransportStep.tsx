@@ -40,12 +40,13 @@ import { useSafeTransition } from "../../useSafeTransition";
 import { DriverSend } from "../DriversPanel";
 import { PullNotice } from "./FlightsStep";
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+import { buttonTone } from "@/components/ui/button-variants";
+const card = "tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 const primary =
-  "inline-flex h-10 items-center justify-center gap-1.5 rounded-[10px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-45";
+  `${buttonTone({ variant: "default" })} inline-flex h-10 items-center justify-center gap-1.5 rounded-[10px] px-3.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-45`;
 const secondary =
   "inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
 
@@ -81,7 +82,7 @@ export function TransportStep({ data }: StepProps) {
   if (cities.length === 0) {
     // the offer has drives or tours the case does not hold yet — pull them, never «لا ينطبق»
     if (notPulled(data, "transport")) return <PullNotice operationId={operationId} />;
-    return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.transport.none")}</p>;
+    return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">{t("wz.transport.none")}</p>;
   }
   // the server's clock, as the supplier panel reads it — the same hours on both renders (no work, no request to time)
   const now = new Date(data.supplierWork?.now ?? 0);
@@ -136,9 +137,9 @@ function FoldedCity({ city, done, supplierLabel, onOpen }: { city: TransportCity
         done ? "border-[#cfe9dc] bg-[#f3faf6]" : "border-[#e2ebe7] bg-white hover:bg-[#f8fbf9]"
       }`}
     >
-      {done ? <CheckCircle2 className="size-4 shrink-0 text-[#0f7a52]" /> : <MapPin className="size-4 shrink-0 text-[#93aaa3]" />}
+      {done ? <CheckCircle2 className="size-4 shrink-0 text-[#0f7a52]" /> : <MapPin className="size-4 shrink-0 text-tv-text-faint" />}
       <span className="text-[13px] font-extrabold text-[#0f3d38]">{city.name || t("wz.transport.noCity")}</span>
-      <span className="text-[11.5px] font-semibold text-[#6d8a84]">{t("wz.transport.trips", { n: String(city.trips.length) })}</span>
+      <span className="text-[11.5px] font-semibold text-tv-text-faint">{t("wz.transport.trips", { n: String(city.trips.length) })}</span>
       {done ? (
         <span className="text-[11.5px] font-bold text-[#0f7a52]">
           {city.noSupplier ? t("wz.transport.noSupplierDone") : (supplierLabel ?? "")}
@@ -277,10 +278,10 @@ function CityCard({
         <span
           className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
             city.request === "confirmed"
-              ? "bg-[#e1f3e9] text-[#0f7a52]"
+              ? "bg-tv-status-success-bg text-tv-status-success"
               : city.request === "sent"
                 ? "bg-[#eaf1ff] text-[#2b57c4]"
-                : "bg-[#fff4e0] text-[#a86a10]"
+                : "bg-tv-status-warning-bg text-tv-status-warning"
           }`}
         >
           {t(`ops.sup.state.${city.request}` as TranslationKey, { h: String(city.sentAt ? hoursSince(city.sentAt, now) : 0) })}
@@ -391,23 +392,23 @@ function CityCard({
             {t("wz.transport.paperOpen")}
           </button>
         ) : null}
-        <p className="w-full text-[11px] font-semibold text-[#93aaa3]">{t(city.confirmed ? "wz.transport.paperHintDone" : "wz.transport.paperHint")}</p>
+        <p className="w-full text-[11px] font-semibold text-tv-text-faint">{t(city.confirmed ? "wz.transport.paperHintDone" : "wz.transport.paperHint")}</p>
       </div>
 
       {draft ? (
         <div className="mt-3 rounded-[9px] border border-[#d6eadf] bg-[#f8fbf9] p-3">
           <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
             {draft.to_label}
-            {draft.to_phone ? <DirText dir="ltr" className="font-semibold text-[#93aaa3]">{draft.to_phone}</DirText> : null}
+            {draft.to_phone ? <DirText dir="ltr" className="font-semibold text-tv-text-faint">{draft.to_phone}</DirText> : null}
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.request.review")}</p>
+          <p className="mb-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.request.review")}</p>
           {/* editable on purpose — what is stored is what actually went out */}
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={12}
             dir="auto"
-            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div className="flex flex-wrap gap-2">
             <button

@@ -34,9 +34,9 @@ import { useSafeTransition, useSessionField } from "../useSafeTransition";
  * payment, its «سند قبض», and the installment schedule.
  */
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 const chip =
   "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
@@ -44,9 +44,9 @@ const chip =
 const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 const STATE_TONE: Record<InstallmentState, string> = {
-  paid: "bg-[#e9f7f0] text-[#0f7a52]",
-  partial: "bg-[#fff8e8] text-[#a86a10]",
-  overdue: "bg-[#fdecef] text-[#c22850]",
+  paid: "bg-tv-status-success-bg text-tv-status-success",
+  partial: "bg-tv-status-warning-bg text-tv-status-warning",
+  overdue: "bg-tv-status-danger-bg text-tv-status-danger",
   due: "bg-[#eef4f1] text-[#557d78]",
 };
 
@@ -92,7 +92,7 @@ export function PaymentsPanel({
 
       <div
         className={`mt-3 rounded-[11px] px-4 py-3 ${
-          remaining != null && remaining <= 0 ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff8e8] text-[#a86a10]"
+          remaining != null && remaining <= 0 ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"
         }`}
       >
         <p className="text-[11.5px] font-bold opacity-70">
@@ -253,7 +253,7 @@ function PaymentForm({
           type="button"
           disabled={pending || !(Number(amount) > 0) || !date}
           onClick={save}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Wallet className="size-4" />}
           {editing ? t("save") : t("ops.payment.add")}
@@ -311,7 +311,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
             {t(`ops.payment.${payment.kind}` as TranslationKey)}
             {payment.method ? <span className="ms-2 font-semibold text-[#557d78]">{t(`ops.pay.method.${payment.method}` as TranslationKey)}</span> : null}
           </p>
-          <p className="tv-tnum mt-0.5 font-semibold text-[#93aaa3]">
+          <p className="tv-tnum mt-0.5 font-semibold text-tv-text-faint">
             <DirText dir="ltr">{payment.paid_at}</DirText>
             {payment.reference ? (
               <span className="ms-2">
@@ -324,7 +324,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
               </span>
             ) : null}
           </p>
-          {payment.note ? <p className="mt-0.5 font-semibold text-[#93aaa3]">{payment.note}</p> : null}
+          {payment.note ? <p className="mt-0.5 font-semibold text-tv-text-faint">{payment.note}</p> : null}
         </div>
         <span className={`tv-tnum shrink-0 ${refund ? "text-[#c22850]" : "text-[#0f3d38]"}`}>
           <DirText dir="ltr">{`${refund ? "-" : ""}${fmt(payment.amount)} ${payment.currency}`}</DirText>
@@ -339,7 +339,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
             type="button"
             disabled={pending}
             onClick={() => run(() => deletePayment(payment.id))}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c22850] px-3 text-[11.5px] font-bold text-white disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#c22850] px-3 text-[11.5px] font-bold text-white disabled:opacity-60 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
             {t("delete")}
@@ -378,7 +378,7 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
                 type="button"
                 disabled={pending}
                 onClick={() => setConfirming(true)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
               >
                 <Trash2 className="size-3.5" />
                 {t("delete")}
@@ -476,7 +476,7 @@ function Schedule({
           </div>
         )}
       </div>
-      {stored ? null : <p className="mt-1 text-[11px] font-semibold text-[#93aaa3]">{t("ops.pay.scheduleDefault")}</p>}
+      {stored ? null : <p className="mt-1 text-[11px] font-semibold text-tv-text-faint">{t("ops.pay.scheduleDefault")}</p>}
 
       {draft ? (
         <div className="mt-2 space-y-2">
@@ -522,7 +522,7 @@ function Schedule({
               type="button"
               disabled={pending || draft.length === 0 || draft.some((r) => !r.due_date || !(Number(r.amount) > 0))}
               onClick={() => save(draft.map((r) => ({ due_date: r.due_date, amount: Number(r.amount) })))}
-              className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+              className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60 max-sm:min-h-10"
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
               {t("save")}
@@ -533,7 +533,7 @@ function Schedule({
           </div>
         </div>
       ) : rows.length === 0 ? (
-        <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.pay.noTotal")}</p>
+        <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("ops.pay.noTotal")}</p>
       ) : (
         <ul className="mt-2 space-y-1.5">
           {rows.map((r, i) => (

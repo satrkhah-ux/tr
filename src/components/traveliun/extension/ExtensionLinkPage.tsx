@@ -107,7 +107,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
   return (
     <TraveliunShell title="nav.extension">
       <div className="mx-auto max-w-3xl space-y-4 p-4">
-        <section className="rounded-[14px] border border-[#dbe6e1] bg-white p-5">
+        <section className="tv-card rounded-[14px] border p-5">
           <h1 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
             <Puzzle className="size-5 text-[#e0a92a]" />
             إضافة المتصفح
@@ -121,7 +121,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                 type="button"
                 onClick={() => void link()}
                 disabled={busy}
-                className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-[13.5px] font-extrabold text-white disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-[13.5px] font-extrabold disabled:opacity-60"
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 {ext.linked ? "أعد ربط هذا المتصفح" : "اربط هذا المتصفح"}
@@ -131,7 +131,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                 الإضافة غير مثبتة في هذا المتصفح — ثبّتها أولاً (اطلب الحزمة من الإدارة)، ثم افتح هذه الصفحة من جديد.
               </p>
             )}
-            {ext ? <span className="text-[11.5px] font-semibold text-[#78948f]">الإضافة مثبتة · الإصدار {ext.version}</span> : null}
+            {ext ? <span className="text-[11.5px] font-semibold text-tv-text-faint">الإضافة مثبتة · الإصدار {ext.version}</span> : null}
           </div>
           {note ? (
             <p className={`mt-3 text-[13px] font-bold ${note.ok ? "text-[#185045]" : "text-[#c43d3d]"}`} role="status">
@@ -140,7 +140,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
           ) : null}
         </section>
 
-        <section className="rounded-[14px] border border-[#dbe6e1] bg-white p-5">
+        <section className="tv-card rounded-[14px] border p-5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="flex-1 text-[14px] font-extrabold text-[#003c3a]">الأجهزة المربوطة</h2>
             {initial.length > 0 ? (
@@ -148,7 +148,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                 type="button"
                 onClick={() => void revokeAll()}
                 disabled={busy}
-                className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
               >
                 <Trash2 className="size-3.5" />
                 ألغِ كل الأجهزة
@@ -156,14 +156,14 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
             ) : null}
           </div>
           {initial.length === 0 ? (
-            <p className="mt-2 text-[12.5px] font-semibold text-[#78948f]">لا جهاز مربوط بعد.</p>
+            <p className="mt-2 text-[12.5px] font-semibold text-tv-text-faint">لا جهاز مربوط بعد.</p>
           ) : (
             <ul className="mt-2 divide-y divide-[#edf2ef]">
               {initial.map((l) => (
                 <li key={l.id} className="flex flex-wrap items-center gap-3 py-2.5">
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-bold text-[#185045]">{l.label || "متصفح"}</span>
-                    <span className="block text-[11.5px] font-semibold text-[#78948f]">
+                    <span className="block text-[11.5px] font-semibold text-tv-text-faint">
                       رُبط {fmt(l.created_at)} · آخر استعمال {fmt(l.last_used_at)} · ينتهي {fmt(l.expires_at)}
                     </span>
                   </span>
@@ -171,7 +171,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
                     type="button"
                     onClick={() => void revoke(l.id)}
                     disabled={busy}
-                    className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                    className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60 max-sm:min-h-10"
                   >
                     <Trash2 className="size-3.5" />
                     إلغاء

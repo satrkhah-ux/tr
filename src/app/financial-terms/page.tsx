@@ -37,7 +37,7 @@ export default async function FinancialTermsPage() {
           هذا ما يظهر في ملف العميل تحت «الشروط المالية»، حسب دولة البرنامج. التواريخ والمبالغ تُحسب في الملف من تاريخ السفر وإجمالي العرض.
         </p>
         {parts.map((p) => (
-          <section key={p.title} className="rounded-2xl border border-[#dbe6e1] bg-white p-4 dark:border-[#294039] dark:bg-[#14231f]">
+          <section key={p.title} className="tv-card rounded-2xl border p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
               <h2 className="text-[15px] font-extrabold text-[#185045] dark:text-[#d6e5df]">{p.title}</h2>
               {manage ? (
@@ -56,7 +56,7 @@ export default async function FinancialTermsPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] text-[#93aaa3]">{p.empty}</p>
+              <p className="text-[12.5px] text-tv-text-faint">{p.empty}</p>
             )}
           </section>
         ))}

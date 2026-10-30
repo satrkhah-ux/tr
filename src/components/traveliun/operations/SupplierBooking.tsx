@@ -33,7 +33,7 @@ import { useSafeTransition } from "../useSafeTransition";
  */
 
 const field =
-  "h-10 w-full rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[9px] border px-2.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const btn =
   "inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold transition-colors disabled:opacity-60";
 
@@ -208,7 +208,7 @@ export function SupplierBooking({
               {typed.sar != null && typed.currency !== "SAR" ? <DirText dir="ltr" className="tv-tnum">{` ≈ ${money(typed.sar, "SAR")}`}</DirText> : null}
             </p>
           ) : null}
-          {party ? <p className="text-[11px] font-semibold text-[#93aaa3]">{`${party.rooms} غرف · ${party.adults} بالغ · ${party.children} طفل`}</p> : null}
+          {party ? <p className="text-[11px] font-semibold text-tv-text-faint">{`${party.rooms} غرف · ${party.adults} بالغ · ${party.children} طفل`}</p> : null}
           {!canCheck ? (
             <p className="text-[11.5px] font-bold text-[#a86a10]">التحقق من السعر والحجز لمن يملك صلاحية «الحجز من المورّد» — أو احجز يدوياً واكتب رقم التأكيد في الأعلى.</p>
           ) : null}
@@ -287,7 +287,7 @@ export function SupplierBooking({
 
           {canBook ? (
             <>
-              <p className="text-[11px] font-bold text-[#93aaa3]">
+              <p className="text-[11px] font-bold text-tv-text-faint">
                 أسماء النزلاء بالحروف اللاتينية كما في الجواز، كل غرفة وحدها — هذا ما يُطبع على الفاوتشر.
               </p>
               {rooms.map((room, r) => (

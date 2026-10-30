@@ -165,7 +165,7 @@ export function EditStage({ draftId, data, patch }: RepackageStageProps) {
               <li className="flex items-center gap-2">
                 <span className="text-[#557d78]">{t("rp.diff.price")}:</span>
                 <DirText dir="ltr"><span className="tv-tnum text-[#a86a10]">{before?.supplier_total ?? "—"}</span></DirText>
-                <ArrowLeftRight className="size-3 text-[#93aaa3]" />
+                <ArrowLeftRight className="size-3 text-tv-text-faint" />
                 <DirText dir="ltr"><span className="tv-tnum text-[#0f7a52]">{total ?? "—"} {data.final_currency}</span></DirText>
               </li>
             ) : null}
@@ -186,7 +186,7 @@ export function EditStage({ draftId, data, patch }: RepackageStageProps) {
       </div>
 
       <div className="flex justify-end">
-        <button type="button" onClick={() => router.push(stageHref(draftId, "preview"))} className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]">
+        <button type="button" onClick={() => router.push(stageHref(draftId, "preview"))} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-bold transition-colors">
           {t("rp.stage.preview")}
         </button>
       </div>
@@ -219,7 +219,7 @@ function ListEditor({ label, items, presets, onChange, addLabel, placeholder }: 
       {remaining.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {remaining.map((p) => (
-            <button key={p} type="button" onClick={() => add(p)} className="rounded-full border border-dashed border-[#b7d0c7] px-2.5 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">＋ {p}</button>
+            <button key={p} type="button" onClick={() => add(p)} className="rounded-full border border-dashed border-[#b7d0c7] px-2.5 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10">＋ {p}</button>
           ))}
         </div>
       ) : null}
@@ -281,7 +281,7 @@ function AdditionsEditor({
                 aria-label={t("rp.add.itemPrice")}
                 onChange={(e) => setLine(a.id, { sell_price: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })}
               />
-              <span className="text-[11px] font-bold text-[#78948f]">{currency}</span>
+              <span className="text-[11px] font-bold text-tv-text-faint">{currency}</span>
             </label>
             <button type="button" className={removeButtonClass} aria-label={t("rp.delete")} onClick={() => onAdditions(additions.filter((x) => x.id !== a.id))}>
               <Trash2 className="size-3.5" />
@@ -328,7 +328,7 @@ function AdditionsEditor({
           <Plus className="size-4" />
           {t("rp.add.addFlight")}
         </button>
-        <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.add.nightsNote")}</p>
+        <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("rp.add.nightsNote")}</p>
       </div>
     </div>
   );

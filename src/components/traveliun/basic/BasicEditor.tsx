@@ -189,7 +189,7 @@ function Chip({ on, icon: Icon, label, onClick }: { on: boolean; icon: typeof Ca
       aria-pressed={on}
       onClick={onClick}
       className={`inline-flex min-h-8 max-sm:min-h-10 items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-2.5 py-1 text-[12px] font-semibold transition-colors duration-150 hover:border-[#165749] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#73B7A4] motion-reduce:transition-none max-sm:text-[11px] ${
-        on ? "border-[#BCE4D3] bg-[#EAF8F2] text-[#0F4339]" : "border-[#DBE4E2] bg-white text-[#687F7B]"
+        on ? "border-[#BCE4D3] bg-[#EAF8F2] text-[#0F4339]" : "border-[#DBE4E2] bg-white text-tv-text-faint"
       }`}
     >
       {on ? <CircleCheck className="size-[13px] fill-[#165749] text-white" /> : <Circle className="size-[13px]" />}
@@ -273,7 +273,7 @@ function NextButton({ missing, onNext, tools }: { missing: string[]; onNext: () 
         type="button"
         onClick={onNext}
         disabled={missing.length > 0}
-        className="inline-flex h-9 items-center rounded-[9px] bg-[#185045] px-5 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+        className="tv-btn-primary inline-flex h-9 items-center rounded-[9px] px-5 text-[12.5px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
       >
         {tx("next")}
       </button>
@@ -791,7 +791,7 @@ export function BasicEditor({
   // over first: `left` is clamped at 0, so a file one night too long also has none left
   const nightsNote =
     used > trip.nights ? tx("over", { n: used - trip.nights }) : trip.nights > 0 && left === 0 ? tx("complete") : tx("remaining", { n: left });
-  const nightsTone = trip.nights > 0 && used === trip.nights ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-white text-[#a86a10]";
+  const nightsTone = trip.nights > 0 && used === trip.nights ? "bg-tv-status-success-bg text-tv-status-success" : "bg-white text-[#a86a10]";
 
   // where the international flights land and leave from — the two ends of the domestic moves
   const intlLegs = data.flights.filter((f) => f.leg_order !== "internal").sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""));
@@ -809,7 +809,7 @@ export function BasicEditor({
         <select
           value={mode}
           onChange={(e) => setHop(a, b, e.target.value as TransportMode)}
-          className="h-7 max-sm:h-10 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
+          className="tv-field h-7 max-sm:h-10 rounded-[7px] border px-1 text-[12px] font-bold"
         >
           {MODE_CHIPS.map((m) => (
             <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
@@ -1089,7 +1089,7 @@ export function BasicEditor({
           <span className="min-w-0 flex-1">
             {tx("datesFitAsk", { a: dayMonth(dateFit.arrival_date), b: dayMonth(dateFit.departure_date), c: dayMonth(trip.arrival_date), d: dayMonth(trip.departure_date) })}
           </span>
-          <button type="button" onClick={adoptFlightDates} className="h-8 max-sm:h-10 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white">
+          <button type="button" onClick={adoptFlightDates} className="tv-btn-primary h-8 max-sm:h-10 rounded-[8px] px-3 text-[12px] font-bold">
             {tx("datesFitYes")}
           </button>
           <button type="button" onClick={() => setKeptDates(dateFitKey)} className="text-[11.5px] font-bold text-[#185045] underline">
@@ -1446,7 +1446,7 @@ export function BasicEditor({
         type="button"
         onClick={() => void calculate()}
         disabled={pricingBusy}
-        className="inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+        className="tv-btn-secondary inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-bold disabled:opacity-60"
       >
         {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
         {pricingBusy ? tx("calcBusy") : tx("calc")}
@@ -1653,7 +1653,7 @@ export function BasicEditor({
       <div className="space-y-3">
         {datesFit}
         {citiesNote && !focus ? (
-          <p role="status" className={`flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[12px] font-bold ${citiesNote === "flightCities" ? "bg-[#eef6f2] text-[#185045]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
+          <p role="status" className={`flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[12px] font-bold ${citiesNote === "flightCities" ? "bg-[#eef6f2] text-[#185045]" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
             <Plane className="size-4 shrink-0" />
             <span className="flex-1">{tx(citiesNote)}</span>
             <button type="button" onClick={() => setCitiesNote(null)} aria-label={tx("dismiss")} className="text-[#557d78]">×</button>
@@ -1671,7 +1671,7 @@ export function BasicEditor({
           </div>
         ) : null}
         {cities.length === 0 ? (
-          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-[#93aaa3]">{tx("noCities")}</p>
+          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-tv-text-faint">{tx("noCities")}</p>
         ) : (
           cities.map((city, i) => {
             if (focus && !focus.includes(city.city_name)) return null;
@@ -1856,7 +1856,7 @@ export function BasicEditor({
           <div>
             {pricingError ? <p role="alert" className="mb-2 text-[12px] font-bold text-[#c22850]">{pricingError}</p> : null}
             {data.pricing.items.length === 0 ? (
-              <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
+              <p className="text-[12px] font-semibold text-tv-text-faint">{tx("noLines")}</p>
             ) : (
               <div className="space-y-2.5">
                 {/* one card per section: red while a price is missing, folded once it is complete */}
@@ -1905,7 +1905,7 @@ export function BasicEditor({
                           <span className="min-w-0 truncate text-[12px] font-bold text-[#185045]" title={item.description}>
                             {item.description}
                           </span>
-                          <span className="tv-tnum hidden text-center text-[11px] font-bold text-[#7a948f] sm:block">{per ? tx("night") : `× ${item.quantity}`}</span>
+                          <span className="tv-tnum hidden text-center text-[11px] font-bold text-tv-text-faint sm:block">{per ? tx("night") : `× ${item.quantity}`}</span>
                           <input
                             type="number" inputMode="decimal"
                             min={0}
@@ -1947,7 +1947,7 @@ export function BasicEditor({
                           type="button"
                           onClick={() => void saveGroup(g.key, !bad)}
                           disabled={saveState === "saving"}
-                          className="inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                          className="tv-btn-primary inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] px-4 text-[12px] font-extrabold disabled:opacity-60"
                         >
                           {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
                           {tx("saveCard")}
@@ -2191,7 +2191,7 @@ export function BasicEditor({
             <span
               role="status"
               className={`inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-bold ${
-                saveState === "error" ? "bg-[#fdeef2] text-[#c22850]" : saveState === "saving" ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
+                saveState === "error" ? "bg-tv-status-danger-bg text-tv-status-danger" : saveState === "saving" ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"
               }`}
             >
               {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : saveState === "error" ? <XCircle className="size-3.5" /> : <Check className="size-3.5" />}

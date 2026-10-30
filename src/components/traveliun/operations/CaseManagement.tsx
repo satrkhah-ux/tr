@@ -10,9 +10,9 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 
 /** Actions the log has words for; anything newer shows its code rather than nothing. */
@@ -155,7 +155,7 @@ export function CaseManagement({
                   value={info.pay_note}
                   onChange={(e) => setInfo({ ...info, pay_note: e.target.value })}
                   rows={2}
-                  className="w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]"
+                  className="tv-field w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
                 />
               </label>
             </div>
@@ -163,7 +163,7 @@ export function CaseManagement({
               type="button"
               disabled={pending}
               onClick={() => run(() => saveClientInfo(operationId, info), () => setSavedInfo(true))}
-              className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+              className="tv-btn-primary mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
             >
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {savedInfo ? t("ops.list.saved") : t("save")}
@@ -176,30 +176,30 @@ export function CaseManagement({
             <Lock className="size-3.5" />
             {t("ops.list.notes")}
           </h2>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.list.notesHint")}</p>
+          <p className="mb-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.list.notesHint")}</p>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]"
+            className="tv-field block w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
           />
           <button
             type="button"
             disabled={pending || !note.trim()}
             onClick={() => run(() => addCaseNote(operationId, note), forgetNote)}
-            className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+            className="tv-btn-secondary mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <MessageSquarePlus className="size-3.5" />}
             {t("ops.list.addNote")}
           </button>
           {notes.length === 0 ? (
-            <p className="mt-3 text-[12px] font-semibold text-[#93aaa3]">{t("ops.list.noNotes")}</p>
+            <p className="mt-3 text-[12px] font-semibold text-tv-text-faint">{t("ops.list.noNotes")}</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {notes.map((n) => (
                 <li key={n.id} className="rounded-[10px] bg-[#f8fbf9] px-3 py-2">
                   <p className="whitespace-pre-line break-words text-[12.5px] font-semibold text-[#0f3d38]">{n.meta.note}</p>
-                  <p className="tv-tnum mt-1 text-[10.5px] font-bold text-[#93aaa3]">
+                  <p className="tv-tnum mt-1 text-[10.5px] font-bold text-tv-text-faint">
                     {n.actor ?? "—"} · <DirText dir="ltr">{riyadh(n.created_at)}</DirText>
                   </p>
                 </li>
@@ -215,13 +215,13 @@ export function CaseManagement({
           {t("ops.list.activity")}
         </h2>
         {log.length === 0 ? (
-          <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.list.noActivity")}</p>
+          <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.list.noActivity")}</p>
         ) : (
           <>
             <ol className="space-y-1.5">
               {(showAll ? log : log.slice(0, 12)).map((a) => (
                 <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 text-[12px] font-semibold text-[#334f4b]">
-                  <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                  <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                     <DirText dir="ltr">{riyadh(a.created_at)}</DirText>
                   </span>
                   <span className="font-extrabold text-[#0f3d38]">{a.actor ?? "—"}</span>

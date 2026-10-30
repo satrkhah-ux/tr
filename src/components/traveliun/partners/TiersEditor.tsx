@@ -12,7 +12,7 @@ import { useSafeTransition } from "../useSafeTransition";
  * becomes X. For one company (partnerId) or the default ladder (null).
  */
 const field =
-  "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+  "tv-field h-9 rounded-[8px] border px-2.5 text-[12.5px] font-semibold";
 
 export function TiersEditor({ partnerId, initial, title, hint }: { partnerId: string | null; initial: Tier[]; title: string; hint: string }) {
   const router = useRouter();
@@ -22,9 +22,9 @@ export function TiersEditor({ partnerId, initial, title, hint }: { partnerId: st
   const key = partnerId ?? "default";
 
   return (
-    <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">{title}</h2>
-      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-[#78948f]">{hint}</p>
+      <p className="mb-3 mt-0.5 text-[12px] font-semibold text-tv-text-faint">{hint}</p>
       <div className="grid gap-2">
         {rows.map((r, i) => (
           <div key={i} className="flex flex-wrap items-end gap-2">
@@ -36,14 +36,14 @@ export function TiersEditor({ partnerId, initial, title, hint }: { partnerId: st
               النسبة %
               <input id={`tier-pct-${key}-${i}`} type="number" min={0} max={100} step="0.5" dir="ltr" value={r.pct} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, pct: e.target.value } : x)))} className={`${field} tv-tnum w-24`} />
             </label>
-            <button type="button" aria-label="حذف الدرجة" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="flex size-9 items-center justify-center rounded-[8px] border border-[#f0c7c7] text-[#c22850]">
+            <button type="button" aria-label="حذف الدرجة" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="flex size-9 items-center justify-center rounded-[8px] border border-[#f0c7c7] text-[#c22850] max-sm:min-h-10 max-sm:min-w-10">
               <X className="size-4" />
             </button>
           </div>
         ))}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setRows([...rows, { min: "", pct: "" }])} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045]">
+        <button type="button" onClick={() => setRows([...rows, { min: "", pct: "" }])} className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] max-sm:min-h-10">
           <Plus className="size-4" />
           درجة
         </button>

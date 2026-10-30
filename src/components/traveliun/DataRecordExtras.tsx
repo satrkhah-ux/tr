@@ -55,7 +55,7 @@ function HotelVerify({ id, row }: { id: string; row: DataRow }) {
   return (
     <div className={`rounded-[10px] border p-3 ${state.verified ? "border-[#bfe5d4] bg-[#e9f7f0]" : "border-[#e2ebe7] bg-[#f8fbf9]"}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <BadgeCheck className={`size-4 ${state.verified ? "text-[#0f7a52]" : "text-[#93aaa3]"}`} />
+        <BadgeCheck className={`size-4 ${state.verified ? "text-[#0f7a52]" : "text-tv-text-faint"}`} />
         <span className="text-[13px] font-extrabold">{t("data.quality.verify.title")}</span>
         <span className="text-[12px] font-semibold text-[#557d78]">
           {state.verified ? t("data.quality.verify.on", { date: (state.at ?? "").slice(0, 10) }) : t("data.quality.verify.off")}
@@ -64,7 +64,7 @@ function HotelVerify({ id, row }: { id: string; row: DataRow }) {
           type="button"
           onClick={toggle}
           disabled={pending || blocked}
-          className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#d8e3de] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:cursor-not-allowed disabled:opacity-50"
+          className="tv-btn-secondary ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
         >
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
           {state.verified ? t("data.quality.verify.undo") : t("data.quality.verify.button")}
@@ -109,14 +109,14 @@ function RecordHistory({ config, id }: { config: TableConfig; id: string }) {
   return (
     <div className="rounded-[10px] border border-[#e2ebe7]">
       <button type="button" onClick={toggle} className="flex w-full items-center gap-2 px-3 py-2.5 text-[13px] font-extrabold text-[#185045]">
-        <History className="size-4 text-[#93aaa3]" />
+        <History className="size-4 text-tv-text-faint" />
         {t("data.quality.history.title")}
-        {pending ? <Loader2 className="size-3.5 animate-spin text-[#93aaa3]" /> : null}
-        <ChevronDown className={`ms-auto size-4 text-[#93aaa3] transition-transform ${open ? "rotate-180" : ""}`} />
+        {pending ? <Loader2 className="size-3.5 animate-spin text-tv-text-faint" /> : null}
+        <ChevronDown className={`ms-auto size-4 text-tv-text-faint transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && entries ? (
         entries.length === 0 ? (
-          <p className="px-3 pb-3 text-[12px] font-semibold text-[#93aaa3]">{t("data.quality.history.empty")}</p>
+          <p className="px-3 pb-3 text-[12px] font-semibold text-tv-text-faint">{t("data.quality.history.empty")}</p>
         ) : (
           <ul className="max-h-56 space-y-2 overflow-y-auto px-3 pb-3">
             {entries.map((entry) => {
@@ -126,7 +126,7 @@ function RecordHistory({ config, id }: { config: TableConfig; id: string }) {
                   <div className="flex flex-wrap items-center gap-x-2 font-bold text-[#185045]">
                     <span>{t(ACTION_LABEL[entry.action] ?? "data.quality.history.other")}</span>
                     <DirText dir="ltr" className="font-semibold text-[#557d78]">{entry.actor_email ?? "—"}</DirText>
-                    <DirText dir="ltr" className="tv-tnum ms-auto font-semibold text-[#93aaa3]">
+                    <DirText dir="ltr" className="tv-tnum ms-auto font-semibold text-tv-text-faint">
                       {entry.created_at.slice(0, 16).replace("T", " ")}
                     </DirText>
                   </div>

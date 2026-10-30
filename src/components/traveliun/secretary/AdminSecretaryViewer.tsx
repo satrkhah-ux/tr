@@ -31,14 +31,14 @@ export function AdminSecretaryViewer({ employees }: { employees: { id: string; n
   const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" });
   const who = (m: SecretaryMsg) => (m.role === "user" ? "الموظف" : m.role === "plan" ? "🗂 خطة اليوم" : "السكرتير");
 
-  return <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+  return <section className="tv-card rounded-2xl border p-4">
     <div className="mb-1 flex items-center gap-2">
       <Eye className="size-4 text-[#557d78]" />
       <h2 className="font-bold">مشاهدة الإدارة — سكرتير موظف</h2>
     </div>
     <p className="mb-3 text-sm text-[#5b7a71]">قراءة فقط: ترى يومه ومحادثته مع سكرتيره كما هي، ولا يمكنك الكتابة باسمه. كل فتح يُسجَّل.</p>
     <select value={picked} onChange={(e) => void open(e.target.value)} disabled={busy}
-      className="w-full max-w-sm rounded-lg border border-[#dbe6e1] bg-white p-2.5 text-sm">
+      className="tv-field w-full max-w-sm rounded-lg border p-2.5 text-sm">
       <option value="">اختر موظفاً…</option>
       {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
     </select>
@@ -54,7 +54,7 @@ export function AdminSecretaryViewer({ employees }: { employees: { id: string; n
         {!view.messages.length && <p className="text-sm text-[#5b7a71]">لا رسائل بعد.</p>}
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {view.messages.map((m) => <div key={m.id} className={`rounded-xl border p-3 text-sm leading-7 ${m.role === "user" ? "border-[#cfe0db] bg-[#f4f8f6]" : m.role === "plan" ? "border-amber-200 bg-amber-50" : "border-[#e7eceb] bg-white"}`}>
-            <p className="mb-1 text-[10px] font-bold text-[#8ba09b]">{who(m)} · {when(m.created_at)}</p>
+            <p className="mb-1 text-[10px] font-bold text-tv-text-faint">{who(m)} · {when(m.created_at)}</p>
             <p className="whitespace-pre-wrap break-words">{m.content}</p>
           </div>)}
         </div>

@@ -99,12 +99,12 @@ export function EmployeeAccounts() {
   return (
     <TraveliunShell title="nav.employeeAccounts">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h2 className="flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
             <KeyRound className="size-4 text-[#185045]" />
             {t("emp.accountsTitle")}
           </h2>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("emp.accountsHint")}</p>
+          <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("emp.accountsHint")}</p>
 
           {rows !== null && missing > 0 ? (
             <p className="mt-3 flex items-center gap-2 rounded-[10px] border border-[#f2e2b4] bg-[#fffdf7] px-4 py-2.5 text-[12px] font-bold text-[#a86a10]">
@@ -125,11 +125,11 @@ export function EmployeeAccounts() {
           ) : null}
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           {rows === null ? (
             <div className="tv-shimmer h-40" />
           ) : rows.length === 0 ? (
-            <p className="p-6 text-center text-sm text-[#93aaa3]">{t("noData")}</p>
+            <p className="p-6 text-center text-sm text-tv-text-faint">{t("noData")}</p>
           ) : (
             <table className="w-full text-start text-[13px]">
               <thead>
@@ -160,7 +160,7 @@ export function EmployeeAccounts() {
                         </span>
                       )}
                     </td>
-                    <td className="tv-tnum px-4 py-3 text-[12px] text-[#93aaa3]">
+                    <td className="tv-tnum px-4 py-3 text-[12px] text-tv-text-faint">
                       {/* Invited is not the same as using it — a person who never
                           opened the mail reads as active everywhere else. */}
                       {row.active && !row.last_sign_in_at ? t("emp.neverSignedIn") : fmt(row.last_sign_in_at)}
@@ -181,7 +181,7 @@ export function EmployeeAccounts() {
                           type="button"
                           onClick={() => setTemp({ id: row.id, value: "" })}
                           disabled={busy !== null}
-                          className="me-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50"
+                          className="me-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50 max-sm:min-h-10"
                         >
                           <KeyRound className="size-3.5" />
                           {t("emp.tempPassword")}
@@ -241,7 +241,7 @@ export function TempPassword({
         aria-label={t("emp.tempPassword")}
         autoComplete="new-password"
         spellCheck={false}
-        className="h-9 w-56 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-start text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]"
+        className="h-9 w-56 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-start text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
       />
       <button
         type="button"
@@ -253,7 +253,7 @@ export function TempPassword({
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
         {t("emp.tempPasswordSave")}
       </button>
-      <button type="button" onClick={onCancel} className="h-9 px-1 text-[12px] font-bold text-[#557d78]">
+      <button type="button" onClick={onCancel} className="h-9 px-1 text-[12px] font-bold text-[#557d78] max-sm:min-h-10">
         {t("cancel")}
       </button>
       {value && weak ? <span className="basis-full text-end text-[11px] font-bold text-[#a86a10]">{weak}</span> : null}

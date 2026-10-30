@@ -24,7 +24,7 @@ import type { Tier } from "@/lib/partners/tiers";
  * its files and history stay.
  */
 
-const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]";
+const card = "tv-card rounded-[14px] border p-4";
 const STATUS_LABEL: Record<string, string> = {
   approved: "معتمدة",
   suspended: "موقوفة",
@@ -51,7 +51,7 @@ export function PartnerCompanyDetailView({ detail, statement, tiers }: { detail:
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-lg font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">{company.name}</h1>
-              <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">
+              <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">
                 {[company.name_latin, company.phone, company.email, company.website].filter(Boolean).join(" · ") || "—"}
               </p>
               <p className="mt-1 text-[12px] font-bold text-[#557d78]">
@@ -61,7 +61,7 @@ export function PartnerCompanyDetailView({ detail, statement, tiers }: { detail:
             </div>
             <span
               className={`rounded-full px-3 py-1 text-[12px] font-bold ${
-                company.status === "approved" ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fdeef2] text-[#c22850]"
+                company.status === "approved" ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-danger-bg text-tv-status-danger"
               }`}
             >
               {STATUS_LABEL[company.status] ?? company.status}
@@ -96,12 +96,12 @@ export function PartnerCompanyDetailView({ detail, statement, tiers }: { detail:
         <section className={card}>
           <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">العروض</h2>
           {detail.offers.length === 0 ? (
-            <p className="text-[12.5px] font-semibold text-[#93aaa3]">لم تُصدر عرضاً بعد.</p>
+            <p className="text-[12.5px] font-semibold text-tv-text-faint">لم تُصدر عرضاً بعد.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-right text-[12.5px]">
                 <thead>
-                  <tr className="text-[11.5px] font-bold text-[#93aaa3]">
+                  <tr className="text-[11.5px] font-bold text-tv-text-faint">
                     <th className="pb-2">العرض</th>
                     <th className="pb-2">الوجهة</th>
                     <th className="pb-2">القيمة</th>
@@ -137,7 +137,7 @@ export function PartnerCompanyDetailView({ detail, statement, tiers }: { detail:
           <section className={card}>
             <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">حسابات الدخول</h2>
             {detail.users.length === 0 ? (
-              <p className="text-[12.5px] font-semibold text-[#93aaa3]">لم يُصدر لها حساب بعد.</p>
+              <p className="text-[12.5px] font-semibold text-tv-text-faint">لم يُصدر لها حساب بعد.</p>
             ) : (
               <ul className="space-y-1.5">
                 {detail.users.map((u) => (
@@ -156,13 +156,13 @@ export function PartnerCompanyDetailView({ detail, statement, tiers }: { detail:
           <section className={card}>
             <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">سجل التغييرات</h2>
             {detail.activity.length === 0 ? (
-              <p className="text-[12.5px] font-semibold text-[#93aaa3]">لا تغييرات مسجّلة.</p>
+              <p className="text-[12.5px] font-semibold text-tv-text-faint">لا تغييرات مسجّلة.</p>
             ) : (
               <ul className="space-y-1.5 text-[12px]">
                 {detail.activity.map((a, i) => (
                   <li key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eef4f1] pb-1.5 dark:border-[#22443b]">
                     <span className="font-semibold">{describeActivity(a)}</span>
-                    <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                    <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
                       <DirText dir="ltr">{`${a.created_at.slice(0, 16).replace("T", " ")}${a.actor_email ? ` · ${a.actor_email}` : ""}`}</DirText>
                     </span>
                   </li>
@@ -190,7 +190,7 @@ function describeActivity(a: PartnerCompanyDetail["activity"][number]): string {
 function Tile({ label, value }: { label: string; value: string }) {
   return (
     <div className={card}>
-      <div className="text-[11.5px] font-bold text-[#78948f]">{label}</div>
+      <div className="text-[11.5px] font-bold text-tv-text-faint">{label}</div>
       <div className="tv-tnum mt-1.5 text-[17px] font-extrabold text-[#185045] dark:text-[#7fd0b2] [overflow-wrap:anywhere]">
         <DirText dir="ltr">{value}</DirText>
       </div>
@@ -211,7 +211,7 @@ function SuspendControl({ id, suspended }: { id: string; suspended: boolean }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className={`mt-3 inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold ${
+        className={`mt-3 inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold max-sm:min-h-10 ${
           suspended ? "border-[#b7d0c7] text-[#185045]" : "border-[#f0c7c7] text-[#c22850]"
         }`}
       >
@@ -228,7 +228,7 @@ function SuspendControl({ id, suspended }: { id: string; suspended: boolean }) {
           id={`suspend-reason-${id}`}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          className="h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] font-semibold dark:border-[#294039] dark:bg-[#0f1f1b]"
+          className="tv-field h-9 rounded-[8px] border px-2.5 text-[12.5px] font-semibold"
         />
       </label>
       <button
@@ -256,7 +256,7 @@ function SuspendControl({ id, suspended }: { id: string; suspended: boolean }) {
         type="button"
         disabled={pending}
         onClick={() => setAsking(false)}
-        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#557d78]"
+        className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#557d78] max-sm:min-h-10"
       >
         تراجع
       </button>

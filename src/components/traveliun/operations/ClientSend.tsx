@@ -96,7 +96,7 @@ export function ClientSend({ operationId }: { operationId: string }) {
       {list && list.items.length > 0 ? (
         <div className="mt-2 rounded-[10px] border border-[#d6eadf] bg-[#f6fbf8] p-2.5">
           <p className="text-[12px] font-extrabold text-[#185045]">{t("trip.status.prepared")}</p>
-          <p className="mb-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("trip.status.preparedHint")}</p>
+          <p className="mb-1.5 text-[11px] font-semibold text-tv-text-faint">{t("trip.status.preparedHint")}</p>
           <ul className="space-y-1">
             {list.items.map((m) => (
               <li key={m.key} className="flex flex-wrap items-center justify-between gap-2 text-[12px] font-bold text-[#0f3d38]">
@@ -128,9 +128,9 @@ export function ClientSend({ operationId }: { operationId: string }) {
           <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
             <UserRound className="size-3.5" />
             {draft.to_name || "—"}
-            <DirText dir="ltr" className="font-semibold text-[#93aaa3]">{draft.to_phone}</DirText>
+            <DirText dir="ltr" className="font-semibold text-tv-text-faint">{draft.to_phone}</DirText>
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.toClient.review")}</p>
+          <p className="mb-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.toClient.review")}</p>
           {draft.blocked ? <p className="mb-2 text-[11.5px] font-bold text-[#a86a10]">{t(draft.blocked)}</p> : null}
           {/* editable on purpose — what is kept is what actually went out */}
           <textarea
@@ -138,14 +138,14 @@ export function ClientSend({ operationId }: { operationId: string }) {
             onChange={(e) => setBody(e.target.value)}
             rows={14}
             dir="auto"
-            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={pending || !body.trim() || draft.blocked !== null}
               onClick={send}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-45"
+              className="tv-btn-primary inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-45 max-sm:min-h-10"
             >
               {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
               {t("ops.dispatch.send")}

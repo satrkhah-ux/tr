@@ -107,7 +107,7 @@ export function TripTypeCards({ mode, onPick }: { mode: FlightBookingMode; onPic
           >
             <Icon className="size-6" />
             <span className="text-[13.5px] font-extrabold sm:text-[15px]">{t(m.key)}</span>
-            <span className={`hidden text-[11px] font-semibold sm:block ${active ? "text-white/80" : "text-[#78948f]"}`}>{t(m.hint)}</span>
+            <span className={`hidden text-[11px] font-semibold sm:block ${active ? "text-white/80" : "text-tv-text-faint"}`}>{t(m.hint)}</span>
           </button>
         );
       })}
@@ -117,9 +117,9 @@ export function TripTypeCards({ mode, onPick }: { mode: FlightBookingMode; onPic
 
 const cell =
   "relative flex min-h-[64px] min-w-0 items-center gap-2.5 rounded-[13px] border border-[#e0ebe7] bg-white px-3.5 py-2 focus-within:border-[#2aa87a] focus-within:bg-[#f7fbf9]";
-const cellLabel = "block text-[10.5px] font-bold text-[#78948f]";
+const cellLabel = "block text-[10.5px] font-bold text-tv-text-faint";
 const cellInput =
-  "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[13px] font-bold text-[#123e3a] outline-none placeholder:text-[#9bb0ac]";
+  "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[13px] font-bold text-[#123e3a] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus placeholder:text-[#9bb0ac]";
 
 export function FlightBuilder({
   airports = { home: [], dest: [] },
@@ -215,7 +215,7 @@ export function FlightBuilder({
             <button
               type="button"
               onClick={() => setMulti([...multi, { from: multi[multi.length - 1]?.to ?? "", to: "", date: "" }])}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
             >
               <Plus className="size-3.5" />
               {t("pg.fb.addSegment")}

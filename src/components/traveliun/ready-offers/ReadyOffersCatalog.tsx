@@ -20,7 +20,7 @@ import { useRole } from "@/lib/roles/RoleContext";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { TraveliunShell } from "../TraveliunShell";
 
-const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_2px_10px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-[14px] border p-4 shadow-[0_2px_10px_rgba(0,60,58,0.04)]";
 const chip = "rounded-full border px-2.5 py-1 text-[11.5px] font-bold";
 
 // the owner's sheet has no tiers: an offer is fine, «بها خطأ» (the sheet contradicts itself), or not published
@@ -70,7 +70,7 @@ export function ReadyOffersCatalog({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ro.title")}</h1>
-            <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">
+            <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">
               {t("ro.subtitle", { ready: String(readyCount), total: String(offers.length) })}
             </p>
           </div>
@@ -78,7 +78,7 @@ export function ReadyOffersCatalog({
             <button
               type="button"
               onClick={() => setSyncOpen(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold"
             >
               <RefreshCw className="size-4" /> {t("ro.sync")}
             </button>
@@ -99,7 +99,7 @@ export function ReadyOffersCatalog({
                       ? "border-[#c22850] bg-[#c22850] text-white"
                       : "border-[#185045] bg-[#185045] text-white"
                     : key === "problems"
-                      ? "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850] hover:bg-[#fbe2e9]"
+                      ? "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger hover:bg-[#fbe2e9]"
                       : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
                 }`}
               >
@@ -125,7 +125,7 @@ export function ReadyOffersCatalog({
             </Link>
           </div>
         ) : visible.length === 0 ? (
-          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-12 text-center text-sm text-[#93aaa3]">
+          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-12 text-center text-sm text-tv-text-faint">
             {t("ro.empty")}
           </p>
         ) : (
@@ -226,7 +226,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
               {Number(offer.price).toLocaleString("en-US")}
             </span>
             <span className="text-[13px] font-bold text-[#557d78]">{offer.currency ?? "SAR"}</span>
-            <span className="text-[11px] font-semibold text-[#93aaa3]">{offer.price_basis || t("ro.priceNote")}</span>
+            <span className="text-[11px] font-semibold text-tv-text-faint">{offer.price_basis || t("ro.priceNote")}</span>
           </div>
         )}
       </div>
@@ -255,7 +255,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
       ) : null}
 
       {offer.validity_raw ? (
-        <p className="mt-2 text-[11.5px] font-bold text-[#93aaa3]">
+        <p className="mt-2 text-[11.5px] font-bold text-tv-text-faint">
           {t("ro.validity")}: {offer.validity_raw}
         </p>
       ) : null}
@@ -369,13 +369,13 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
             />
           </label>
           {uploading ? <Loader2 className="size-4 animate-spin text-[#185045]" /> : null}
-          <p className="text-[11.5px] font-bold text-[#78948f]">{t("ro.orLink")}</p>
+          <p className="text-[11.5px] font-bold text-tv-text-faint">{t("ro.orLink")}</p>
           <input
             value={design}
             onChange={(e) => setDesign(e.target.value)}
             placeholder="https://drive.google.com/..."
             dir="ltr"
-            className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus:border-[#2aa87a]"
+            className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div className="flex items-center gap-2">
             <button
@@ -414,7 +414,7 @@ function Row({ icon, value }: { icon: React.ReactNode; value: string | null }) {
   if (!value) return null;
   return (
     <div className="flex items-start gap-2">
-      <span className="mt-0.5 shrink-0 text-[#93aaa3]">{icon}</span>
+      <span className="mt-0.5 shrink-0 text-tv-text-faint">{icon}</span>
       <span className="whitespace-pre-line">{value}</span>
     </div>
   );
@@ -564,7 +564,7 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
                 type="button"
                 onClick={apply}
                 disabled={state === "applying"}
-                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[13px] font-bold disabled:opacity-50"
               >
                 {state === "applying" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 {t("ro.syncApply")}
@@ -594,9 +594,9 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
 
 function Stat({ label, value, tone }: { label: string; value: number; tone: "good" | "warn" | "bad" | "mute" }) {
   const tones = {
-    good: "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]",
+    good: "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success",
     warn: "border-[#f0e2c4] bg-[#fdf9ee] text-[#8a6d1f]",
-    bad: "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]",
+    bad: "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger",
     mute: "border-[#dbe6e1] bg-[#f6faf8] text-[#557d78]",
   }[tone];
   return (

@@ -29,7 +29,7 @@ export function SecretaryEditRequest() {
   }
 
   if (!files.length) return null;
-  return <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+  return <section className="tv-card rounded-2xl border p-4">
     <div className="mb-1 flex items-center gap-2">
       <FilePenLine className="size-4 text-[#557d78]" />
       <h2 className="font-bold">نفّذ طلب العميل على الملف</h2>
@@ -37,12 +37,12 @@ export function SecretaryEditRequest() {
     <p className="mb-3 text-sm text-[#5b7a71]">اكتب ما طلبه العميل (مثل: «احذف باتومي وأبقِ تبليسي فقط») — أجهّز نسخة جديدة للمراجعة، والملف الأصلي يبقى كما هو، ولا يصل العميل شيء.</p>
     <div className="flex flex-col gap-2">
       <select value={conversation} onChange={(e) => { setConversation(e.target.value); setResult(null); }} disabled={busy}
-        className="w-full max-w-sm rounded-lg border border-[#dbe6e1] bg-white p-2.5 text-sm">
+        className="tv-field w-full max-w-sm rounded-lg border p-2.5 text-sm">
         <option value="">اختر العميل…</option>
         {files.map((f) => <option key={f.conversationId} value={f.conversationId}>{f.client}{f.destination ? ` — ${f.destination}` : ""}</option>)}
       </select>
       <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={2} disabled={busy}
-        placeholder="طلب العميل…" className="w-full rounded-lg border border-[#dbe6e1] bg-white p-3 text-sm" />
+        placeholder="طلب العميل…" className="tv-field w-full rounded-lg border p-3 text-sm" />
       <button type="button" onClick={() => void run()} disabled={busy || !conversation || !text.trim()}
         className="self-start rounded-lg bg-[var(--tv-brand)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
         {busy ? <span className="flex items-center gap-2"><Loader2 className="size-4 animate-spin" /> يجهّز النسخة…</span> : "جهّز نسخة للمراجعة"}

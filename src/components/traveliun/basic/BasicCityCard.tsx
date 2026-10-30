@@ -113,7 +113,7 @@ type Tab = "tours" | "program";
  * bare fields aligned under them — rather than a label over every field, which
  * spread a city over half a screen. Below xl the rows wrap two to a line.
  */
-const head = "hidden px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid";
+const head = "hidden px-0.5 text-[10.5px] font-bold text-tv-text-faint xl:grid";
 const rowGap = "grid grid-cols-2 items-start gap-2";
 // the hotel, its room type, the board, the price (the owner, 2026-10-22) — the rest under «المزيد»
 const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_5rem_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_minmax(7rem,0.8fr)_2rem]";
@@ -432,7 +432,7 @@ export function BasicCityCard({
               window.setTimeout(() => onDragFrom(index), 0);
             }}
             onDragEnd={() => onDragFrom(null)}
-            className="cursor-grab text-[#7a948f] hover:text-[#185045] active:cursor-grabbing"
+            className="cursor-grab text-tv-text-faint hover:text-[#185045] active:cursor-grabbing"
           >
             <GripVertical className="size-4" />
           </span>
@@ -509,7 +509,7 @@ export function BasicCityCard({
             {theirs || !main ? (
               <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
                 {tx("nights")}
-                <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
+                <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="tv-field h-7 rounded-[7px] border px-1 text-[12px] font-bold">
                   {range(1, 30).map((n) => (
                     <option key={n} value={n}>{n}</option>
                   ))}
@@ -533,7 +533,7 @@ export function BasicCityCard({
               type="button"
               onClick={collapsed ? onExpand : onFold}
               aria-expanded={!collapsed}
-              className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#557d78] hover:border-[#165749] hover:text-[#185045]"
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#557d78] hover:border-[#165749] hover:text-[#185045] max-sm:min-h-10"
             >
               {collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
               {collapsed ? tx("expand") : tx("fold")}
@@ -581,10 +581,10 @@ export function BasicCityCard({
             <CheckCircle2 className="size-3.5" />
             {tx("saveCity")}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="inline-flex h-9 items-center px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045]">
+          <button type="button" onClick={() => setEditing(false)} className="inline-flex h-9 items-center px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] max-sm:min-h-10">
             {tx("cancelEdit")}
           </button>
-          <p className="basis-full text-[11px] font-semibold text-[#7a948f]">{tx("editCityHint")}</p>
+          <p className="basis-full text-[11px] font-semibold text-tv-text-faint">{tx("editCityHint")}</p>
         </div>
       ) : null}
 
@@ -628,7 +628,7 @@ export function BasicCityCard({
               type="button"
               onClick={onDone}
               disabled={missing.length > 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+              className="tv-btn-primary inline-flex h-8 items-center gap-1.5 rounded-[8px] px-4 text-[12px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10"
             >
               <CheckCircle2 className="size-3.5" />
               {tx("cityDone", { city: city.city_name })}
@@ -811,7 +811,7 @@ export function HotelPanel({
                   {/* the city's nights: on its first row; the other stays say their own on their dates line */}
                   {i === 0 && j === 0 && onNights ? (
                     <label className="grid gap-0.5">
-                      <span className="text-[10.5px] font-bold text-[#7a948f] xl:hidden">{tx("nights")}</span>
+                      <span className="text-[10.5px] font-bold text-tv-text-faint xl:hidden">{tx("nights")}</span>
                       <select
                         value={city.nights}
                         onChange={(e) => onNights(Number(e.target.value))}
@@ -893,7 +893,7 @@ export function HotelPanel({
                       type="button"
                       onClick={() => follow(line, (l) => withRooms(l, l.rooms.filter((_, k) => k !== j)))}
                       aria-label={tx("removeRoom")}
-                      className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1]"
+                      className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1] max-sm:min-h-10 max-sm:min-w-10"
                     >
                       <X className="size-4" />
                     </button>
@@ -938,7 +938,7 @@ export function HotelPanel({
                 type="button"
                 // a new room starts as the one before it — type, board and price — and is changed if it differs
                 onClick={() => follow(line, (l) => withRooms(l, [...l.rooms, { ...(l.rooms[l.rooms.length - 1] ?? emptyRoomSpec()) }]))}
-                className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
               >
                 <Plus className="size-3.5" />
                 {tx("addRoom")}
@@ -974,7 +974,7 @@ export function HotelPanel({
           type="button"
           onClick={() => setMore((v) => !v)}
           aria-expanded={more}
-          className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045]"
+          className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045] max-sm:min-h-10"
         >
           {tx("moreInfo")}
           <ChevronDown className={`size-3.5 transition-transform ${more ? "rotate-180" : ""}`} />
@@ -986,7 +986,7 @@ export function HotelPanel({
           </span>
         ) : null}
         {more ? (
-          <span className="tv-tnum text-[11px] font-bold text-[#7a948f]">
+          <span className="tv-tnum text-[11px] font-bold text-tv-text-faint">
             {tx("dayRange", { from: dayFrom, to: dayFrom + city.nights })}
             {lines.length === 1 ? stays.map((s) => (s.check_in ? ` · ${tx("stayDates", { in: s.check_in, out: s.check_out ?? "" })}` : "")) : null}
           </span>
@@ -1202,7 +1202,7 @@ function ClientHotelPanel({
           {tx("clientHint")}
         </p>
       )}
-      <p className="text-[11px] font-semibold text-[#7a948f]">{tx("clientNote")}</p>
+      <p className="text-[11px] font-semibold text-tv-text-faint">{tx("clientNote")}</p>
     </div>
   );
 }
@@ -1277,7 +1277,7 @@ function TboStayPrice({
             type="button"
             onClick={ask}
             disabled={state === "loading" || !checkIn || !checkOut}
-            className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#2b5bb5] bg-white px-2.5 text-[11.5px] font-bold text-[#2b5bb5] hover:bg-[#eef4ff] disabled:opacity-50"
+            className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#2b5bb5] bg-white px-2.5 text-[11.5px] font-bold text-[#2b5bb5] hover:bg-[#eef4ff] disabled:opacity-50 max-sm:min-h-10"
           >
             {state === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : null}
             {tx("tboPrice")}
@@ -1300,7 +1300,7 @@ function TboStayPrice({
                   type="button"
                   onClick={() => apply(r)}
                   disabled={r.total_line == null}
-                  className="rounded-[7px] bg-[#185045] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                  className="tv-btn-primary rounded-[7px] px-2.5 py-1 text-[11px] font-bold disabled:opacity-50 max-sm:min-h-10"
                 >
                   {tx("tboUse")}
                 </button>
@@ -1318,7 +1318,7 @@ function TboStayPrice({
 /** A small labelled field for the short lines. */
 function Field({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <label className={`grid gap-1 text-[10.5px] font-bold text-[#7a948f] ${className ?? ""}`}>
+    <label className={`grid gap-1 text-[10.5px] font-bold text-tv-text-faint ${className ?? ""}`}>
       {label}
       {children}
     </label>
@@ -1512,7 +1512,7 @@ function ServicesPanel({
     <button
       type="button"
       onClick={() => addOn(date)}
-      className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+      className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
     >
       <Plus className="size-3.5" />
       {label}
@@ -1603,7 +1603,7 @@ function ServicesPanel({
         return (
           <div key={date} className="flex min-h-9 flex-wrap items-center gap-2 rounded-[8px] border border-dashed border-[#DCE9E5] px-2 py-1 text-[11.5px]">
             <span className="tv-tnum font-bold text-[#185045]">{dayLabel(date)}</span>
-            {title ? <span className="min-w-0 truncate font-semibold text-[#7a948f]">{title}</span> : null}
+            {title ? <span className="min-w-0 truncate font-semibold text-tv-text-faint">{title}</span> : null}
             {toursOn ? <span className="ms-auto">{extra ?? tourButton(date, t("pg.tour.add"))}</span> : null}
           </div>
         );
@@ -1615,7 +1615,7 @@ function ServicesPanel({
         <button
           type="button"
           onClick={() => (transportOn ? onSlice({ cities: addService(cities, index, "transfer", city.check_in) }) : addOn(null))}
-          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
         >
           <Plus className="size-3.5" />
           {tx("addService")}
@@ -1774,7 +1774,7 @@ function DayLines({
           <button
             type="button"
             onClick={() => onChange([...shown, ""])}
-            className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2 text-[11px] text-[#185045] hover:bg-[#f0f7f4]"
+            className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2 text-[11px] text-[#185045] hover:bg-[#f0f7f4] max-sm:min-h-10"
           >
             <Plus className="size-3.5" />
             {tx("addLine")}
@@ -1783,7 +1783,7 @@ function DayLines({
             <button
               type="button"
               onClick={() => onChange(undefined)}
-              className="inline-flex h-7 items-center gap-1 rounded-[7px] px-2 text-[11px] text-[#557d78] hover:text-[#185045]"
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] px-2 text-[11px] text-[#557d78] hover:text-[#185045] max-sm:min-h-10"
             >
               <RotateCcw className="size-3.5" />
               {tx("defaultText")}

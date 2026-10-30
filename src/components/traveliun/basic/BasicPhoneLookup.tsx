@@ -63,9 +63,9 @@ export function BasicPhoneLookup({
       {label}
       <span className="relative">
         {searching ? (
-          <Loader2 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-[#8aa29b]" />
+          <Loader2 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-tv-text-faint" />
         ) : (
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
         )}
         <input
           dir="ltr"
@@ -88,7 +88,7 @@ export function BasicPhoneLookup({
           {problem ? (
             <span className="block px-3 py-2.5 text-[11.5px] font-semibold text-[#c22850]">{problem}</span>
           ) : hits.length === 0 ? (
-            <span className="block px-3 py-2.5 text-[12px] font-semibold text-[#93aaa3]">{t("tl.noResults")}</span>
+            <span className="block px-3 py-2.5 text-[12px] font-semibold text-tv-text-faint">{t("tl.noResults")}</span>
           ) : (
             hits.map((hit) => (
               <button
@@ -106,7 +106,7 @@ export function BasicPhoneLookup({
                 <UserRound className="size-4 shrink-0 text-[#185045]" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12.5px] font-extrabold text-[#0f3d38]">{hit.name || t("tl.unnamed")}</span>
-                  <span className="block truncate text-[11.5px] font-semibold text-[#8aa29b]">
+                  <span className="block truncate text-[11.5px] font-semibold text-tv-text-faint">
                     <DirText>{hit.phone || hit.email}</DirText>
                   </span>
                 </span>

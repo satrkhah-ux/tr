@@ -19,7 +19,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
 const field =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 /** The option «الكل» stands for — it opens the list, it assigns nobody. */
 const ALL = "__all";
@@ -167,7 +167,7 @@ export function AssignBooking({
           type="button"
           disabled={pending}
           onClick={prepare}
-          className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#b7d0c7] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+          className="tv-btn-secondary inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3 text-[12px] font-bold disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
           {t("ops.request.draft")}
@@ -181,16 +181,16 @@ export function AssignBooking({
           <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
             <Building2 className="size-3.5" />
             {draft.to_label}
-            {draft.to_phone ? <span className="font-semibold text-[#93aaa3]" dir="ltr">{draft.to_phone}</span> : null}
+            {draft.to_phone ? <span className="font-semibold text-tv-text-faint" dir="ltr">{draft.to_phone}</span> : null}
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.request.review")}</p>
+          <p className="mb-2 text-[11px] font-semibold text-tv-text-faint">{t("ops.request.review")}</p>
           {/* editable on purpose — what gets stored is what actually went out */}
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={10}
             dir="auto"
-            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div className="flex flex-wrap gap-2">
             <button
@@ -238,7 +238,7 @@ export function AssignBooking({
               type="button"
               disabled={pending}
               onClick={() => send("manual")}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+              className="tv-btn-secondary inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10"
             >
               <Check className="size-3.5" />
               {t("ops.request.markSent")}

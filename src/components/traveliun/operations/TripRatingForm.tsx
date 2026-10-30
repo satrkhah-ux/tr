@@ -50,14 +50,14 @@ export function TripRatingForm({ token, rated }: { token: string; rated: number 
           rows={4}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          className="w-full rounded-[10px] border border-[#dbe6e1] p-3 text-[14px] text-[#185045] outline-none focus:border-[#2aa87a]"
+          className="w-full rounded-[10px] border border-[#dbe6e1] p-3 text-[14px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
         />
       </label>
       {message ? <p className="text-[12.5px] font-bold text-[#c22850]">{message}</p> : null}
       <button
         type="submit"
         disabled={pending || score === 0}
-        className="inline-flex h-11 items-center justify-center rounded-[10px] bg-[#185045] px-6 text-[14px] font-bold text-white disabled:opacity-50"
+        className="tv-btn-primary inline-flex h-11 items-center justify-center rounded-[10px] px-6 text-[14px] font-bold disabled:opacity-50"
       >
         إرسال التقييم
       </button>

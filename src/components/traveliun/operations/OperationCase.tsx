@@ -38,9 +38,9 @@ import { ClientSend } from "./ClientSend";
 const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
 const EXEC_KEY = (s: string) => `ops.exec.${s}` as TranslationKey;
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 export function OperationCase({
@@ -130,7 +130,7 @@ export function OperationCase({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-lg font-extrabold text-[#003c3a]">{operation.customer_name || "—"}</h1>
-              <p className="tv-tnum mt-1 text-[12.5px] font-bold text-[#93aaa3]">
+              <p className="tv-tnum mt-1 text-[12.5px] font-bold text-tv-text-faint">
                 <DirText dir="ltr">{operation.serial}</DirText>
                 {operation.destination ? <span className="ms-2 font-semibold">{operation.destination}</span> : null}
                 {operation.customer_phone ? (
@@ -146,7 +146,7 @@ export function OperationCase({
               </p>
             </div>
             <div className="text-end">
-              <p className="text-[11.5px] font-bold text-[#93aaa3]">{t("ops.travelWindow")}</p>
+              <p className="text-[11.5px] font-bold text-tv-text-faint">{t("ops.travelWindow")}</p>
               <p className="tv-tnum text-[13px] font-extrabold text-[#0f3d38]">
                 <DirText dir="ltr">{`${operation.travel_start ?? "—"} → ${operation.travel_end ?? "—"}`}</DirText>
               </p>
@@ -276,9 +276,9 @@ function TrackControl({
 
   return (
     <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-      <p className="text-[11.5px] font-bold text-[#93aaa3]">{title}</p>
+      <p className="text-[11.5px] font-bold text-tv-text-faint">{title}</p>
       <p className="mt-1 text-[15px] font-extrabold text-[#0f3d38]">{labelFor(current)}</p>
-      {hint ? <p className="mt-0.5 text-[11px] font-semibold text-[#93aaa3]">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-[11px] font-semibold text-tv-text-faint">{hint}</p> : null}
       {error ? <p className="mt-1 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
       {next.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-1.5">

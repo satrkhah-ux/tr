@@ -104,7 +104,7 @@ export function AddStayMenu({ label, className, onAdd }: { label: string; classN
               <Icon className="mt-0.5 size-4 shrink-0 text-[#2aa87a]" />
               <span className="grid gap-0.5">
                 <span className="text-[12.5px] font-extrabold">{t(ADD_LABEL[d])}</span>
-                <span className="text-[11px] font-semibold text-[#7a948f]">{t(ADD_HINT[d])}</span>
+                <span className="text-[11px] font-semibold text-tv-text-faint">{t(ADD_HINT[d])}</span>
               </span>
             </DropdownMenuItem>
           );

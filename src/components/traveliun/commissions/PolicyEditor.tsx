@@ -48,7 +48,7 @@ export function PolicyEditor({ view }: { view: PolicyView }) {
             <Scale className="size-5" />
             سياسة العمولة
           </h1>
-          <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-[#93aaa3]">
+          <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-tv-text-faint">
             ربح الملفات المسددة في الشهر يُقارن بالتكلفة الشهرية. أعلى مستوى يتحقق يحدد نسبة الوعاء من الفائض (الربح − التكلفة)، ويُوزَّع الوعاء على الموظفين بحسب
             حصتهم من عدد الملفات ومن المبيعات. إن لم تُغطَّ التكلفة يأخذ كل موظف نسبة الحد الأدنى من ربحه. أي تعديل يُحفظ مسودة، ويعتمده شخص غير الذي كتبه.
           </p>

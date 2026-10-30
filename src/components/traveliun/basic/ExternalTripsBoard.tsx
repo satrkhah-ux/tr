@@ -17,10 +17,10 @@ import { TraveliunShell } from "../TraveliunShell";
  * traveller's: when they write before the return + 3 days it comes back to
  * whoever entered the trip («إدارة المحادثات»).
  */
-const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+const FIELD = "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
 const CARD = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const LABEL = "grid gap-1 text-[11.5px] font-bold text-[#185045]";
-const STATUS_COLOR: Record<ExternalStatus, string> = { confirmed: "bg-[#eef6ff] text-[#1d4f8a]", paid_partial: "bg-[#fff6e6] text-[#8a5a10]", paid_full: "bg-[#e8f6ef] text-[#185045]", cancelled: "bg-[#f2f4f3] text-[#7a8a86]" };
+const STATUS_COLOR: Record<ExternalStatus, string> = { confirmed: "bg-[#eef6ff] text-[#1d4f8a]", paid_partial: "bg-[#fff6e6] text-[#8a5a10]", paid_full: "bg-[#e8f6ef] text-[#185045]", cancelled: "bg-[#f2f4f3] text-tv-text-faint" };
 
 /** `client`: what is typed in «العميل» (a name or a number); `phone`: the number saved; `name`: the picked client's */
 type Form = { id?: string; client: string; phone: string; name: string; travelStart: string; days: string; destination: string; status: ExternalStatus; paid: string; confirmed: string[] };
@@ -173,18 +173,18 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
             {CONFIRMED_ITEMS.map((x) => {
               const on = form.confirmed.includes(x);
               return (
-                <button key={x} type="button" aria-pressed={on} onClick={() => set("confirmed", on ? form.confirmed.filter((y) => y !== x) : [...form.confirmed, x])} className={`h-8 rounded-full border px-3 text-[12px] font-bold ${on ? "border-[#2aa87a] bg-[#e8f6ef] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]"}`}>
+                <button key={x} type="button" aria-pressed={on} onClick={() => set("confirmed", on ? form.confirmed.filter((y) => y !== x) : [...form.confirmed, x])} className={`h-8 rounded-full border px-3 text-[12px] font-bold max-sm:min-h-10 ${on ? "border-[#2aa87a] bg-[#e8f6ef] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]"}`}>
                   {x}
                 </button>
               );
             })}
           </div>
           <div className="mt-4 flex gap-2">
-            <button type="button" onClick={save} disabled={busy !== null} className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-[#2aa87a] px-4 text-[12.5px] font-bold text-white disabled:opacity-50">
+            <button type="button" onClick={save} disabled={busy !== null} className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-[#2aa87a] px-4 text-[12.5px] font-bold text-white disabled:opacity-50 max-sm:min-h-10">
               {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null} {form.id ? "حفظ التعديل" : "إضافة"}
             </button>
             {form.id ? (
-              <button type="button" onClick={() => reset()} className="h-9 rounded-[8px] border border-[#dbe6e1] px-3 text-[12.5px] font-bold text-[#557d78]">إلغاء</button>
+              <button type="button" onClick={() => reset()} className="h-9 rounded-[8px] border border-[#dbe6e1] px-3 text-[12.5px] font-bold text-[#557d78] max-sm:min-h-10">إلغاء</button>
             ) : null}
           </div>
     </>

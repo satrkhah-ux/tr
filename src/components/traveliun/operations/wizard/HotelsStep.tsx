@@ -109,7 +109,7 @@ export function HotelsStep({ data }: StepProps) {
       ) : notPulled(data, "hotel") ? (
         <PullNotice operationId={operationId} />
       ) : (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.hotels.none")}</p>
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">{t("wz.hotels.none")}</p>
       )}
       <button
         type="button"
@@ -205,7 +205,7 @@ function HotelRow({
   }
 
   const rooms = roomLines(booking.detail);
-  const dot = <span className="hidden text-[#b7cac4] sm:inline">·</span>;
+  const dot = <span className="hidden text-tv-text-faint sm:inline">·</span>;
 
   return (
     <li
@@ -214,7 +214,7 @@ function HotelRow({
     >
       {/* a phone: the city and the buttons on one line, the hotel, the stay and the number under them; wider: all on one line */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-0.5 text-[12.5px] font-bold text-[#557d78] sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-        <button type="button" onClick={onOpen} disabled={open} className="col-start-1 row-start-1 flex items-center gap-1.5 py-1.5 text-start text-[13px] font-extrabold text-[#0f3d38]">
+        <button type="button" onClick={onOpen} disabled={open} className="col-start-1 row-start-1 flex items-center gap-1.5 py-1.5 text-start text-[13px] font-extrabold text-[#0f3d38] max-sm:min-h-10">
           {done ? <CheckCircle2 className="size-4 shrink-0 text-[#0f7a52]" /> : <span className="size-2.5 shrink-0 rounded-full bg-[#e3a43a]" />}
           {booking.city_name || "—"}
         </button>
@@ -242,7 +242,7 @@ function HotelRow({
               type="button"
               onClick={onOpen}
               aria-label={t("wz.hotels.edit")}
-              className="inline-flex h-8 items-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold text-[#185045] hover:bg-[#e6f2ed]"
+              className="inline-flex h-8 items-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold text-[#185045] hover:bg-[#e6f2ed] max-sm:min-h-10"
             >
               <Pencil className="size-3" />
               <span className="hidden sm:inline">{t("wz.hotels.edit")}</span>
@@ -252,7 +252,7 @@ function HotelRow({
             type="button"
             onClick={() => setOptions((v) => !v)}
             aria-expanded={options}
-            className="inline-flex h-8 items-center gap-0.5 rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f0f5f3]"
+            className="inline-flex h-8 items-center gap-0.5 rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f0f5f3] max-sm:min-h-10"
           >
             {t("wz.hotels.options")}
             <ChevronDown className={`size-3.5 transition-transform ${options ? "rotate-180" : ""}`} />
@@ -436,7 +436,7 @@ function HotelEntry({
             dir="auto"
             autoFocus
             placeholder={t("wz.hotels.paste")}
-            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
           <div>
             <button type="button" disabled={pending || text.trim().length <= 10} onClick={() => read(null, text)} className={wzSecondary}>
@@ -468,7 +468,7 @@ function HotelEntry({
         </p>
       ) : null}
       {fills.length > 0 ? (
-        <p className="break-words text-[11px] font-semibold text-[#93aaa3]">
+        <p className="break-words text-[11px] font-semibold text-tv-text-faint">
           {t("wz.hotels.fill")} <DirText dir="auto">{fills.join(" · ")}</DirText>
         </p>
       ) : null}

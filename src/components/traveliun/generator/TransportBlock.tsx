@@ -69,8 +69,8 @@ function LegCard({
           type="button"
           onClick={() => onChange({ enabled: !leg.enabled })}
           aria-pressed={leg.enabled}
-          className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
-            leg.enabled ? "bg-[#185045] text-white" : "bg-[#eef4f1] text-[#93aaa3]"
+          className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] transition-colors max-sm:min-h-10 max-sm:min-w-10 ${
+            leg.enabled ? "bg-[#185045] text-white" : "bg-[#eef4f1] text-tv-text-faint"
           }`}
           aria-label={title}
         >
@@ -81,7 +81,7 @@ function LegCard({
             <Icon className="size-4 text-[#185045]" />
             {title}
           </div>
-          <p className="mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">{hint}</p>
+          <p className="mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{hint}</p>
         </div>
       </div>
 
@@ -183,7 +183,7 @@ export function TransportBlock({
         <Bus className="size-4 text-[#185045]" />
         {t("pg.transport.title")}
       </h3>
-      <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.transport.hint")}</p>
+      <p className="mt-1 text-[11.5px] font-semibold text-tv-text-faint">{t("pg.transport.hint")}</p>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <LegCard
@@ -230,7 +230,7 @@ export function TransportBlock({
               and takes the train after. So several modes, then one per hop. */}
           <div className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
             {t("pg.transport.mode")}
-            <span className="text-[10.5px] font-semibold text-[#93aaa3]">{t("pg.transport.modesHint")}</span>
+            <span className="text-[10.5px] font-semibold text-tv-text-faint">{t("pg.transport.modesHint")}</span>
             <div className="flex gap-1.5">
               {MODES.map((mode) => {
                 const ModeIcon = MODE_ICON[mode];

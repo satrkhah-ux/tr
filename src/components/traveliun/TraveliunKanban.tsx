@@ -93,7 +93,7 @@ export function TraveliunKanban() {
   return (
     <TraveliunShell title="nav.kanban">
       <div className="tv-fade-up">
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card mb-4 flex flex-wrap items-center gap-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="inline-flex overflow-hidden rounded-[11px] bg-[#e2ede9] p-1 text-sm">
             {filterButtons.map((btn) => (
               <button
@@ -101,7 +101,7 @@ export function TraveliunKanban() {
                 type="button"
                 onClick={() => setStatusFilter(btn.key)}
                 className={`rounded-lg px-4 py-2 font-bold transition-colors ${
-                  statusFilter === btn.key ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-[#6f8f88] hover:text-[#185045]"
+                  statusFilter === btn.key ? "bg-white text-[#185045] shadow-[0_1px_3px_rgba(0,60,58,0.12)]" : "text-tv-text-faint hover:text-[#185045]"
                 }`}
               >
                 {btn.label}
@@ -109,16 +109,16 @@ export function TraveliunKanban() {
             ))}
           </div>
           <div className="relative h-11 w-full max-w-[280px]">
-            <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-[#8aa29b]" />
+            <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("searchPlaceholder")}
-              className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus:border-[#2aa87a]"
+              className="h-full w-full rounded-[11px] border border-[#dbe6e1] bg-[#f5f8f7] pe-11 ps-4 text-sm text-[#557d78] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </div>
           {savingId ? (
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#6f8f88]"><Loader2 className="size-4 animate-spin" /> {t("saving")}</span>
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-tv-text-faint"><Loader2 className="size-4 animate-spin" /> {t("saving")}</span>
           ) : null}
           {error ? <span className="text-sm font-semibold text-[#c22850]">{error}</span> : null}
         </section>
@@ -126,7 +126,7 @@ export function TraveliunKanban() {
         {loading ? (
           <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             {KANBAN_STAGES.map((s) => (
-              <div key={s.key} className="min-h-[220px] rounded-2xl border border-[#e2ebe7] bg-white p-3">
+              <div key={s.key} className="tv-card min-h-[220px] rounded-2xl border p-3">
                 <div className="tv-shimmer mb-3 h-8 rounded-md" />
                 <div className="tv-shimmer mb-2 h-20 rounded-md" />
                 <div className="tv-shimmer h-20 rounded-md" />
@@ -158,7 +158,7 @@ export function TraveliunKanban() {
                         <p className="tv-tnum mb-3 font-bold text-[#185045]"><DirText dir="ltr">{card.serial}</DirText></p>
                         {card.offer_date ? (
                           <p className="mb-2 flex items-center gap-2">
-                            <CalendarDays className="size-4 text-[#8ca49e]" />
+                            <CalendarDays className="size-4 text-tv-text-faint" />
                             <DirText dir="ltr" className="tv-tnum">{card.offer_date}</DirText>
                           </p>
                         ) : null}
@@ -176,7 +176,7 @@ export function TraveliunKanban() {
                       </article>
                     ))}
                     {column.cards.length === 0 ? (
-                      <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-6 text-center text-xs text-[#9cafaa]">{t("noCards")}</p>
+                      <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-6 text-center text-xs text-tv-text-faint">{t("noCards")}</p>
                     ) : null}
                   </div>
                 </div>
@@ -188,11 +188,11 @@ export function TraveliunKanban() {
 
       {selected ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/20 p-4" role="dialog" aria-modal="true" dir={dir} onClick={() => setSelected(null)}>
-          <div className="w-full max-w-[520px] rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]" onClick={(e) => e.stopPropagation()}>
+          <div className="tv-card w-full max-w-[520px] rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
               <div>
                 <h2 className="tv-tnum text-lg font-extrabold"><DirText dir="ltr">{selected.serial}</DirText></h2>
-                <p className="mt-1 text-sm text-[#6d8a84]">{stageName(selected.stage)}</p>
+                <p className="mt-1 text-sm text-tv-text-faint">{stageName(selected.stage)}</p>
               </div>
               <button type="button" onClick={() => setSelected(null)} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}><X className="size-5" /></button>
             </div>
@@ -251,7 +251,7 @@ function ConfirmToOperations({ offerId }: { offerId: string }) {
         type="button"
         disabled={busy}
         onClick={() => void run()}
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] bg-[#185045] text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        className="tv-btn-primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] text-sm font-bold disabled:opacity-60"
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
         {busy ? t("ops.confirming") : t("ops.confirm")}

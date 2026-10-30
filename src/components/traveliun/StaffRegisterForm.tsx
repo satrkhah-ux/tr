@@ -18,7 +18,7 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  */
 
 const field =
-  "h-[46px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-sm outline-none transition-colors focus:border-[#185045]";
+  "h-[46px] w-full rounded-[8px] border border-[#ead8d2] px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]";
 const label = "block text-[13px] font-medium text-[#003c3a]";
 
 type Form = {
@@ -102,7 +102,7 @@ export function StaffRegisterForm() {
                   maxLength={500}
                   value={form.note}
                   onChange={set("note")}
-                  className="w-full rounded-[8px] border border-[#ead8d2] p-3 text-sm outline-none transition-colors focus:border-[#185045]"
+                  className="w-full rounded-[8px] border border-[#ead8d2] p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#185045]"
                 />
               </label>
 
@@ -128,7 +128,7 @@ export function StaffRegisterForm() {
               <button
                 type="submit"
                 disabled={pending}
-                className="flex h-[50px] w-full items-center justify-center gap-2 rounded-[8px] bg-[#185045] text-[15px] font-semibold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-70"
+                className="tv-btn-primary flex h-[50px] w-full items-center justify-center gap-2 rounded-[8px] text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {pending ? <Loader2 className="size-5 animate-spin" /> : null}
                 {t("reg.submit")}

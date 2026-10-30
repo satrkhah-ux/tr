@@ -18,7 +18,7 @@ import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
 
 /** Keep field labels visible when the card wraps, regardless of viewport width. */
-const SMALL_CAPTION = "text-[10px] font-bold text-[#7a948f]";
+const SMALL_CAPTION = "text-[10px] font-bold text-tv-text-faint";
 
 type Look = { busy?: boolean; note?: string; hits?: FlightLookupHit[] };
 
@@ -226,7 +226,7 @@ export function LegRow({
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
           {tx("pickRoute")}
           {look.hits.map((hit, i) => (
-            <button key={i} type="button" onClick={() => apply(hit)} className="tv-tnum rounded-[7px] border border-[#cfe0d9] bg-[#f4f8f6] px-2 py-1 text-[#185045] hover:bg-[#e7f2ec]">
+            <button key={i} type="button" onClick={() => apply(hit)} className="tv-tnum rounded-[7px] border border-[#cfe0d9] bg-[#f4f8f6] px-2 py-1 text-[#185045] hover:bg-[#e7f2ec] max-sm:min-h-10">
               {`${hit.from_iata} → ${hit.to_iata} ${localTimePart(hit.departure_at) ?? ""}`}
             </button>
           ))}
@@ -379,7 +379,7 @@ export function BasicFlightPlan({
             onChange={(e) => onChange({ flight_booking: { ...withTypedTotal(booking, "intl", typedNumber(e.target)), intl_currency: booking.intl_currency || "SAR" } })}
             className={`${basicField} tv-tnum w-64 max-w-full text-center`}
           />
-          <span className="text-[11px] font-semibold text-[#7a948f]">{canFetch ? tx("fetchHint") : null}</span>
+          <span className="text-[11px] font-semibold text-tv-text-faint">{canFetch ? tx("fetchHint") : null}</span>
         </div>
         <FlightFare booking={booking} kind="intl" trip={data.trip} field={basicField} onChange={(flight_booking) => onChange({ flight_booking })} />
       </div>

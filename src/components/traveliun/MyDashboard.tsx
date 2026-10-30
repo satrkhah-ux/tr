@@ -102,7 +102,7 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-extrabold text-[#003c3a]">{t("dash.tab.mine")}</h2>
-        <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.mine.hint")}</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("dash.mine.hint")}</p>
       </div>
 
       <FollowUpList items={data.followUp} />
@@ -122,7 +122,7 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
               }`}
             >
               <span className="flex items-start justify-between gap-2">
-                <span className="text-[12.5px] font-bold text-[#6f8f88]">{t(c.label)}</span>
+                <span className="text-[12.5px] font-bold text-tv-text-faint">{t(c.label)}</span>
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-[11px]" style={{ color: c.color, background: `${c.color}1a` }}>
                   <c.icon className="size-[18px]" />
                 </span>
@@ -130,7 +130,7 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
               <span className="tv-tnum mt-1.5 block text-[26px] font-extrabold text-[#003c3a]">
                 <DirText>{fmt(c.value)}</DirText>
               </span>
-              <span className="mt-1 block text-[11.5px] font-semibold text-[#93aaa3]">{c.hint}</span>
+              <span className="mt-1 block text-[11.5px] font-semibold text-tv-text-faint">{c.hint}</span>
             </button>
           );
         })}
@@ -144,7 +144,7 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
             <DirText>{t("dash.mine.count", { shown: fmt(Math.min(limit, total)), total: fmt(total) })}</DirText>
           </span>
           <label className="relative w-full sm:ms-auto sm:w-80">
-            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-tv-text-faint" />
             <input
               value={query}
               onChange={(e) => {
@@ -153,13 +153,13 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
               }}
               placeholder={t("dash.mine.search")}
               aria-label={t("dash.mine.search")}
-              className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] pe-3 ps-9 text-[13px] font-semibold text-[#185045] outline-none focus:border-[#2aa87a]"
+              className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] pe-3 ps-9 text-[13px] font-semibold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
             />
           </label>
         </div>
 
         {total === 0 ? (
-          <p className="py-8 text-center text-[13px] font-semibold text-[#93aaa3]">{t(base === 0 ? EMPTY[list] : "dash.mine.noMatch")}</p>
+          <p className="py-8 text-center text-[13px] font-semibold text-tv-text-faint">{t(base === 0 ? EMPTY[list] : "dash.mine.noMatch")}</p>
         ) : (
           <ul className="divide-y divide-[#eef2f0] dark:divide-[#294039]">
             {list === "incomplete"
@@ -174,7 +174,7 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
           <button
             type="button"
             onClick={() => setLimit((n) => n + PAGE)}
-            className="mt-3 w-full rounded-[10px] border border-[#dbe6e1] py-2 text-[13px] font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6] dark:hover:bg-[#1b2d27]"
+            className="tv-btn-secondary mt-3 w-full rounded-[10px] border py-2 text-[13px] font-bold transition-colors"
           >
             {t("dash.mine.more")}
           </button>
@@ -274,7 +274,7 @@ function Meta({ client, phone, place, cities, start, end, updated }: {
           <DirText>{end ? `${start} → ${end}` : start}</DirText>
         </span>
       ) : null}
-      <span className="text-[#93aaa3]">
+      <span className="text-tv-text-faint">
         {t("dash.mine.updated")} <DirText className="tv-tnum">{day(updated)}</DirText>
       </span>
     </div>
@@ -363,7 +363,7 @@ function ClientItem({ c, onOpen }: { c: MyClient; onOpen: () => void }) {
         </span>
         <span className="mt-1 flex flex-wrap gap-x-3 text-[12px] font-semibold text-[#557d78]">
           {c.countries.length > 0 ? <span>{c.countries.join(" · ")}</span> : null}
-          <span className="text-[#93aaa3]">
+          <span className="text-tv-text-faint">
             {t("dash.mine.lastOffer")} <DirText className="tv-tnum">{day(c.lastAt)}</DirText>
           </span>
         </span>
@@ -387,7 +387,7 @@ function Analysis({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-extrabold text-[#003c3a]">{t("dash.mine.analysis")}</h2>
-        <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.mine.analysisHint")}</p>
+        <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("dash.mine.analysisHint")}</p>
       </div>
       {s.issued === 0 ? (
         <section className={CARD}>
@@ -439,5 +439,5 @@ function Analysis({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
 
 function NoData() {
   const { t } = useTraveliunUI();
-  return <p className="py-10 text-center text-[13px] font-semibold text-[#93aaa3]">{t("dash.mine.noData")}</p>;
+  return <p className="py-10 text-center text-[13px] font-semibold text-tv-text-faint">{t("dash.mine.noData")}</p>;
 }

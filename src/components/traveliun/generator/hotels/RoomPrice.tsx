@@ -114,13 +114,13 @@ export function RoomPrice({
       ) : null}
       {/* only when it DISAGREES with the box — repeating the same number is noise */}
       {differs && remembered ? (
-        <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#93aaa3]">
+        <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-tv-text-faint">
           {t("pg.lastSavedNight")}
           <DirText dir="ltr" className="tv-tnum font-bold text-[#557d78]">{`${remembered.price} ${remembered.currency}`}</DirText>
           <button
             type="button"
             onClick={() => onChange({ price: Math.round(remembered.price * n * 100) / 100 })}
-            className="rounded-full border border-[#b7d0c7] px-2 py-0.5 text-[10.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="tv-btn-secondary rounded-full border px-2 py-0.5 text-[10.5px] font-bold max-sm:min-h-10"
           >
             {t("pg.useLastRate")}
           </button>

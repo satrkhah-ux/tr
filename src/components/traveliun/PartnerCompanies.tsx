@@ -29,9 +29,9 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  * palette rather than a hex string nobody can picture.
  */
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 type Draft = {
@@ -121,12 +121,12 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-extrabold text-[#003c3a]">{t("partner.title")}</h1>
-              <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("partner.subtitle")}</p>
+              <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("partner.subtitle")}</p>
             </div>
             <button
               type="button"
               onClick={() => { setError(null); setDraft(toDraft()); }}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]"
+              className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold"
             >
               <Plus className="size-4" />
               {t("partner.add")}
@@ -154,7 +154,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+                className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
                 aria-label={t("close")}
               >
                 <X className="size-4" />
@@ -205,7 +205,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
                   type="color"
                   value={draft.brand_color}
                   onChange={(e) => setDraft({ ...draft, brand_color: e.target.value })}
-                  className="h-11 w-24 cursor-pointer rounded-[10px] border border-[#dbe6e1] bg-white p-1"
+                  className="tv-field h-11 w-24 cursor-pointer rounded-[10px] border p-1"
                 />
               </label>
               <label className={label}>
@@ -214,7 +214,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
                   type="color"
                   value={draft.accent_color}
                   onChange={(e) => setDraft({ ...draft, accent_color: e.target.value })}
-                  className="h-11 w-24 cursor-pointer rounded-[10px] border border-[#dbe6e1] bg-white p-1"
+                  className="tv-field h-11 w-24 cursor-pointer rounded-[10px] border p-1"
                 />
               </label>
               <BrandPreview primary={draft.brand_color} accent={draft.accent_color} name={draft.name} />
@@ -248,13 +248,13 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
                       >
                         {option.labelAr} · أهلاً وسهلاً
                       </span>
-                      <span className="mt-0.5 block text-[11px] font-semibold text-[#93aaa3]">{option.noteAr}</span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-tv-text-faint">{option.noteAr}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
-            <p className="mt-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("partner.colorsHint")}</p>
+            <p className="mt-1.5 text-[11px] font-semibold text-tv-text-faint">{t("partner.colorsHint")}</p>
             {isHouseColor(draft.brand_color) ? (
               <p className="mt-1.5 flex items-center gap-1.5 rounded-[9px] bg-[#fff8e8] px-3 py-2 text-[11.5px] font-bold text-[#a86a10]">
                 <AlertTriangle className="size-3.5 shrink-0" />
@@ -285,7 +285,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
                 type="button"
                 onClick={save}
                 disabled={pending}
-                className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-[13px] font-bold disabled:opacity-60"
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                 {t("save")}
@@ -293,7 +293,7 @@ export function PartnerCompanies({ companies, defaultTiers }: { companies: Partn
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="inline-flex h-11 items-center rounded-[10px] border border-[#d8e3de] px-5 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+                className="tv-btn-secondary inline-flex h-11 items-center rounded-[10px] border px-5 text-[13px] font-bold"
               >
                 {t("cancel")}
               </button>
@@ -354,7 +354,7 @@ function Toggle({
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-4 accent-[#185045]" />
       <span>
         <span className="block text-[12.5px] font-bold text-[#185045]">{text}</span>
-        {hint ? <span className="block text-[11px] font-semibold text-[#93aaa3]">{hint}</span> : null}
+        {hint ? <span className="block text-[11px] font-semibold text-tv-text-faint">{hint}</span> : null}
       </span>
     </label>
   );
@@ -381,7 +381,7 @@ function LogoUpload({ partnerId }: { partnerId: string }) {
   return (
     <div className="mt-4 rounded-[10px] border border-dashed border-[#cfe0d9] p-3">
       <p className="text-[12px] font-bold text-[#185045]">{t("partner.logo")}</p>
-      <p className="mt-0.5 text-[11px] font-semibold text-[#93aaa3]">{t("partner.logoHint")}</p>
+      <p className="mt-0.5 text-[11px] font-semibold text-tv-text-faint">{t("partner.logoHint")}</p>
       <input
         ref={input}
         type="file"
@@ -397,7 +397,7 @@ function LogoUpload({ partnerId }: { partnerId: string }) {
         type="button"
         disabled={busy}
         onClick={() => input.current?.click()}
-        className="mt-2 inline-flex h-10 items-center gap-2 rounded-[9px] border border-[#dbe6e1] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+        className="tv-btn-secondary mt-2 inline-flex h-10 items-center gap-2 rounded-[9px] border px-3 text-[12.5px] font-bold disabled:opacity-60"
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <ImageUp className="size-4" />}
         {t("partner.uploadLogo")}
@@ -432,7 +432,7 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
           <Link href={`/partner-companies/${company.id}`} className="block truncate text-[14px] font-extrabold text-[#003c3a] hover:underline">
             {company.name}
           </Link>
-          <p className="truncate text-[11.5px] font-semibold text-[#93aaa3]">
+          <p className="truncate text-[11.5px] font-semibold text-tv-text-faint">
             {[company.name_latin, company.phone, company.website].filter(Boolean).join(" · ") || "—"}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">
@@ -453,7 +453,7 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
           <button
             type="button"
             onClick={onEdit}
-            className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+            className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6] max-sm:min-h-10 max-sm:min-w-10"
             aria-label={t("edit")}
           >
             <Pencil className="size-4" />

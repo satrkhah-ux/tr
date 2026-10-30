@@ -20,9 +20,9 @@ import { SuggestInput } from "../../SuggestInput";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
 
-export const wzCard = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+export const wzCard = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 export const wzField =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 export const wzLabel = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 export const wzPrimary =
   "inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-60";
@@ -88,7 +88,7 @@ export function PaperReader({
             disabled={busy}
             rows={4}
             dir="auto"
-            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+            className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
           />
         </label>
       )}
@@ -149,7 +149,7 @@ export function PullNotice({ operationId }: { operationId: string }) {
 export function NameRow({ check }: { check: NameCheck }) {
   const { t } = useTraveliunUI();
   const tone =
-    check.status === "ok" ? "border-[#cfe9dc] bg-[#eef8f3] text-[#0f7a52]" : check.status === "likely" ? "border-[#f1dfb8] bg-[#fff8ea] text-[#a86a10]" : "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]";
+    check.status === "ok" ? "border-[#cfe9dc] bg-tv-status-success-bg text-tv-status-success" : check.status === "likely" ? "border-[#f1dfb8] bg-tv-status-warning-bg text-tv-status-warning" : "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger";
   return (
     <li className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-[9px] border px-3 py-1.5 text-[12px] font-bold ${tone}`}>
       {check.status === "mismatch" ? <AlertTriangle className="size-3.5" /> : <Check className="size-3.5" />}
@@ -206,7 +206,7 @@ export function FlightsStep({ data }: StepProps) {
         <Plane className="size-4" />
         {t("wz.flights.title")}
       </h2>
-      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.flights.hint")}</p>
+      <p className="mb-3 mt-1 text-[11.5px] font-semibold text-tv-text-faint">{t("wz.flights.hint")}</p>
       {flights.length > 0 ? (
         <ul className="grid gap-3">
           {flights.map((b) => (
@@ -216,7 +216,7 @@ export function FlightsStep({ data }: StepProps) {
       ) : notPulled(data, "flight") ? (
         <PullNotice operationId={data.operation.id} />
       ) : (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.flights.none")}</p>
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-tv-text-faint">{t("wz.flights.none")}</p>
       )}
     </section>
   );
@@ -319,11 +319,11 @@ function FlightCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="break-words text-[13px] font-extrabold text-[#0f3d38]">{booking.title}</p>
-          <p className="mt-0.5 text-[11px] font-semibold text-[#93aaa3]">
+          <p className="mt-0.5 text-[11px] font-semibold text-tv-text-faint">
             {t("wz.flights.ourRef")}: <DirText>{booking.company_ref ?? "—"}</DirText>
           </p>
         </div>
-        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff4e0] text-[#a86a10]"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
           {done ? t("wz.flights.ticketed") : t("wz.flights.waiting")}
         </span>
       </div>
@@ -430,9 +430,9 @@ function FlightCard({
                 rows={Math.max(2, travelers)}
                 dir="ltr"
                 placeholder="065-2400000001"
-                className="tv-tnum block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]"
+                className="tv-tnum block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
               />
-              <span className="font-semibold text-[#93aaa3]">{t("wz.flights.ticketsHint")}</span>
+              <span className="font-semibold text-tv-text-faint">{t("wz.flights.ticketsHint")}</span>
               {travelers > 0 && ticketCount !== travelers ? (
                 <span className="font-bold text-[#a86a10]">{t("wz.flights.countWarn", { tickets: String(ticketCount), travelers: String(travelers) })}</span>
               ) : null}

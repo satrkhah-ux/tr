@@ -7,7 +7,7 @@ import { PAY_METHODS, type MethodFee, type PayMethod, type PaymentFees, type Set
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
-const field = "h-9 w-20 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-center text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+const field = "tv-field h-9 w-20 rounded-[9px] border px-2 text-center text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 /**
  * «رسوم وسائل الدفع» on «سياسة الربح» (the owner, 2026-10-29): per method a
@@ -37,9 +37,9 @@ export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees
   }
 
   return (
-    <section className="mt-4 max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card mt-4 max-w-3xl rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("pay.fees.title")}</h2>
-      <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("pay.fees.hint")}</p>
+      <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("pay.fees.hint")}</p>
       <div className="grid gap-1.5">
         {PAY_METHODS.map((m) => (
           <div key={m} className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#eef2f0] px-3 py-2">
@@ -80,7 +80,7 @@ export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees
         ))}
       </div>
       <h3 className="mt-4 text-[13px] font-extrabold text-[#185045]">{t("pay.settle.title")}</h3>
-      <p className="mt-1 mb-2 text-[12px] font-semibold text-[#93aaa3]">{t("pay.settle.hint")}</p>
+      <p className="mt-1 mb-2 text-[12px] font-semibold text-tv-text-faint">{t("pay.settle.hint")}</p>
       <div className="flex flex-wrap items-center gap-3 text-[12px] font-bold text-[#557d78]">
         <label className="flex items-center gap-1.5">
           {t("pay.settle.weekday")}
@@ -111,7 +111,7 @@ export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees
           type="button"
           disabled={state === "saving"}
           onClick={() => void save()}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60"
         >
           {state === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
           {t("save")}

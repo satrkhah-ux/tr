@@ -4,14 +4,15 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { DirText } from "@/components/DirText";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /** Shared pieces of the «العمولات» pages — the operations money pages' look. */
 
-export const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
-export const th = "px-2.5 py-2 text-start text-[11px] font-bold text-[#93aaa3] whitespace-nowrap";
+export const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+export const th = "px-2.5 py-2 text-start text-[11px] font-bold text-tv-text-faint whitespace-nowrap";
 export const td = "px-2.5 py-2 text-[12px] font-bold text-[#0f3d38] whitespace-nowrap";
-export const field = "h-10 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045]";
+export const field = "tv-field h-10 rounded-[10px] border px-3 text-[13px]";
 export const primary =
-  "inline-flex h-10 items-center justify-center rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50";
+  `${buttonTone({ variant: "default" })} inline-flex h-10 items-center justify-center rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-50`;
 export const secondary =
   "inline-flex h-10 items-center justify-center rounded-[10px] border border-[#dbe6e1] bg-white px-4 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50";
 export const danger =
@@ -29,10 +30,10 @@ export const Num = ({ children, tone }: { children: string; tone?: string }) => 
 export const STATUS: Record<string, { label: string; tone: string }> = {
   none: { label: "لم تُفتح بعد", tone: "bg-[#f1f5f3] text-[#557d78]" },
   draft: { label: "مسودة — تتحدث مع كل سداد", tone: "bg-[#f1f5f3] text-[#557d78]" },
-  review: { label: "بانتظار الاعتماد", tone: "bg-[#fff8e8] text-[#a86a10]" },
+  review: { label: "بانتظار الاعتماد", tone: "bg-tv-status-warning-bg text-tv-status-warning" },
   approved: { label: "معتمدة", tone: "bg-[#e8f6ef] text-[#17795a]" },
   paid: { label: "صُرفت", tone: "bg-[#e3f1ff] text-[#1f5fa8]" },
-  void: { label: "ملغاة", tone: "bg-[#fff0f3] text-[#c22850]" },
+  void: { label: "ملغاة", tone: "bg-tv-status-danger-bg text-tv-status-danger" },
 };
 
 export function StatusPill({ status }: { status: string }) {
@@ -43,11 +44,11 @@ export function StatusPill({ status }: { status: string }) {
 export function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: string }) {
   return (
     <div className="rounded-xl border border-[#e2ebe7] bg-[#fbfdfc] p-4">
-      <div className="text-[11.5px] font-bold text-[#93aaa3]">{label}</div>
+      <div className="text-[11.5px] font-bold text-tv-text-faint">{label}</div>
       <div className={`mt-1 text-[19px] font-extrabold ${tone ?? "text-[#003c3a]"}`}>
         <Num>{value}</Num>
       </div>
-      {hint && <div className="mt-1 text-[11px] font-semibold text-[#93aaa3]">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] font-semibold text-tv-text-faint">{hint}</div>}
     </div>
   );
 }

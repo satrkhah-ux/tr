@@ -71,7 +71,7 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
   return (
     <div className="space-y-3">
       {/* who travels — the passports against what the offer was priced for */}
-      <div className={`rounded-[12px] px-4 py-3 text-[12.5px] font-bold ${summary.mismatch ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#f2fbf6] text-[#0f7a52]"}`}>
+      <div className={`rounded-[12px] px-4 py-3 text-[12.5px] font-bold ${summary.mismatch ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"}`}>
         <p className="flex items-start gap-2">
           {summary.mismatch ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" />}
           <span>
@@ -95,7 +95,7 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
         <span className="text-[13.5px] font-extrabold text-[#185045]">
           {progress ? t("wz.pass.reading", { done: progress.done, of: progress.of }) : t("wz.pass.upload")}
         </span>
-        <span className="text-[11.5px] font-semibold text-[#93aaa3]">{t(canReadMrz ? "wz.pass.uploadHint" : "wz.pass.uploadHintNoMrz")}</span>
+        <span className="text-[11.5px] font-semibold text-tv-text-faint">{t(canReadMrz ? "wz.pass.uploadHint" : "wz.pass.uploadHintNoMrz")}</span>
         <input
           type="file"
           multiple

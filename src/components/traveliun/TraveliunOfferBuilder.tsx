@@ -119,8 +119,8 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
   if (savedSerial) {
     return (
       <TraveliunShell title="title.addOffer">
-        <div className="tv-fade-up mx-auto max-w-[640px] rounded-2xl border border-[#bfe5d4] bg-white p-8 text-center shadow-[0_1px_2px_rgba(0,60,58,0.04)]" dir={dir}>
-          <div className="mx-auto mb-4 flex size-[76px] items-center justify-center rounded-[20px] bg-[#e9f7f0] text-[#0f7a52]">
+        <div className="tv-card tv-fade-up mx-auto max-w-[640px] rounded-2xl border p-8 text-center shadow-[0_1px_2px_rgba(0,60,58,0.04)]" dir={dir}>
+          <div className="mx-auto mb-4 flex size-[76px] items-center justify-center rounded-[20px] bg-tv-status-success-bg text-tv-status-success">
             <CheckCircle2 className="size-9" />
           </div>
           <h2 className="text-xl font-extrabold text-[#003c3a]">{t("builder.saved")}</h2>
@@ -137,7 +137,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
             <a href={`/offer/${savedSerial}/image`} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#d8e3de] px-5 text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]">
               {t("builder.downloadImage")}
             </a>
-            <button type="button" onClick={() => setSavedSerial(null)} className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#d8e3de] px-5 text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]">
+            <button type="button" onClick={() => setSavedSerial(null)} className="tv-btn-secondary inline-flex h-11 items-center gap-2 rounded-[11px] border px-5 text-sm font-bold">
               {t("builder.newOffer")}
             </button>
           </div>
@@ -149,10 +149,10 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
   return (
     <TraveliunShell title="title.addOffer">
       <div className="tv-fade-up space-y-4 pb-10" dir={dir}>
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h1 className="text-[22px] font-extrabold text-[#003c3a]">{t("builder.newTitle")}</h1>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={save} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-70">
+            <button type="button" onClick={save} disabled={saving} className="tv-btn-primary inline-flex h-11 items-center gap-2 rounded-[11px] px-5 text-sm font-bold disabled:opacity-70">
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               {saving ? t("saving") : t("builder.saveDb")}
             </button>
@@ -266,11 +266,11 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
           <div className="grid gap-2 md:grid-cols-2">
             {services.map((service, index) => (
               <div key={index} className="flex items-center gap-2 rounded-[10px] border border-[#e2ebe7] p-2">
-                <select value={service.kind} onChange={(e) => updateService(index, { kind: e.target.value as "include" | "exclude" })} className="h-10 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-xs font-bold text-[#185045] outline-none">
+                <select value={service.kind} onChange={(e) => updateService(index, { kind: e.target.value as "include" | "exclude" })} className="tv-field h-10 rounded-[8px] border px-2 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
                   <option value="include">{t("builder.include")}</option>
                   <option value="exclude">{t("builder.exclude")}</option>
                 </select>
-                <input value={service.label} onChange={(e) => updateService(index, { label: e.target.value })} placeholder={t("builder.serviceName")} className="h-10 flex-1 rounded-[8px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]" />
+                <input value={service.label} onChange={(e) => updateService(index, { label: e.target.value })} placeholder={t("builder.serviceName")} className="tv-field h-10 flex-1 rounded-[8px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus" />
                 <RemoveButton onClick={() => setServices((prev) => prev.filter((_, i) => i !== index))} />
               </div>
             ))}
@@ -278,7 +278,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
         </Panel>
 
         <Panel title={t("builder.terms")} icon={FileText}>
-          <textarea value={terms} onChange={(e) => setTerms(e.target.value)} placeholder={t("builder.termsPlaceholder")} className="h-28 w-full rounded-[11px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#0f3d38] outline-none focus:border-[#2aa87a]" />
+          <textarea value={terms} onChange={(e) => setTerms(e.target.value)} placeholder={t("builder.termsPlaceholder")} className="tv-field h-28 w-full rounded-[11px] border p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus" />
         </Panel>
 
         <Panel title={t("builder.finalPrice")}>
@@ -309,7 +309,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
                       <DirText dir="ltr">{`${(Number(total) - Number(buyPrice)).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${currency}`}</DirText>
                     </span>
                   ) : (
-                    <span className="text-sm text-[#93aaa3]">—</span>
+                    <span className="text-sm text-tv-text-faint">—</span>
                   )}
                 </div>
               </Field>
@@ -331,7 +331,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
 
 function Panel({ title, icon: Icon, actions, children }: { title: string; icon?: typeof Hotel; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="flex items-center justify-between gap-3 border-b border-[#eef2f0] px-5 py-4">
         <h2 className="flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
           {Icon ? <Icon className="size-5 text-[#185045]" /> : null}
@@ -393,7 +393,7 @@ function LabeledDate({ label, value, onChange }: { label: string; value: string;
 }
 function AddButton({ label, icon: Icon = Plus, onClick }: { label: string; icon?: typeof Plus; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#cfe0d9] bg-white px-3 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6]">
+    <button type="button" onClick={onClick} className="tv-btn-secondary inline-flex h-9 items-center gap-2 rounded-[9px] border px-3 text-xs font-bold max-sm:min-h-10">
       <Icon className="size-4" /> {label}
     </button>
   );
@@ -407,8 +407,8 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
   );
 }
 function Empty({ text }: { text: string }) {
-  return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#9cafaa]">{text}</p>;
+  return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">{text}</p>;
 }
 
-const field = "h-[46px] rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#0f3d38] outline-none transition-colors focus:border-[#2aa87a]";
-const fieldSm = "h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#0f3d38] outline-none transition-colors focus:border-[#2aa87a]";
+const field = "tv-field h-[46px] rounded-[11px] border px-3 text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors";
+const fieldSm = "tv-field h-10 rounded-[9px] border px-3 text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors";

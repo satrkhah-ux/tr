@@ -117,7 +117,7 @@ export function PayMethodPick({
         </div>
       </div>
       {chosen && !chosen.unset && chosen.fee > 0 ? (
-        <p className="tv-tnum mt-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("pg.payMethod.split", { fee: fmt(chosen.fee), net: fmt(price) })}</p>
+        <p className="tv-tnum mt-1.5 text-[11px] font-semibold text-tv-text-faint">{t("pg.payMethod.split", { fee: fmt(chosen.fee), net: fmt(price) })}</p>
       ) : null}
       <details className="mt-1">
         <summary className="cursor-pointer text-[11px] font-bold text-[#557d78]">{t("pg.payMethod.compare")}</summary>

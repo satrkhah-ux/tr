@@ -100,21 +100,21 @@ export function SecretaryChat({ tall = false, active = true, pendingError = null
         m.role === "user" ? "me-auto rounded-ss-sm border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white"
         : m.role === "plan" ? "ms-auto border-[#dddcc4] bg-[#faf9f1] text-[#5a5637]"
         : "ms-auto rounded-se-sm border-[#dfe8e4] bg-white text-[#185045]"}`}>
-        <p className={`mb-1 text-[11px] font-bold ${m.role === "user" ? "text-white/70" : "text-[#6c8680]"}`}>{m.role === "user" ? "أنت" : m.role === "plan" ? "مُراد · خطة اليوم" : "مُراد"}</p>
+        <p className={`mb-1 text-[11px] font-bold ${m.role === "user" ? "text-white/70" : "text-tv-text-faint"}`}>{m.role === "user" ? "أنت" : m.role === "plan" ? "مُراد · خطة اليوم" : "مُراد"}</p>
         <p className="whitespace-pre-wrap break-words">{m.content}</p>
-        <p className={`mt-1 text-[10px] ${m.role === "user" ? "text-white/70" : "text-[#8ba09b]"}`}>{when(m.created_at)}</p>
+        <p className={`mt-1 text-[10px] ${m.role === "user" ? "text-white/70" : "text-tv-text-faint"}`}>{when(m.created_at)}</p>
       </div>)}
       {busy && <p className="flex items-center gap-2 text-sm text-[#557d78]"><Loader2 className="size-4 animate-spin" /> سكرتيرك يكتب…</p>}
     </div>
     {error && <p role="alert" data-murad-own className="px-3 pb-1 text-sm text-red-700">{error}</p>}
     {lastError && !busy && <div className="flex items-center gap-2 px-3 pt-2 text-xs">
       <button type="button" onClick={() => void report()} disabled={!!reported}
-        className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 font-bold text-red-800 hover:bg-red-100 disabled:opacity-60">أبلغ الإدارة</button>
+        className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 font-bold text-red-800 hover:bg-red-100 disabled:opacity-60 max-sm:min-h-10">أبلغ الإدارة</button>
       {reported && <span role="status" className="text-[#557d78]">{reported}</span>}
     </div>}
     <div className="flex shrink-0 gap-2 overflow-x-auto border-t border-[#e7eeeb] px-3 pt-3 pb-1">
       {QUICK.map((q) => <button key={q} type="button" disabled={busy || loading} onClick={() => void send(q)}
-        className="shrink-0 rounded-full border border-[#dfe8e4] bg-white px-3 py-1.5 text-xs font-semibold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50">{q}</button>)}
+        className="tv-btn-secondary shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 max-sm:min-h-10">{q}</button>)}
     </div>
     <form className="flex shrink-0 items-end gap-2 bg-white p-3" onSubmit={(e) => { e.preventDefault(); void send(text); }}>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={2000} placeholder="اكتب لمُراد…" aria-label="رسالتك إلى مُراد"

@@ -54,7 +54,7 @@ export function TargetsEditor({ view }: { view: TargetsView }) {
               <Target className="size-5" />
               أهداف المبيعات
             </h1>
-            <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-6 text-[#93aaa3]">
+            <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-6 text-tv-text-faint">
               الهدف الشهري بالريال لكل موظف، ويظهر له وحده في رئيسيته مع ما حققه. المحقق = مبيعات الملفات التي أكمل عميلها الدفع في الشهر (كما في «عمولتي»).
               هدف الشهر المختار يغلب الهدف الثابت لذلك الشهر فقط. اترك الخانة فارغة لحذف الهدف.
             </p>

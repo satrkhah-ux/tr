@@ -31,7 +31,7 @@ export function TraveliunNotReady({ title }: TraveliunNotReadyProps) {
     <TraveliunShell title="notready.title">
       <section className="rounded-md border border-[#c8d2cd] bg-white p-8 shadow-[0_3px_8px_rgba(0,0,0,0.14)]">
         {title ? (
-          <p className="mb-2 text-xs font-semibold text-[#93aaa3]">
+          <p className="mb-2 text-xs font-semibold text-tv-text-faint">
             <DirText dir="ltr">{title}</DirText>
           </p>
         ) : null}

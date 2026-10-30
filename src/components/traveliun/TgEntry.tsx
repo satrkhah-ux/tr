@@ -83,7 +83,7 @@ export function TgEntry() {
   return (
     <main dir="rtl" className="flex min-h-dvh items-center justify-center bg-[#eef3f1] p-6 font-sans text-[#0f3d38]">
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onReady={() => void start()} onError={() => void start()} />
-      <div className="w-full max-w-[380px] rounded-2xl border border-[#e2ebe7] bg-white p-6 text-center shadow-[0_8px_30px_rgba(0,60,58,0.08)]">
+      <div className="tv-card w-full max-w-[380px] rounded-2xl border p-6 text-center shadow-[0_8px_30px_rgba(0,60,58,0.08)]">
         <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-[#185045] text-white">
           <Send className="size-6" />
         </span>
@@ -106,7 +106,7 @@ export function TgEntry() {
             >
               <LogIn className="size-4" /> {t("tg.linkButton")}
             </a>
-            <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("tg.linkOnce")}</p>
+            <p className="mt-2 text-[11.5px] font-semibold text-tv-text-faint">{t("tg.linkOnce")}</p>
           </>
         ) : null}
 
@@ -130,7 +130,7 @@ export function TgEntry() {
             <button
               type="button"
               onClick={() => void start()}
-              className="mt-3 inline-flex h-10 items-center justify-center rounded-[10px] border border-[#dbe6e1] px-4 text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]"
+              className="tv-btn-secondary mt-3 inline-flex h-10 items-center justify-center rounded-[10px] border px-4 text-sm font-bold"
             >
               {t("exec.retry")}
             </button>

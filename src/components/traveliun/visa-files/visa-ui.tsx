@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { PAYMENT_LABEL, VISA_STATUS_LABEL, type PaymentState, type VisaStatus } from "@/lib/visa-files/types";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * The visa screens' look: the operations screens' palette (white cards, #185045 green, 44 px targets), which the dark
  * layer in globals.css already remaps. Status and payment chips keep their own tints, as the other badges do.
@@ -13,29 +14,29 @@ export type Person = { id: string; name: string };
 /** what the last action of a section said, shown under it */
 export type Message = { tone: "ok" | "error" | "busy"; text: string } | null;
 
-export const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:p-5";
-export const field = "h-11 w-full min-w-0 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60";
-export const area = "min-h-24 w-full min-w-0 rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";
+export const card = "tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:p-5";
+export const field = "tv-field h-11 w-full min-w-0 rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60";
+export const area = "tv-field min-h-24 w-full min-w-0 rounded-[10px] border p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 export const label = "grid min-w-0 gap-1.5 text-[12px] font-bold text-[#185045]";
-export const btn = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6] disabled:opacity-50";
-export const btnPrimary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50";
+export const btn = `${buttonTone({ variant: "secondary" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border px-4 text-sm font-bold transition-colors disabled:opacity-50`;
+export const btnPrimary = `${buttonTone({ variant: "default" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 text-sm font-bold transition-colors disabled:opacity-50`;
 export const btnDanger = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#f3c9d3] bg-white px-4 text-sm font-bold text-[#c22850] transition-colors hover:bg-[#fdecef] disabled:opacity-50";
 export const heading = "text-sm font-extrabold text-[#185045]";
 
 const STATUS_TONE: Record<VisaStatus, string> = {
   new: "bg-[#eef4f1] text-[#557d78]",
-  collecting: "bg-[#fff8e8] text-[#a86a10]",
+  collecting: "bg-tv-status-warning-bg text-tv-status-warning",
   ready: "bg-[#dff1f4] text-[#0e7490]",
   submitted: "bg-[#e8eefc] text-[#3b4fa8]",
-  approved: "bg-[#e9f7f0] text-[#0f7a52]",
-  rejected: "bg-[#fdecef] text-[#c22850]",
+  approved: "bg-tv-status-success-bg text-tv-status-success",
+  rejected: "bg-tv-status-danger-bg text-tv-status-danger",
   delivered: "bg-[#d5eee3] text-[#0b5e3f]",
   cancelled: "bg-[#eef1f4] text-[#5b6b78]",
 };
 const PAYMENT_TONE: Record<PaymentState, string> = {
-  unpaid: "bg-[#fdecef] text-[#c22850]",
-  partial: "bg-[#fff8e8] text-[#a86a10]",
-  paid: "bg-[#e9f7f0] text-[#0f7a52]",
+  unpaid: "bg-tv-status-danger-bg text-tv-status-danger",
+  partial: "bg-tv-status-warning-bg text-tv-status-warning",
+  paid: "bg-tv-status-success-bg text-tv-status-success",
   free: "bg-[#eef1f4] text-[#5b6b78]",
 };
 const chip = "inline-flex min-h-7 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-xs font-extrabold";
@@ -49,7 +50,7 @@ export function PaymentChip({ state }: { state: PaymentState }) {
 
 /** One inline line under a form or a list: what happened, in words. Errors are alerts, the rest polite status. */
 export function Notice({ tone, children }: { tone: "error" | "ok" | "busy"; children: ReactNode }) {
-  const look = tone === "error" ? "bg-[#fdecef] text-[#c22850]" : tone === "ok" ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#eef4f1] text-[#557d78]";
+  const look = tone === "error" ? "bg-tv-status-danger-bg text-tv-status-danger" : tone === "ok" ? "bg-tv-status-success-bg text-tv-status-success" : "bg-[#eef4f1] text-[#557d78]";
   const Icon = tone === "error" ? AlertTriangle : tone === "ok" ? CheckCircle2 : Loader2;
   return (
     <p role={tone === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-[10px] px-3 py-2 text-[13px] font-bold ${look}`}>

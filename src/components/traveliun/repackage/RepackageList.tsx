@@ -48,10 +48,10 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
   return (
     <TraveliunShell title="nav.repackage">
       <div className="tv-fade-up space-y-4">
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div>
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("rp.title")}</h1>
-            <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("rp.subtitle")}</p>
+            <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("rp.subtitle")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* a ticket the client already holds, re-set in our identity — no supplier, no price */}
@@ -85,7 +85,7 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
                 type="button"
                 onClick={() => void onCreate()}
                 disabled={creating}
-                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
+                className="tv-btn-primary inline-flex h-10 items-center gap-2 rounded-[10px] px-5 text-[13px] font-bold transition-colors disabled:opacity-70"
               >
                 {creating ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
                 {creating ? t("pg.creating") : hasCustomer(customer) ? t("rp.start.go") : t("rp.start.goNoClient")}
@@ -100,13 +100,13 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
         ) : null}
 
         {rows.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState icon={FileText} title={t("rp.empty")} description={t("rp.subtitle")} />
           </section>
         ) : (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {rows.map((row) => (
-              <article key={row.id} className="flex flex-col justify-between rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
+              <article key={row.id} className="tv-card flex flex-col justify-between rounded-[14px] border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
                 <div>
                   <div className="mb-1 flex items-start justify-between gap-2">
                     <h2 className="min-w-0 truncate text-[15px] font-extrabold text-[#185045]">{row.title || t("rp.untitled")}</h2>
@@ -120,8 +120,8 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
                     <span className="min-w-0 truncate">{row.customer_name ?? t("rp.noClient")}</span>
                   </p>
                   {row.destination ? <p className="text-[12.5px] font-semibold text-[#557d78]">{row.destination}</p> : null}
-                  {row.supplier_name ? <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.supplier")}: {row.supplier_name}</p> : null}
-                  <p className="tv-tnum mt-1.5 text-[11px] text-[#93aaa3]">{t("pg.lastUpdated")}: <DirText dir="ltr">{row.updated_at.slice(0, 16).replace("T", " ")}</DirText></p>
+                  {row.supplier_name ? <p className="text-[11.5px] font-semibold text-tv-text-faint">{t("rp.supplier")}: {row.supplier_name}</p> : null}
+                  <p className="tv-tnum mt-1.5 text-[11px] text-tv-text-faint">{t("pg.lastUpdated")}: <DirText dir="ltr">{row.updated_at.slice(0, 16).replace("T", " ")}</DirText></p>
                 </div>
                 <div className="mt-4 flex items-center gap-2">
                   <Link href={stageHref(row.id, "import")} className="inline-flex h-10 flex-1 items-center justify-center rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439]">{t("rp.continue")}</Link>

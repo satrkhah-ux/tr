@@ -49,7 +49,7 @@ export function VisasStage({ data, patch, lookups }: StageFormProps) {
 
 
       {visas.length === 0 ? (
-        <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+        <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-tv-text-faint">
           {t("pg.noVisasYet")}
         </p>
       ) : (

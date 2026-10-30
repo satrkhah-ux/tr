@@ -6,9 +6,9 @@ import type { VisaIssue, VisaReview } from "@/lib/data/visa-review";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
 const TONE: Record<VisaIssue, string> = {
-  lostWhenHidden: "border-[#f2c9d3] bg-[#fdf3f5] text-[#c22850]",
-  noRequirements: "border-[#f2c9d3] bg-[#fdf3f5] text-[#c22850]",
-  noCountry: "border-[#f2c9d3] bg-[#fdf3f5] text-[#c22850]",
+  lostWhenHidden: "border-[#f2c9d3] bg-tv-status-danger-bg text-tv-status-danger",
+  noRequirements: "border-[#f2c9d3] bg-tv-status-danger-bg text-tv-status-danger",
+  noCountry: "border-[#f2c9d3] bg-tv-status-danger-bg text-tv-status-danger",
   noPrice: "border-[#f1dca7] bg-[#fff8e6] text-[#7a5a12]",
   notSar: "border-[#f1dca7] bg-[#fff8e6] text-[#7a5a12]",
   runOn: "border-[#f1dca7] bg-[#fff8e6] text-[#7a5a12]",
@@ -24,7 +24,7 @@ export function VisaListReview({ total, reviews }: { total: number; reviews: Vis
   const { t } = useTraveliunUI();
   const todo = reviews.length;
   return (
-    <details open={todo > 0} className="mb-4 rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <details open={todo > 0} className="tv-card mb-4 rounded-2xl border px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1">
         {todo ? <AlertTriangle className="size-4 text-[#b7791f]" aria-hidden /> : <CheckCircle2 className="size-4 text-[#0f7a52]" aria-hidden />}
         <span className="text-[14px] font-extrabold text-[#003c3a]">{t("data.visas.review.title")}</span>
@@ -32,7 +32,7 @@ export function VisaListReview({ total, reviews }: { total: number; reviews: Vis
           {t("data.visas.review.summary", { total, ready: total - todo, todo })}
         </span>
       </summary>
-      <p className="mt-2 text-[12px] font-semibold text-[#93aaa3]">{todo ? t("data.visas.review.hint") : t("data.visas.review.clean")}</p>
+      <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">{todo ? t("data.visas.review.hint") : t("data.visas.review.clean")}</p>
       {todo ? (
         <ul className="mt-3 grid gap-2">
           {reviews.map((r) => (
@@ -40,7 +40,7 @@ export function VisaListReview({ total, reviews }: { total: number; reviews: Vis
               {/* the table opens that one row's details from ?id= */}
               <a href={`/visas?id=${r.id}`} className="min-w-[110px] text-[13px] font-extrabold text-[#185045] underline-offset-4 hover:underline">
                 {r.country}
-                {r.visa_type ? <span className="font-semibold text-[#93aaa3]"> · {r.visa_type}</span> : null}
+                {r.visa_type ? <span className="font-semibold text-tv-text-faint"> · {r.visa_type}</span> : null}
               </a>
               <span className="flex flex-1 flex-wrap gap-1.5">
                 {r.issues.map((issue) => (

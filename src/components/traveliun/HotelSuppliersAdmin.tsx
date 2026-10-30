@@ -16,7 +16,7 @@ import { TraveliunShell } from "./TraveliunShell";
 type MarkupOption = { id: string; name: string };
 
 const fieldClass =
-  "h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#0f3d38] outline-none focus:border-[#2aa87a]";
+  "tv-field h-10 rounded-[9px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const labelClass = "grid gap-1 text-[12px] font-bold text-[#185045]";
 
 export function HotelSuppliersAdmin({
@@ -34,12 +34,12 @@ export function HotelSuppliersAdmin({
     <TraveliunShell title="settings.suppliers.title">
       <div className="tv-fade-up mx-auto max-w-[860px]">
         <h1 className="text-lg font-extrabold text-[#003c3a]">{t("settings.suppliers.title")}</h1>
-        <p className="mt-1 mb-5 text-[12.5px] font-semibold text-[#93aaa3]">{t("settings.suppliers.subtitle")}</p>
+        <p className="mt-1 mb-5 text-[12.5px] font-semibold text-tv-text-faint">{t("settings.suppliers.subtitle")}</p>
 
         <SearchSourceCard suppliers={suppliers} initial={searchSource} />
 
         {suppliers.length === 0 ? (
-          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-10 text-center text-sm text-[#93aaa3]">
+          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-10 text-center text-sm text-tv-text-faint">
             {t("settings.suppliers.empty")}
           </p>
         ) : (
@@ -84,9 +84,9 @@ function SearchSourceCard({ suppliers, initial }: { suppliers: SupplierView[]; i
   }
 
   return (
-    <section className="mb-5 rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card mb-5 rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.searchSource.title")}</h2>
-      <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.searchSource.hint")}</p>
+      <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.searchSource.hint")}</p>
       <div role="radiogroup" aria-label={t("settings.searchSource.title")} className="flex flex-wrap gap-2">
         {options.map((o) => (
           <button
@@ -168,12 +168,12 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
   }
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       {/* header */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-extrabold text-[#003c3a]">{supplier.name_ar}</h2>
-          <p className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+          <p className="tv-tnum text-[11px] font-bold text-tv-text-faint">
             <DirText dir="ltr">{supplier.code.toUpperCase()}</DirText>
           </p>
         </div>
@@ -222,7 +222,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
             <button
               type="button"
               onClick={() => setReplacing(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#557d78] hover:bg-[#f0f7f4]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#557d78] hover:bg-[#f0f7f4] max-sm:min-h-10"
             >
               {t("settings.suppliers.replace")}
             </button>
@@ -241,7 +241,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
               <button
                 type="button"
                 onClick={() => { setReplacing(false); setUsername(""); setPassword(""); }}
-                className="justify-self-start text-[12px] font-bold text-[#93aaa3] hover:text-[#557d78]"
+                className="justify-self-start text-[12px] font-bold text-tv-text-faint hover:text-[#557d78]"
               >
                 {t("settings.suppliers.cancel")}
               </button>
@@ -251,7 +251,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
       </div>
 
       {/* last sync / error */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] font-semibold text-[#93aaa3]">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] font-semibold text-tv-text-faint">
         <span>
           {t("settings.suppliers.lastSync")}:{" "}
           {supplier.last_sync_at ? <DirText dir="ltr">{supplier.last_sync_at.slice(0, 16).replace("T", " ")}</DirText> : t("settings.suppliers.never")}
@@ -270,7 +270,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
           type="button"
           onClick={() => void onSave()}
           disabled={saveState === "saving"}
-          className="inline-flex h-9 items-center gap-2 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-60"
+          className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[9px] px-4 text-[12.5px] font-bold transition-colors disabled:opacity-60 max-sm:min-h-10"
         >
           {saveState === "saving" ? <Loader2 className="size-4 animate-spin" /> : null}
           {saveState === "saved" ? t("settings.suppliers.saved") : t("settings.suppliers.save")}
@@ -279,7 +279,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
           type="button"
           onClick={() => void onTest()}
           disabled={test.state === "testing"}
-          className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-4 text-[12.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-60"
+          className="tv-btn-secondary inline-flex h-9 items-center gap-2 rounded-[9px] border px-4 text-[12.5px] font-bold transition-colors disabled:opacity-60 max-sm:min-h-10"
         >
           {test.state === "testing" ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}
           {t("settings.suppliers.test")}

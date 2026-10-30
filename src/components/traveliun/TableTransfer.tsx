@@ -181,7 +181,7 @@ export function TableTransfer({
 
       {plan ? (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" aria-labelledby="import-preview-title" dir={dir}>
-          <div className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[820px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+          <div className="tv-card max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[820px] overflow-y-auto rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
             <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
               <h2 id="import-preview-title" className="text-lg font-extrabold">{t("data.tools.import.previewTitle")}</h2>
               <button type="button" onClick={() => setPlan(null)} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}>
@@ -196,7 +196,7 @@ export function TableTransfer({
                 errors: plan.errors.length,
               })}
             </p>
-            <p className="mb-4 text-[12.5px] text-[#6d8a84]">{t("data.tools.import.noDelete")}</p>
+            <p className="mb-4 text-[12.5px] text-tv-text-faint">{t("data.tools.import.noDelete")}</p>
 
             {plan.errors.length > 0 ? (
               <ul className="mb-4 grid gap-1 rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] p-3 text-[13px] text-[#c22850]">
@@ -237,7 +237,7 @@ export function TableTransfer({
                 type="button"
                 disabled={busy || plan.creates.length + plan.updates.length === 0}
                 onClick={() => save(plan)}
-                className="flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                className="tv-btn-primary flex h-10 items-center gap-2 rounded-[10px] px-6 text-sm font-bold disabled:opacity-50"
               >
                 {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                 {t("data.tools.import.save")}

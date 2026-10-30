@@ -139,13 +139,13 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-[13px] font-extrabold text-[#185045]">
           {t(titleKey)}
-          {items.length ? <span className="tv-tnum ms-1.5 text-[11.5px] font-bold text-[#78948f]">({items.length})</span> : null}
+          {items.length ? <span className="tv-tnum ms-1.5 text-[11.5px] font-bold text-tv-text-faint">({items.length})</span> : null}
         </h3>
         <button
           type="button"
           onClick={() => setAdding((o) => !o)}
           aria-expanded={adding}
-          className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] border px-2.5 text-[12px] font-bold ${
+          className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] border px-2.5 text-[12px] font-bold max-sm:min-h-10 ${
             adding ? "border-[#185045] bg-[#185045] text-white" : "border-[#cfe0d9] bg-white text-[#185045] hover:border-[#2aa87a]"
           }`}
         >
@@ -155,7 +155,7 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
       </div>
 
       {items.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-2 text-center text-[12px] text-[#93aaa3]">{t("pg.docNoContent")}</p>
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-2 text-center text-[12px] text-tv-text-faint">{t("pg.docNoContent")}</p>
       ) : chips ? (
         <ul className="flex flex-wrap gap-1.5">
           {items.map((item, index) => (
@@ -172,7 +172,7 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
                 onClick={() => removeItem(index)}
                 aria-label={t("pg.removeRow")}
                 title={t("pg.removeRow")}
-                className="flex size-5 shrink-0 items-center justify-center rounded-full text-[#93aaa3] hover:bg-white hover:text-[#c43d3d]"
+                className="flex size-5 shrink-0 items-center justify-center rounded-full text-tv-text-faint hover:bg-white hover:text-[#c43d3d]"
               >
                 <X className="size-3" />
               </button>

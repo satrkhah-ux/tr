@@ -14,6 +14,7 @@ import { TABS } from "@/lib/ready-offers/parse";
 import { SyncDialog } from "../ready-offers/ReadyOffersCatalog";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
+import { buttonTone } from "@/components/ui/button-variants";
 /**
  * «العروض الجاهزة» on /developer (the owner, 2026-10-18): the sheet the sync
  * reads — changed here without a deploy — a check of it, its preview and sync,
@@ -21,7 +22,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  */
 
 const button =
-  "inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-extrabold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
+  `${buttonTone({ variant: "secondary" })} inline-flex h-9 items-center rounded-[9px] border px-3 text-[12px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
 
 export function ReadyOffersSheetPanel({ data }: { data: ReadyOffersPanelData }) {
@@ -57,19 +58,19 @@ export function ReadyOffersSheetPanel({ data }: { data: ReadyOffersPanelData }) 
   const source = { settings: "dev.ro.source.settings", env: "dev.ro.source.env", default: "dev.ro.source.default" }[data.source] as TranslationKey;
 
   return (
-    <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.ro.title")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("dev.ro.hint")}</p>
+      <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.ro.hint")}</p>
 
       <label className="mt-3 grid gap-1">
         <span className="text-[11.5px] font-extrabold text-[#557d78]">
-          {t("dev.ro.link")} <span className="font-semibold text-[#93aaa3]">— {t(source)}</span>
+          {t("dev.ro.link")} <span className="font-semibold text-tv-text-faint">— {t(source)}</span>
         </span>
         <input
           value={link}
           onChange={(e) => setLink(e.target.value)}
           dir="ltr"
-          className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus:border-[#2aa87a]"
+          className="tv-field h-10 rounded-[9px] border px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
         />
       </label>
       <div className="mt-2 flex flex-wrap items-center gap-2">
