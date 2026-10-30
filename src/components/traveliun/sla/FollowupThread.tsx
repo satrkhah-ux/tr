@@ -118,7 +118,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
           <div className="mt-4 grid gap-2">
             {data.canReply ? (
               <>
-                <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={tx("reply")} className="w-full rounded-[10px] border border-[#cfe0d9] bg-white p-2.5 text-[13px] text-[#103f37]" />
+                <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={tx("reply")} className="tv-field w-full rounded-[10px] border p-2.5 text-[13px]" />
                 <button type="button" disabled={busy !== null || !text.trim()} onClick={send} className="inline-flex h-9 items-center justify-center gap-1.5 justify-self-start rounded-[8px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
                   {busy === "send" ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
                   {tx("send")}
@@ -128,7 +128,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
               <p className="rounded-[10px] border border-[#f4d9a6] bg-[#fff8e8] p-3 text-[12.5px] font-bold leading-6 text-[#a86a10]">{tx("window")}</p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#e6eeea] pt-3">
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tx("closeNote")} className="h-9 min-w-48 flex-1 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[12.5px]" />
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tx("closeNote")} className="tv-field h-9 min-w-48 flex-1 rounded-[8px] border px-2.5 text-[12.5px]" />
               <button type="button" disabled={busy !== null} onClick={close} className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-4 text-[12.5px] font-bold text-white hover:bg-[#0b6140] disabled:opacity-60">
                 {busy === "close" ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 {tx("close")}

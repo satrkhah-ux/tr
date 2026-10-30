@@ -30,7 +30,7 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 type Draft = {
@@ -165,7 +165,7 @@ export function TeamMembers({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("searchPlaceholder")}
-                  className="h-10 w-56 rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
+                  className="tv-field h-10 w-56 rounded-[10px] border px-3 pe-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
                 />
               </div>
               {canManage ? (
@@ -319,7 +319,7 @@ export function TeamMembers({
                       value={m.role_id ?? ""}
                       disabled={busyId === m.id}
                       onChange={(e) => void move(m.id, e.target.value)}
-                      className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-bold text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] disabled:opacity-60"
+                      className="tv-field h-9 rounded-[9px] border px-2 text-[12px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60"
                     >
                       <option value="">{t("team.noRole")}</option>
                       {roles.map((r) => (

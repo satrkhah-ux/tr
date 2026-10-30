@@ -392,7 +392,7 @@ export function TourRow({
               value={pick.text}
               onChange={(e) => onChange({ text: e.target.value })}
               rows={3}
-              className="mt-1 w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[12.5px] leading-6 text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
+              className="tv-field mt-1 w-full rounded-[10px] border p-2.5 text-[12.5px] leading-6 outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
             />
           ) : null}
         </div>

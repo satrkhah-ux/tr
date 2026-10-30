@@ -15,7 +15,7 @@ import type { CheckResult } from "@/lib/developer/health";
  */
 
 type Data = NonNullable<Awaited<ReturnType<typeof listSecrets>>>;
-const field = "rounded-lg border border-[#dbe6e1] bg-white p-2 text-sm";
+const field = "tv-field rounded-lg border p-2 text-sm";
 const btn = "rounded-lg border border-[#dbe6e1] px-2.5 py-1.5 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50";
 const SOURCE = { vault: "محفوظ هنا", env: "من الخادم" } as const;
 const TONE: Record<string, string> = { ok: "text-emerald-700", warn: "text-amber-700", down: "text-red-700", idle: "text-[#557d78]", unconfigured: "text-[#557d78]" };

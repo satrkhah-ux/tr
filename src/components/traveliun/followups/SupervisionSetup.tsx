@@ -12,7 +12,7 @@ import { PRIORITY_LABEL, type Priority, type SupervisionSettings, type Threshold
  */
 
 type Data = NonNullable<Awaited<ReturnType<typeof listSupervisors>>>;
-const field = "rounded-lg border border-[#dbe6e1] bg-white p-2 text-sm";
+const field = "tv-field rounded-lg border p-2 text-sm";
 const SCOPE_LABEL = { employee: "موظف", team: "فريق Teletel", inbox: "صندوق Teletel", all: "الجميع" } as const;
 const T_LABEL: Record<keyof Thresholds, string> = {
   waitingMinutes: "العميل ينتظر (دقيقة)", dueGraceMinutes: "تأخر موعد المتابعة (دقيقة)", idleHours: "بلا إجراء قادم (ساعة)",

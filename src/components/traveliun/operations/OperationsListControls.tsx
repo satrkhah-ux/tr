@@ -11,7 +11,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const field =
-  "h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+  "tv-field h-9 rounded-[9px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1 text-[11px] font-bold text-[#557d78]";
 
 /** The list's filters: travel date, destination, owner, status. Closed cases need their status picked. */

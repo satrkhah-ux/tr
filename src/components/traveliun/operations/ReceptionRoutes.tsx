@@ -22,7 +22,7 @@ const LABEL: Record<RouteKey | "fallback", string> = {
   fallback: "الفريق العام (ما لا فريق له)",
 };
 
-const field = "h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[12.5px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+const field = "tv-field h-9 w-full rounded-[8px] border px-2 text-[12.5px] font-semibold";
 
 export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
   const [routes, setRoutes] = useState<Routes>(setup?.routes ?? {});

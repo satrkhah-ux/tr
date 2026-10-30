@@ -16,7 +16,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  * is read when the panel opens, never with the page.
  */
 
-const field = "h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] disabled:opacity-60";
+const field = "tv-field h-9 rounded-[9px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60";
 const button =
   "inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60";
 

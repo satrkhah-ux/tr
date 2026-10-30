@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createManagementDecision, getManagementDecisions, updateManagementDecision, type ManagementDecision } from "@/lib/data/management-decisions";
 type Data = NonNullable<Awaited<ReturnType<typeof getManagementDecisions>>>;
-const field = "w-full rounded-lg border border-[#dbe6e1] bg-white p-3 text-sm";
+const field = "tv-field w-full rounded-lg border p-3 text-sm";
 const states = { open: "بانتظار التنفيذ", in_progress: "قيد التنفيذ", done: "مكتمل" };
 export function ManagementDecisions({ initial }: { initial: Data }) {
   const [data, setData] = useState(initial);

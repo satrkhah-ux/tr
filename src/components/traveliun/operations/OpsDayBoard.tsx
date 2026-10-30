@@ -56,7 +56,7 @@ export function OpsDayBoard({ day }: { day: OpsDay }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("ops.list.searchHint")}
-                className="h-9 w-56 rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
+                className="tv-field h-9 w-56 rounded-[10px] border px-3 pe-9 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
               />
             </div>
           </div>

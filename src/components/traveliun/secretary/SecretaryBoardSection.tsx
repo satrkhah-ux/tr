@@ -23,7 +23,7 @@ export function SecretaryBoardSection({ initial }: { initial: SecretaryBoard }) 
       {busy && <Loader2 className="size-4 animate-spin text-[#557d78]" />}
       <span className="flex-1" />
       {board.view.team && board.view.people.length > 0 && <select value={board.view.employeeId} onChange={(e) => void open(e.target.value)} disabled={busy}
-        aria-label="سكرتير موظف" className="rounded-lg border border-[#dbe6e1] bg-white p-2 text-sm">
+        aria-label="سكرتير موظف" className="tv-field rounded-lg border p-2 text-sm">
         {board.view.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>}
     </div>

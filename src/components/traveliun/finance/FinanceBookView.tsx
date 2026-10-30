@@ -9,7 +9,7 @@ import {
 } from "@/lib/finance/model";
 
 type Tab = "summary" | "plan" | "staff" | "rents" | "debts" | "profits";
-const field = "w-full min-w-0 rounded-lg border border-[#dbe6e1] bg-white px-2 py-1.5 text-sm";
+const field = "tv-field w-full min-w-0 rounded-lg border px-2 py-1.5 text-sm";
 const card = "rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-5";
 const th = "whitespace-nowrap px-2 py-2 text-right text-xs font-semibold text-[#5b6b66]";
 const td = "px-2 py-1.5 align-top";

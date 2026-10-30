@@ -809,7 +809,7 @@ export function BasicEditor({
         <select
           value={mode}
           onChange={(e) => setHop(a, b, e.target.value as TransportMode)}
-          className="h-7 max-sm:h-10 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
+          className="tv-field h-7 max-sm:h-10 rounded-[7px] border px-1 text-[12px] font-bold"
         >
           {MODE_CHIPS.map((m) => (
             <option key={m.mode} value={m.mode}>{tx(m.label)}</option>

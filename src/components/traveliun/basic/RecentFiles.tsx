@@ -281,7 +281,7 @@ export function RecentFiles({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={tx("searchFiles")}
-            className="h-8 w-full rounded-[8px] border border-[#cfe0d9] bg-white pe-2 ps-7 text-[12px] font-semibold text-[#185045]"
+            className="tv-field h-8 w-full rounded-[8px] border pe-2 ps-7 text-[12px] font-semibold"
           />
         </label>
       </div>

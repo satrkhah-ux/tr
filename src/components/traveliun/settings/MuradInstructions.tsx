@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { instructMurad, setLessonActive, type InstructionRow, type LessonRow } from "@/lib/data/murad-control";
 import { TOPICS, type Knowledge } from "@/lib/murad/knowledge-topics";
 
-const field = "w-full min-w-0 rounded-xl border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045] dark:border-[#294039] dark:bg-[#12241f] dark:text-[#eaf3ef]";
+const field = "tv-field w-full min-w-0 rounded-xl border p-3 text-sm";
 const STATUS: Record<string, string> = { applied: "نُفّذ", not_understood: "لم يُفهم", undone: "تُراجع عنه", failed: "تعذّر" };
 const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 

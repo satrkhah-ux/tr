@@ -189,7 +189,7 @@ export function OperationsBoard({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("ops.list.searchHint")}
-                className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] sm:w-64"
+                className="tv-field h-10 w-full rounded-[10px] border px-3 pe-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus sm:w-64"
               />
             </div>
           </div>

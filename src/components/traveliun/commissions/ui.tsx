@@ -9,7 +9,7 @@ import { DirText } from "@/components/DirText";
 export const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 export const th = "px-2.5 py-2 text-start text-[11px] font-bold text-tv-text-faint whitespace-nowrap";
 export const td = "px-2.5 py-2 text-[12px] font-bold text-[#0f3d38] whitespace-nowrap";
-export const field = "h-10 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045]";
+export const field = "tv-field h-10 rounded-[10px] border px-3 text-[13px]";
 export const primary =
   "inline-flex h-10 items-center justify-center rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50";
 export const secondary =

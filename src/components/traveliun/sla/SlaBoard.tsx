@@ -261,7 +261,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
         </select>
         <label className="relative min-w-40 flex-1">
           <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-tv-text-faint" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tx("search")} className="h-8 w-full rounded-[8px] border border-[#cfe0d9] bg-white pe-2 ps-7 text-[12px] font-semibold text-[#185045]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tx("search")} className="tv-field h-8 w-full rounded-[8px] border pe-2 ps-7 text-[12px] font-semibold" />
         </label>
       </div>
 
@@ -619,9 +619,9 @@ function RuleRow({ initial, teams, onChanged, onDiscard }: { initial: Draft; tea
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[8px] bg-[#f8fbfa] p-2">
-      <input value={r.name} onChange={(e) => set({ name: e.target.value })} placeholder={tx("ruleName")} aria-label={tx("ruleName")} className="h-8 min-w-36 flex-1 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12.5px] font-bold text-[#103f37]" />
+      <input value={r.name} onChange={(e) => set({ name: e.target.value })} placeholder={tx("ruleName")} aria-label={tx("ruleName")} className="tv-field h-8 min-w-36 flex-1 rounded-[8px] border px-2 text-[12.5px] font-bold" />
       <span className="text-[12px] font-bold text-[#557d78]">{tx("ruleAfter")}</span>
-      <input type="number" min={1} value={r.amount} onChange={(e) => set({ amount: Number(e.target.value) })} className="tv-tnum h-8 w-20 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12.5px] font-bold" dir="ltr" />
+      <input type="number" min={1} value={r.amount} onChange={(e) => set({ amount: Number(e.target.value) })} className="tv-field tv-tnum h-8 w-20 rounded-[8px] border px-2 text-[12.5px] font-bold" dir="ltr" />
       <select value={r.unit} onChange={(e) => set({ unit: e.target.value as SlaRule["unit"] })} className={SELECT}>
         {SLA_UNITS.map((u) => (
           <option key={u} value={u}>{unit(u, Number(r.amount) || 1)}</option>
@@ -629,7 +629,7 @@ function RuleRow({ initial, teams, onChanged, onDiscard }: { initial: Draft; tea
       </select>
       <label className="flex items-center gap-1 text-[11.5px] font-bold text-[#557d78]">
         {tx("ruleColor")}
-        <input type="color" value={r.color} onChange={(e) => set({ color: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-[#cfe0d9] bg-white" />
+        <input type="color" value={r.color} onChange={(e) => set({ color: e.target.value })} className="tv-field h-7 w-9 cursor-pointer rounded border" />
       </label>
       <MoveSelect value={r} teams={teams} onChange={(v) => set(v)} />
       <label className="flex items-center gap-1 text-[11.5px] font-bold text-[#557d78]">

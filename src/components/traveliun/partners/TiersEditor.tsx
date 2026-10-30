@@ -12,7 +12,7 @@ import { useSafeTransition } from "../useSafeTransition";
  * becomes X. For one company (partnerId) or the default ladder (null).
  */
 const field =
-  "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+  "tv-field h-9 rounded-[8px] border px-2.5 text-[12.5px] font-semibold";
 
 export function TiersEditor({ partnerId, initial, title, hint }: { partnerId: string | null; initial: Tier[]; title: string; hint: string }) {
   const router = useRouter();

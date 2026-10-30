@@ -69,7 +69,7 @@ export function ReadyOffersSheetPanel({ data }: { data: ReadyOffersPanelData }) 
           value={link}
           onChange={(e) => setLink(e.target.value)}
           dir="ltr"
-          className="h-10 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
+          className="tv-field h-10 rounded-[9px] border px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
         />
       </label>
       <div className="mt-2 flex flex-wrap items-center gap-2">

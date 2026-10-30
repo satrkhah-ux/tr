@@ -743,7 +743,7 @@ function EmployeeInput({
       </span>
       <input
         type={type}
-        className="h-[48px] rounded-[7px] border border-[#e2d8d4] bg-white px-4 text-start text-[13px] font-normal text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#96d18a]"
+        className="tv-field h-[48px] rounded-[7px] border px-4 text-start text-[13px] font-normal outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -936,7 +936,7 @@ function RoleInput({
         {required ? <span className="text-[#ff4868]">*</span> : null} {label}
       </span>
       <input
-        className="h-[48px] rounded-[7px] border border-[#e2d8d4] bg-white px-4 text-start text-[13px] font-normal text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#96d18a]"
+        className="tv-field h-[48px] rounded-[7px] border px-4 text-start text-[13px] font-normal outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

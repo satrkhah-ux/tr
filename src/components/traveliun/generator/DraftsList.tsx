@@ -169,7 +169,7 @@ export function DraftsList({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("pg.searchDrafts")}
-                className="h-10 w-[min(340px,calc(70vw/var(--tv-zoom)))] rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
+                className="tv-field h-10 w-[min(340px,calc(70vw/var(--tv-zoom)))] rounded-[10px] border px-3 pe-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
               />
             </div>
           </div>

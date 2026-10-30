@@ -177,7 +177,7 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
 
           <label className={labelClass}>
             {t("rp.order.body")}
-            <textarea dir="auto" rows={16} value={body} onChange={(e) => setBody(e.target.value)} className="block w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2.5 text-[13px] leading-relaxed text-[#0f3d38] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]" />
+            <textarea dir="auto" rows={16} value={body} onChange={(e) => setBody(e.target.value)} className="tv-field block w-full rounded-[10px] border px-3 py-2.5 text-[13px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus" />
           </label>
 
           {draft.sentAt ? <p className="text-[12px] font-bold text-[#0f7a52]">{t("rp.order.sentOn", { date: draft.sentAt.slice(0, 10) })}</p> : null}

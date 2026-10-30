@@ -18,7 +18,7 @@ import type { ReceptionSetup } from "@/lib/data/app-settings";
  */
 
 const field =
-  "h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+  "tv-field h-9 w-full rounded-[8px] border px-2.5 text-[12.5px] font-semibold";
 const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]";
 
 /**

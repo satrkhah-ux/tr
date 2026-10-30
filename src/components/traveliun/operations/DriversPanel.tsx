@@ -16,7 +16,7 @@ import { OpsLinkButton } from "./OpsLinkButton";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
-  "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+  "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 
 const KIND_TONE: Record<ServiceKind, string> = {

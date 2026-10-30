@@ -60,7 +60,7 @@ export function WelcomeBoardButton({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={defaultName || "اسم الضيف"}
-              className="h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
+              className="tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
             />
           </label>
 
@@ -70,7 +70,7 @@ export function WelcomeBoardButton({
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="اسم المجموعة أو الجهة"
-              className="h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]"
+              className="tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus"
             />
           </label>
 

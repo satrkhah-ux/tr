@@ -74,7 +74,7 @@ export function MoneyLinks() {
 
 export function ProfitabilityReport({ report }: { report: ProfitReport }) {
   const { t } = useTraveliunUI();
-  const field = "h-10 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045]";
+  const field = "tv-field h-10 rounded-[10px] border px-3 text-[13px]";
   return (
     <Page title="ops.money.report" hint="ops.money.reportHint" icon={<TrendingUp className="size-5" />}>
       {/* a plain GET form: the range is in the URL, so a report can be bookmarked or sent */}

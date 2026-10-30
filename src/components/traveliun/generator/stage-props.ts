@@ -25,7 +25,7 @@ export type StageFormProps = {
 
 /** Shared field styles (Traveliun identity). */
 export const fieldClass =
-  "h-11 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors focus:border-[#2aa87a]";
+  "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus transition-colors";
 export const labelClass = "grid gap-2 text-[13px] font-bold text-[#185045]";
 export const sectionClass =
   "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";

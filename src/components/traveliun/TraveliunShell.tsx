@@ -1127,7 +1127,7 @@ function CalculatorPanel() {
             className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[var(--tv-brand)]"
           />
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <select value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
+            <select value={from} onChange={(e) => setFrom(e.target.value)} className="tv-field h-10 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
               {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
             <button
@@ -1138,7 +1138,7 @@ function CalculatorPanel() {
             >
               ⇄
             </button>
-            <select value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
+            <select value={to} onChange={(e) => setTo(e.target.value)} className="tv-field h-10 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus">
               {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
           </div>

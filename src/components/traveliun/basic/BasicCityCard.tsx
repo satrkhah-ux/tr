@@ -509,7 +509,7 @@ export function BasicCityCard({
             {theirs || !main ? (
               <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
                 {tx("nights")}
-                <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
+                <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="tv-field h-7 rounded-[7px] border px-1 text-[12px] font-bold">
                   {range(1, 30).map((n) => (
                     <option key={n} value={n}>{n}</option>
                   ))}

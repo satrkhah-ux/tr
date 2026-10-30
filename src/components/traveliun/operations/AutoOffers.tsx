@@ -10,7 +10,7 @@ import { priceOffer, type OfferCountry } from "@/lib/murad/auto-offer";
  * prices — with a worked example so a change is checked before it is saved.
  */
 
-const field = "min-h-11 w-full min-w-0 rounded-xl border border-[#dbe6e1] bg-white px-3 py-2 text-sm font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+const field = "tv-field min-h-11 w-full min-w-0 rounded-xl border px-3 py-2 text-sm font-semibold";
 
 export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: number }) {
   const [offers, setOffers] = useState<OfferCountry[]>(initial);

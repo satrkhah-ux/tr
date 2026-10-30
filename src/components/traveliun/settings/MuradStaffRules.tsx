@@ -87,7 +87,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
             {dec?.choice === "edit" && <div className="mt-3 space-y-2">
               <label className="block text-xs">اكتب القاعدة كما تريدها (وقت، صياغة، استثناء…):
                 <textarea value={drafts[r.id] ?? dec.text ?? r.desc} onChange={(e) => setDrafts({ ...drafts, [r.id]: e.target.value })}
-                  maxLength={2000} className="mt-1 w-full rounded-lg border border-[#dbe6e1] bg-white p-3 text-sm" rows={3} />
+                  maxLength={2000} className="tv-field mt-1 w-full rounded-lg border p-3 text-sm" rows={3} />
               </label>
               <button disabled={busy} onClick={() => saveEdit(r.id)} className="rounded-lg bg-[#185045] px-4 py-1.5 text-sm font-bold text-white">احفظ التعديل</button>
               {dec.text && <p className="rounded-lg bg-amber-50 p-2 text-xs leading-6">التعديل المحفوظ: {dec.text}</p>}
@@ -108,7 +108,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
       </div>
       <div className="mt-3 flex flex-col gap-2">
         <textarea value={addText} onChange={(e) => setAddText(e.target.value)} maxLength={1000} rows={2}
-          placeholder="مثال: السحب لا يشمل عملاء كباراً محددين بقائمة…" className="w-full rounded-lg border border-[#dbe6e1] bg-white p-3 text-sm" />
+          placeholder="مثال: السحب لا يشمل عملاء كباراً محددين بقائمة…" className="tv-field w-full rounded-lg border p-3 text-sm" />
         <button disabled={busy || !addText.trim()} onClick={addRule} className="self-start rounded-lg bg-[#185045] px-4 py-2 text-sm font-bold text-white">أضف القاعدة</button>
       </div>
     </div>

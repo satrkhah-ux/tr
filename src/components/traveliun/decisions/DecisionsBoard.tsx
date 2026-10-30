@@ -26,7 +26,7 @@ const btn =
 const primary =
   "inline-flex min-h-10 items-center justify-center rounded-xl bg-[#185045] px-4 text-sm font-bold text-white disabled:opacity-40";
 const field =
-  "mt-1 w-full rounded-xl border border-[#D5DED9] bg-white p-2.5 text-sm text-slate-900 dark:bg-[#0f1c19] dark:text-[#eaf3ef]";
+  "tv-field mt-1 w-full rounded-xl border p-2.5 text-sm";
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-xs font-bold ${on ? "border-[#185045] bg-[#185045] text-white" : "border-[#D5DED9] bg-white text-[#185045] dark:bg-[#0f1c19] dark:text-[#eaf3ef]"}`;
 const when = (iso: string | null) =>

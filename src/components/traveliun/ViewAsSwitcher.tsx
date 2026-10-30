@@ -55,7 +55,7 @@ export function ViewAsSwitcher() {
         value={current}
         disabled={pending || roles === null}
         onChange={(e) => go(e.target.value || null)}
-        className="h-10 rounded-md border border-[#dfe8e4] bg-white px-2 text-sm font-semibold text-[var(--tv-brand)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] disabled:opacity-60 dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]"
+        className="tv-field h-10 rounded-md border px-2 text-sm font-semibold text-[var(--tv-brand)] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60"
       >
         <option value="">{t("viewAs.mine")}</option>
         {/* the role being viewed stays listed even if it vanished from the list since */}

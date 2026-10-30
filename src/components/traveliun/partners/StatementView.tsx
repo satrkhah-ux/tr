@@ -84,7 +84,7 @@ export function StatementView({ statement, title }: { statement: PartnerStatemen
 }
 
 const field =
-  "h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+  "tv-field h-9 rounded-[8px] border px-2.5 text-[12.5px] font-semibold";
 const label = "grid gap-1 text-[11.5px] font-bold text-[#185045] dark:text-[#9fc5b8]";
 
 /** Ours only: record a payment the company made, and set its credit limit. */

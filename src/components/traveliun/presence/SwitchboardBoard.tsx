@@ -14,7 +14,7 @@ const card = "rounded-2xl border border-[#E3E8E4] bg-white p-4 dark:border-[#294
 const btn =
   "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#D5DED9] bg-white px-3 text-sm font-bold text-[#185045] hover:bg-[#F4F6F3] disabled:opacity-40";
 const primary = "inline-flex min-h-10 items-center justify-center rounded-xl bg-[#185045] px-4 text-sm font-bold text-white disabled:opacity-40";
-const field = "mt-1 w-full rounded-xl border border-[#D5DED9] bg-white p-2.5 text-sm text-slate-900 dark:bg-[#0f1c19] dark:text-[#eaf3ef]";
+const field = "tv-field mt-1 w-full rounded-xl border p-2.5 text-sm";
 const REASON: Record<string, string> = { leave: "إجازة", off_shift: "خارج الدوام", break: "زر حالة", offline: "غير متصل", exempt: "معفى من التأخير" };
 const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-nu-latn-ca-gregory", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" });
 

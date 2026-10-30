@@ -738,7 +738,7 @@ function Line({
             // the supplier the paper names, beside the file's — the employee picks (never replaced by itself)
             <label className="flex flex-wrap items-center gap-2 text-[11.5px] font-semibold text-[#557d78] sm:col-span-2">
               {t("wz.up.money.supplierOnFile")}: {sup.onFile?.name ?? "—"} · {t("wz.up.paperSupplier")}: {sup.supplier.name}
-              <select value={item.supplier} onChange={(e) => onMoney({ supplier: e.target.value })} disabled={working} className="h-8 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-bold text-[#185045]">
+              <select value={item.supplier} onChange={(e) => onMoney({ supplier: e.target.value })} disabled={working} className="tv-field h-8 rounded-[8px] border px-2 text-[12px] font-bold">
                 <option value="">{sup.onFile ? t("wz.up.money.keep", { name: sup.onFile.name }) : t("wz.up.money.noSupplier")}</option>
                 <option value={sup.supplier.id}>{t("wz.up.money.use", { name: sup.supplier.name })}</option>
               </select>

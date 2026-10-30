@@ -228,7 +228,7 @@ function SuspendControl({ id, suspended }: { id: string; suspended: boolean }) {
           id={`suspend-reason-${id}`}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          className="h-9 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] font-semibold dark:border-[#294039] dark:bg-[#0f1f1b]"
+          className="tv-field h-9 rounded-[8px] border px-2.5 text-[12.5px] font-semibold"
         />
       </label>
       <button

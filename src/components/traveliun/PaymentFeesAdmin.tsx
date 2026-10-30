@@ -7,7 +7,7 @@ import { PAY_METHODS, type MethodFee, type PayMethod, type PaymentFees, type Set
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
-const field = "h-9 w-20 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-center text-[13px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+const field = "tv-field h-9 w-20 rounded-[9px] border px-2 text-center text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 /**
  * «رسوم وسائل الدفع» on «سياسة الربح» (the owner, 2026-10-29): per method a

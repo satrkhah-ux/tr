@@ -14,8 +14,8 @@ export type Person = { id: string; name: string };
 export type Message = { tone: "ok" | "error" | "busy"; text: string } | null;
 
 export const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:p-5";
-export const field = "h-11 w-full min-w-0 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a] disabled:opacity-60";
-export const area = "min-h-24 w-full min-w-0 rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+export const field = "tv-field h-11 w-full min-w-0 rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus disabled:opacity-60";
+export const area = "tv-field min-h-24 w-full min-w-0 rounded-[10px] border p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 export const label = "grid min-w-0 gap-1.5 text-[12px] font-bold text-[#185045]";
 export const btn = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-4 text-sm font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6] disabled:opacity-50";
 export const btnPrimary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50";

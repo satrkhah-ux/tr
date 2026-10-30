@@ -27,7 +27,7 @@ import { loginName, passwordProblem } from "@/lib/auth/password-rule";
  */
 
 const field =
-  "h-9 w-full rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-[12.5px] text-[#185045] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus focus:border-[#2aa87a]";
+  "tv-field h-9 w-full rounded-[9px] border px-2.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 
 export function PendingRegistrations({ companies }: { companies: PartnerCompany[] }) {
   const pending = companies.filter((c) => c.status === "pending");

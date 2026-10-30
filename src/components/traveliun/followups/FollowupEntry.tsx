@@ -29,7 +29,7 @@ export function TransferToFollowup({ conversationId }: { conversationId: number 
   }
   return <div className="mb-3 space-y-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
     <label className="block text-xs font-bold text-emerald-950">تحويل لفريق المتابعة
-      <input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} className="mt-2 w-full rounded-lg border border-emerald-200 bg-white p-2 text-sm" placeholder="سبب التحويل وما المطلوب من الفريق" />
+      <input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} className="tv-field mt-2 w-full rounded-lg border border-emerald-200 p-2 text-sm" placeholder="سبب التحويل وما المطلوب من الفريق" />
     </label>
     <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => void transfer()} className="rounded-lg bg-emerald-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">تحويل إلى المتابعة</button>
     {notice && <p role="status" className="text-xs text-emerald-950">{notice}</p>}

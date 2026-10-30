@@ -86,11 +86,11 @@ export function WaitButton({ operationId, step, wait, today }: { operationId: st
           <div className="grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)]">
             <label className="grid gap-1 text-[11.5px] font-bold text-[#8a6a2a]">
               {t("wz.wait.until")}
-              <input type="date" dir="ltr" min={today} value={until} onChange={(e) => setUntil(e.target.value)} className="tv-tnum h-10 rounded-[9px] border border-[#e6c98a] bg-white px-2 text-[13px] text-[#185045]" />
+              <input type="date" dir="ltr" min={today} value={until} onChange={(e) => setUntil(e.target.value)} className="tv-field tv-tnum h-10 rounded-[9px] border px-2 text-[13px]" />
             </label>
             <label className="grid gap-1 text-[11.5px] font-bold text-[#8a6a2a]">
               {t("wz.wait.note")}
-              <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} className="h-10 rounded-[9px] border border-[#e6c98a] bg-white px-3 text-[13px] text-[#185045]" />
+              <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} className="tv-field h-10 rounded-[9px] border px-3 text-[13px]" />
             </label>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -309,7 +309,7 @@ export function BasicFileStatus({
                 <select
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as typeof channel)}
-                  className="h-9 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]"
+                  className="tv-field h-9 rounded-[8px] border px-2 text-[12px] font-bold"
                 >
                   <option value="whatsapp">{tx("channel_whatsapp")}</option>
                   <option value="phone">{tx("channel_phone")}</option>

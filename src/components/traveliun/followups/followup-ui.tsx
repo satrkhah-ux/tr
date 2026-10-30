@@ -11,7 +11,7 @@ export const BLUE = "#1D4ED8";
 export const card = "rounded-2xl border border-[#E3E8E4] bg-white";
 export const btn = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#D5DED9] bg-white px-4 text-sm font-bold text-[#185045] transition-colors hover:bg-[#F4F6F3] disabled:opacity-40";
 export const btnPrimary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#185045] px-4 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40";
-export const field = "w-full rounded-xl border border-[#D5DED9] bg-white p-3 text-sm text-slate-900";
+export const field = "tv-field w-full rounded-xl border p-3 text-sm";
 
 export const when = (at: string | null) => at ? new Date(at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" }) : "—";
 const riyadhDay = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(t);

@@ -38,7 +38,7 @@ export function AdminSecretaryViewer({ employees }: { employees: { id: string; n
     </div>
     <p className="mb-3 text-sm text-[#5b7a71]">قراءة فقط: ترى يومه ومحادثته مع سكرتيره كما هي، ولا يمكنك الكتابة باسمه. كل فتح يُسجَّل.</p>
     <select value={picked} onChange={(e) => void open(e.target.value)} disabled={busy}
-      className="w-full max-w-sm rounded-lg border border-[#dbe6e1] bg-white p-2.5 text-sm">
+      className="tv-field w-full max-w-sm rounded-lg border p-2.5 text-sm">
       <option value="">اختر موظفاً…</option>
       {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
     </select>
