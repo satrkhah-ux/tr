@@ -58,6 +58,8 @@ export type ReportRequest = {
   assignee: string | null;
   /** typed by the reviewer: the reason of an incomplete request, the description of another one */
   note: string | null;
+  /** a client back on a later day than the conversation opened — «عملاء عادوا», apart from the day's new requests */
+  returning?: boolean;
 };
 
 /** What the reviewer corrected by hand — never written to the system. */
@@ -115,6 +117,7 @@ export function requestsFrom(leads: LeadFacts[], nameOf: Map<string, string>, pl
       employee,
       assignee,
       note: null,
+      returning: day !== riyadhDay(l.created_at),
     }));
   });
 }
@@ -185,9 +188,11 @@ export type Line = { text: string; employee: string | null };
 export type Report = {
   period: Period;
   total: number;
+  /** of the total, the visits of clients back on a later day */
+  returning: number;
   counts: Record<BucketKey, number>;
   requests: ReportRequest[];
-  /** the packages by who received them, each with the destinations it was asked for */
+  /** the packages by the seller they were given to (else who received them), each with the destinations it was asked for */
   packagesByEmployee: { name: string; count: number; destinations: string[] }[];
   packagesByDestination: Count[];
   /** the days of a week or a month */
@@ -231,8 +236,9 @@ export function buildReport(all: ReportRequest[], period: Period): Report {
   const counts = Object.fromEntries(BUCKETS.map((b) => [b.key, requests.filter((r) => r.bucket === b.key).length])) as Record<BucketKey, number>;
   const packages = requests.filter((r) => r.bucket === "package");
   const byEmployee = new Map<string, { name: string; count: number; destinations: string[] }>();
+  // by the seller the package was given to (the owner, 2026-10-30, from أسوار's report), else who received it
   for (const r of packages) {
-    const name = employeeName(r);
+    const name = holderOf(r);
     const g = byEmployee.get(fold(name)) ?? { name, count: 0, destinations: [] };
     g.count += 1;
     g.destinations.push(r.country?.trim() || NONE_DESTINATION);
@@ -241,6 +247,7 @@ export function buildReport(all: ReportRequest[], period: Period): Report {
   return {
     period,
     total: requests.length,
+    returning: requests.filter((r) => r.returning).length,
     counts,
     requests,
     packagesByEmployee: [...byEmployee.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ar")),
@@ -288,7 +295,7 @@ export function reportText(r: Report, supervision?: SupervisionFigures | null): 
   const c = r.counts;
   const by = (key: BucketKey) => r.requests.filter((x) => x.bucket === key);
   const out: string[] = [...header(r)];
-  out.push("🔹ملخص الطلبات", `🔹إجمالي الطلبات : ${r.total}`);
+  out.push("🔹ملخص الطلبات", `🔹إجمالي الطلبات : ${r.total}`, `🆕 طلبات جديدة : ${r.total - r.returning}`, `🔁 عملاء عادوا : ${r.returning}`);
   for (const key of ["package", "flight", "visa", "inquiry"] as const) out.push(`${BUCKET.get(key)!.icon} ${BUCKET.get(key)!.label} : ${c[key]}`);
   out.push(RULES[1]);
 

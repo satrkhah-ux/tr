@@ -162,6 +162,8 @@ describe("the report, as the staff write it", () => {
         "═════════════════",
         "🔹ملخص الطلبات",
         "🔹إجمالي الطلبات : 10",
+        "🆕 طلبات جديدة : 10",
+        "🔁 عملاء عادوا : 0",
         "🌍 البكجات السياحية : 4",
         "✈️ حجوزات الطيران : 1",
         "🛂 التأشيرات : 2",
@@ -220,7 +222,7 @@ describe("the report, as the staff write it", () => {
     expect(moved.map((r) => [r.employee, r.assignee])).toEqual([["منى", "منى"], ["منى", "منى"]]);
   });
 
-  it("says where a hotel or transport request is, and whom it is with — the package and the unclear one by their receiver", () => {
+  it("says where a hotel or transport request is, and whom it is with — the package by its seller, the unclear one by its receiver", () => {
     const rs = [
       req({ bucket: "hotel", place: "مكة", employee: "احمد القدسي", assignee: "رشا" }),
       req({ bucket: "transport", place: "جدة", employee: "احمد القدسي" }),
@@ -233,9 +235,14 @@ describe("the report, as the staff write it", () => {
     expect(text).toContain("🏨 طلبات الفنادق : 1\n_ مكة : رشا");
     expect(text).toContain("🚘 مواصلات : 2\nجدة : احمد القدسي\nاسطنبول : منى");
     expect(text).toContain("🔸 طلبات اخرى : 1\n_ رخص دولية الرياض : رشا");
-    // a Saudi place is no destination of a package, whom it is with changes nothing for the package
-    expect(text).toContain("🔹 احمد القدسي : العدد 1 _ غير محددة");
+    // a Saudi place is no destination of a package; the package counts for the seller it was given to (أسوار's report, 2026-10-30)
+    expect(text).toContain("🔹 رشا : العدد 1 _ غير محددة");
     expect(text).toContain("🟣 الطلبات غير المكتملة : 1\n_ طلب غير واضح\n");
+  });
+
+  it("tells the day's new requests from the clients back on it", () => {
+    const r = buildReport([req({ bucket: "visa" }), req({ bucket: "package", returning: true })], periodOf("day", "2026-10-26", "2026-10-29"));
+    expect(reportText(r)).toContain("🔹إجمالي الطلبات : 2\n🆕 طلبات جديدة : 1\n🔁 عملاء عادوا : 1");
   });
 
   it("adds the follow-up figures with the window they cover and whose they are", () => {

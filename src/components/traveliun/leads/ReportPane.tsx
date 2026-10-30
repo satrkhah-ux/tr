@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, RotateCcw, Search } from "lucide-react";
 import type { Lead } from "@/lib/data/leads";
 import { getReportSupervision, incompleteReasons } from "@/lib/data/daily-report";
@@ -221,6 +221,14 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
     }
     setReading(false);
   }
+
+  // the reasons are read on their own as the report opens (the owner, 2026-10-30), twenty at a time until none is left unread;
+  // a conversation Teletel could not answer is left to the button, so a failing one never loops
+  const autoLeft = toRead.filter((id) => !failedIds.includes(id)).length;
+  useEffect(() => {
+    if (autoLeft > 0 && !reading) void readReasons();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- readReasons reads the page as it stands; the count is the trigger
+  }, [autoLeft, reading]);
 
   function reset() {
     if (window.confirm(`تُلغى كل التصحيحات اليدوية (${Object.keys(edits).length})؟`)) {
