@@ -1,0 +1,23 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "color": {
+    "primitive": {
+      "blue-700": { "$type": "color", "$value": "#1D4ED8" },
+      "slate-900": { "$type": "color", "$value": "#0F172A" },
+      "white": { "$type": "color", "$value": "#FFFFFF" }
+    },
+    "semantic": {
+      "text-primary": { "$type": "color", "$value": "{color.primitive.slate-900}" },
+      "surface-canvas": { "$type": "color", "$value": "{color.primitive.white}" },
+      "action-primary": { "$type": "color", "$value": "{color.primitive.blue-700}" }
+    }
+  },
+  "space": {
+    "primitive": {
+      "1": { "$type": "dimension", "$value": "4px" },
+      "2": { "$type": "dimension", "$value": "8px" },
+      "3": { "$type": "dimension", "$value": "12px" },
+      "4": { "$type": "dimension", "$value": "16px" }
+    }
+  }
+}
