@@ -1,5 +1,8 @@
 import { couponWith, site } from "@/lib/data/discounts";
-import { couponCard } from "@/lib/discounts/card";
+import { couponPng } from "@/lib/discounts/card";
+
+export const runtime = "nodejs";
+export const maxDuration = 26;
 
 /** The coupon's landscape picture — the WhatsApp message's header (Meta fetches it by this URL). No session: the token is the key. */
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
@@ -8,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const found = await couponWith({ token });
   if (!found || found.coupon.excluded) return new Response("not found", { status: 404 });
   const { coupon, campaign } = found;
-  return couponCard({
+  const png = await couponPng({
     name: coupon.client_name,
     phone: coupon.phone,
     code: coupon.code,
@@ -18,4 +21,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     applies_to: campaign.applies_to,
     expires_at: coupon.expires_at,
   });
+  return new Response(new Uint8Array(png), { headers: { "content-type": "image/png", "cache-control": "public, max-age=3600" } });
 }

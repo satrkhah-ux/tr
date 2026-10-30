@@ -128,12 +128,12 @@ export async function warmPdfEngine(): Promise<void> {
  * Same browser, same HTML as the PDF, so the image cannot drift from the paper;
  * only the first `.od-page` is captured, at twice the A4 pixel width.
  */
-export async function documentToPng(html: string): Promise<Buffer> {
+export async function documentToPng(html: string, viewport: { width: number; height: number } = { width: 794, height: 1123 }): Promise<Buffer> {
   let browser: Browser | null = null;
   try {
     browser = await launchBrowser();
     const page = await browser.newPage();
-    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
+    await page.setViewport({ ...viewport, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: "load" });
     const sheet = await page.$(".od-page");
     const shot = sheet ? await sheet.screenshot({ type: "png" }) : await page.screenshot({ type: "png", fullPage: true });
