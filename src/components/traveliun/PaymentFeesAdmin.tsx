@@ -37,7 +37,7 @@ export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees
   }
 
   return (
-    <section className="mt-4 max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card mt-4 max-w-3xl rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("pay.fees.title")}</h2>
       <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("pay.fees.hint")}</p>
       <div className="grid gap-1.5">

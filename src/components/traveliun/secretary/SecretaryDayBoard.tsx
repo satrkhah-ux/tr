@@ -55,7 +55,7 @@ function Row({ item, index, nowMs, readOnly, onDone, busyKey }: {
     } catch { setError("تعذّر الاتصال."); } finally { setRemindBusy(false); }
   }
 
-  return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
+  return <div className="tv-card rounded-xl border p-3">
     <div className="flex flex-wrap items-baseline gap-2">
       {index !== null && <span className="rounded-full bg-[#b3261e] px-2 py-0.5 text-xs font-extrabold text-white tabular-nums">{index + 1}</span>}
       <strong className="text-sm">{item.name}</strong>
@@ -120,7 +120,7 @@ export function SecretaryDayBoard({ board, compact = false }: { board: Secretary
 
   return <div className="space-y-4">
     {/* progress: Murad follows what got done on its own — a reply, an acted follow-up, a «تمّت» */}
-    <div className="rounded-xl border border-[#dfe8e4] bg-white p-3">
+    <div className="tv-card rounded-xl border p-3">
       <div className="flex flex-wrap items-center gap-3">
         <strong className="text-sm">أنجزت {doneToday.length} من {total} اليوم</strong>
         <div className="h-2 min-w-24 flex-1 overflow-hidden rounded-full bg-[#eef3f1]">

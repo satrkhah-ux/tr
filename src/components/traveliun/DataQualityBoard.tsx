@@ -43,7 +43,7 @@ export function DataQualityBoard({ report }: { report: QualityReport }) {
                   const card = cards.get(issue.key);
                   const total = card?.total ?? null;
                   return (
-                    <article key={issue.key} className="flex flex-col rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+                    <article key={issue.key} className="tv-card flex flex-col rounded-[14px] border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                       <p className="text-[12.5px] font-bold text-[#557d78]">{t(issue.labelKey)}</p>
                       <div className="mt-1 flex items-baseline gap-2">
                         <DirText dir="ltr" className={`tv-tnum text-[26px] font-extrabold ${total ? "text-[#c2410c]" : "text-[#0f7a52]"}`}>

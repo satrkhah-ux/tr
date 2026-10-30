@@ -118,10 +118,10 @@ export function GeneratorShell({
               role="status"
               className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${
                 saveState === "error"
-                  ? "bg-[#fdeef2] text-[#c22850]"
+                  ? "bg-tv-status-danger-bg text-tv-status-danger"
                   : saveState === "saving"
-                    ? "bg-[#fff8e8] text-[#a86a10]"
-                    : "bg-[#e9f7f0] text-[#0f7a52]"
+                    ? "bg-tv-status-warning-bg text-tv-status-warning"
+                    : "bg-tv-status-success-bg text-tv-status-success"
               }`}
             >
               {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : saveState === "error" ? <XCircle className="size-3.5" /> : <Check className="size-3.5" />}
@@ -205,7 +205,7 @@ export function GeneratorShell({
                 other question — "is this whole file ready to go out" — and each
                 row is a link straight to the box that is wrong. */}
             {stage === "preview" ? (
-            <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+            <div className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
               <p className="mb-2 text-[11px] font-extrabold tracking-wide text-tv-text-faint">{t("pg.validationPanel")}</p>
               {validation.blocking.length === 0 && validation.warnings.length === 0 ? (
                 <p className="flex items-start gap-2 text-[12px] font-bold text-[#0f7a52]">

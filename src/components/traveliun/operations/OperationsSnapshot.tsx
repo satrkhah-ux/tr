@@ -68,7 +68,7 @@ export function OperationsSnapshot({ summary }: { summary: OpsSummary }) {
   ];
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
@@ -141,7 +141,7 @@ export function OperationsSnapshot({ summary }: { summary: OpsSummary }) {
 
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                            critical ? "bg-[#fdeef2] text-[#c22850]" : "bg-[#fff8e8] text-[#a86a10]"
+                            critical ? "bg-tv-status-danger-bg text-tv-status-danger" : "bg-tv-status-warning-bg text-tv-status-warning"
                           }`}
                         >
                           <AlertTriangle className="size-3" />

@@ -30,13 +30,13 @@ export default async function SupplierLinkPage({ params }: { params: Promise<{ t
           </p>
         </header>
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5">
+        <section className="tv-card rounded-2xl border p-5">
           <pre dir="auto" className="whitespace-pre-wrap break-words font-sans text-[13.5px] font-semibold leading-relaxed">
             {view.body}
           </pre>
         </section>
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5">
+        <section className="tv-card rounded-2xl border p-5">
           {view.confirmed ? (
             <p className="rounded-[12px] bg-[#e9f7f0] px-4 py-3 text-[14px] font-bold text-[#0f7a52]">
               {en ? "Confirmed — thank you." : "تم التأكيد — شكراً لكم."}

@@ -153,7 +153,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
   return (
     <TraveliunShell title="nav.transportPrices">
       <section className="space-y-4">
-        <div className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+        <div className="tv-card rounded-[14px] border p-4">
           {/* ١ الدولة */}
           <h2 className="mb-2 text-[15px] font-extrabold text-[#185045]">{t("tp.step1")}</h2>
           <div className="flex flex-wrap items-end gap-3">
@@ -251,7 +251,7 @@ export function TransportPricesAdmin({ countries }: { countries: { id: string; n
 
         {/* المحفوظ لهذه الدولة */}
         {data ? (
-          <div className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+          <div className="tv-card rounded-[14px] border p-4">
             <div className="mb-3 flex flex-wrap items-center gap-3">
               <h2 className="flex-1 text-[15px] font-extrabold text-[#185045]">{t("tp.savedTitle")}</h2>
               <input type="search" value={roadQuery} onChange={(e) => setRoadQuery(e.target.value)} placeholder={t("searchPlaceholder")} className={`${field} h-9 w-56`} />

@@ -15,7 +15,7 @@ const SELECT = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12
 const BTN = "inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[12px] font-bold disabled:opacity-60";
 const KIND_TONE: Record<SlaKind, string> = {
   first_reply: "border-[#d7c8f0] bg-[#f6f1fd] text-[#5b3c9a]",
-  waiting: "border-[#f4d9a6] bg-[#fff8e8] text-[#a86a10]",
+  waiting: "border-[#f4d9a6] bg-tv-status-warning-bg text-tv-status-warning",
   cold: "border-[#c9d6ea] bg-[#f2f6fb] text-[#3d5a80]",
 };
 
@@ -92,7 +92,7 @@ export function SlaBoard({ initial }: { initial: OkBoard }) {
           </div>
         </div>
         {/* the rules act only when a manager says so (the owner, 2026-10-18) */}
-        <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[12.5px] font-bold ${board.applying ? "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]" : "border-[#f4d9a6] bg-[#fff8e8] text-[#a86a10]"}`}>
+        <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[12.5px] font-bold ${board.applying ? "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success" : "border-[#f4d9a6] bg-tv-status-warning-bg text-tv-status-warning"}`}>
           <span className="min-w-0 flex-1">{tx(board.applying ? "applyOn" : "applyOff")}</span>
           <button type="button" disabled={loading} onClick={toggleApply} className={`${BTN} border bg-white ${board.applying ? "border-[#bfe5d4] text-[#0f7a52]" : "border-[#e0c48a] text-[#7a5a10]"}`}>
             {tx(board.applying ? "applyStop" : "applyStart")}
@@ -244,7 +244,7 @@ function Conversations({ board, rows, onChanged }: { board: OkBoard; rows: SlaRo
               key={name || "__none"}
               type="button"
               onClick={() => setAgent(agent === (name || "__none") ? "" : name || "__none")}
-              className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10 ${agent === (name || "__none") ? "border-[#c22850] bg-[#fdf3f6] text-[#c22850]" : "border-[#f2c9d4] bg-white text-[#8a1f3c]"}`}
+              className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-bold max-sm:min-h-10 ${agent === (name || "__none") ? "border-[#c22850] bg-tv-status-danger-bg text-tv-status-danger" : "border-[#f2c9d4] bg-white text-[#8a1f3c]"}`}
             >
               {name || tx("noAgent")} <span className="tv-tnum">{n}</span>
             </button>

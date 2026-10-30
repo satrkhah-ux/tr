@@ -6,16 +6,16 @@ import { useBasicLabels } from "./labels";
 /** Each state's colour: waiting on us (amber), with the client (blue), done steps (green), stopped (red). */
 const TONE: Record<FileState, string> = {
   draft: "bg-[#f2f4f3] text-tv-text-faint",
-  issued: "bg-[#fff8e8] text-[#a86a10]",
+  issued: "bg-tv-status-warning-bg text-tv-status-warning",
   published: "bg-[#f0f5f3] text-[#557d78]",
   sent: "bg-[#e8f3fb] text-[#1d5f8a]",
   expired: "bg-[#fdf0e6] text-[#b4540a]",
-  confirmed: "bg-[#e9f7f0] text-[#0f7a52]",
-  paid_partial: "bg-[#e9f7f0] text-[#0f7a52]",
+  confirmed: "bg-tv-status-success-bg text-tv-status-success",
+  paid_partial: "bg-tv-status-success-bg text-tv-status-success",
   paid_full: "bg-[#dff3e8] text-[#0b6140]",
   ready: "bg-[#e0f4f4] text-[#0b6d6d]",
   travelled: "bg-[#eef1f6] text-[#41506b]",
-  cancelled: "bg-[#fdeef2] text-[#c22850]",
+  cancelled: "bg-tv-status-danger-bg text-tv-status-danger",
 };
 
 /** «أُرسل للعميل · نسخة 2» — the file's state, its version (the one sent, on a sent file), and a newer version the client has not had. */

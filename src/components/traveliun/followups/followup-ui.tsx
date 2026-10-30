@@ -9,7 +9,7 @@ import { buttonTone } from "@/components/ui/button-variants";
 export const GREEN = "#185045";
 export const CLAY = "#9A3412";
 export const BLUE = "#1D4ED8";
-export const card = "rounded-2xl border border-[#E3E8E4] bg-white";
+export const card = "tv-card rounded-2xl border";
 export const btn = `${buttonTone({ variant: "secondary" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold transition-colors disabled:opacity-40`;
 export const btnPrimary = `${buttonTone({ variant: "default" })} inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-opacity disabled:opacity-40`;
 export const field = "tv-field w-full rounded-xl border p-3 text-sm";

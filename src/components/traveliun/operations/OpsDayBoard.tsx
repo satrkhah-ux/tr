@@ -46,7 +46,7 @@ export function OpsDayBoard({ day }: { day: OpsDay }) {
   return (
     <TraveliunShell title="nav.opsDay">
       <div className="tv-fade-up mx-auto max-w-3xl space-y-3">
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ops.day.title")}</h1>
             <p className="tv-tnum text-[12px] font-semibold text-tv-text-faint">{t("ops.day.subtitle", { items: String(day.items.length), cases: String(day.cases) })}</p>
@@ -63,7 +63,7 @@ export function OpsDayBoard({ day }: { day: OpsDay }) {
         </section>
 
         {byCase.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState icon={ClipboardCheck} title={t("ops.day.empty")} description="" />
           </section>
         ) : (
@@ -71,14 +71,14 @@ export function OpsDayBoard({ day }: { day: OpsDay }) {
             const head = group[0];
             const urgent = head.urgency !== "normal";
             return (
-              <section key={head.operationId} className="rounded-2xl border border-[#e2ebe7] bg-white p-3.5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <section key={head.operationId} className="tv-card rounded-2xl border p-3.5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <p className="min-w-0 flex-1 text-[13.5px] font-extrabold text-[#0f3d38]">
                     {head.customer}
                     <DirText dir="ltr" className="tv-tnum ms-2 text-[11.5px] font-bold text-tv-text-faint">{head.serial}</DirText>
                   </p>
                   {head.travelStart ? (
-                    <span className={`tv-tnum rounded-full px-2.5 py-0.5 text-[11px] font-bold ${urgent ? "bg-[#fdeef2] text-[#c22850]" : "bg-[#eef5f2] text-[#557d78]"}`}>
+                    <span className={`tv-tnum rounded-full px-2.5 py-0.5 text-[11px] font-bold ${urgent ? "bg-tv-status-danger-bg text-tv-status-danger" : "bg-[#eef5f2] text-[#557d78]"}`}>
                       {t("ops.travelWindow")} <DirText dir="ltr">{head.travelStart}</DirText>
                     </span>
                   ) : null}
@@ -105,7 +105,7 @@ export function OpsDayBoard({ day }: { day: OpsDay }) {
           })
         )}
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-3.5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-3.5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <button type="button" onClick={() => setShowDone((v) => !v)} aria-expanded={showDone} className="flex w-full items-center gap-2 text-start">
             <Check className="size-4 text-[#0f7a52]" />
             <span className="flex-1 text-[13px] font-extrabold text-[#0f3d38]">{t("ops.day.done", { n: String(day.done.length) })}</span>

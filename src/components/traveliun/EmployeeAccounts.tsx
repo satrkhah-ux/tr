@@ -99,7 +99,7 @@ export function EmployeeAccounts() {
   return (
     <TraveliunShell title="nav.employeeAccounts">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h2 className="flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
             <KeyRound className="size-4 text-[#185045]" />
             {t("emp.accountsTitle")}
@@ -125,7 +125,7 @@ export function EmployeeAccounts() {
           ) : null}
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           {rows === null ? (
             <div className="tv-shimmer h-40" />
           ) : rows.length === 0 ? (

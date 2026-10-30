@@ -28,7 +28,7 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
   }
 
   return (
-    <section className="min-w-0 rounded-2xl border border-[#e2ebe7] bg-white p-4 sm:p-6 dark:border-[#22443b] dark:bg-[#12241f]">
+    <section className="tv-card min-w-0 rounded-2xl border p-4 sm:p-6">
       <h2 className="text-lg font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">بكجات مُراد وأسعارها</h2>
       <p className="mt-1 text-sm leading-6 text-tv-text-faint">
         حدّد الدول التي يجهّز لها مُراد برنامجاً مقترحاً، وأسعار الخدمات والمدن والفنادق. يحفظ البرنامج في بيسك ليؤكده الموظف.
@@ -98,7 +98,7 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
         );
       })}
 
-      <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#dbe6e1] bg-white p-3 lg:bottom-0 dark:bg-[#12241f]">
+      <div className="tv-card sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 mt-4 flex flex-wrap items-center gap-2 rounded-xl border p-3 lg:bottom-0">
         <button type="button" onClick={save} disabled={saving} className="tv-btn-primary min-h-11 rounded-xl px-4 text-sm font-bold disabled:opacity-60">
           حفظ العروض الآلية
         </button>

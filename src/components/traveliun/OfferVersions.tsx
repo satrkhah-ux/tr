@@ -96,7 +96,7 @@ export function OfferVersions({
     new Date(iso).toLocaleString(language === "ar" ? "ar-SA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" });
 
   return (
-    <section className="mt-3 rounded-[12px] border border-[#dbe6e1] bg-white">
+    <section className="tv-card mt-3 rounded-[12px] border">
       <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 px-3 py-2 text-start">
         <History className="size-4 text-[#185045]" />
         <span className="text-[12.5px] font-extrabold text-[#185045]">{t("pg.versions.title")}</span>

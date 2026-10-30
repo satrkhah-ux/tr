@@ -12,7 +12,7 @@ import { useSafeTransition } from "../useSafeTransition";
  * what it owes per currency, its limit, and every invoice and payment.
  */
 
-const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]";
+const card = "tv-card rounded-[14px] border p-4";
 const money = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const METHOD: Record<string, string> = { bank_transfer: "تحويل بنكي", cash: "نقداً", card: "بطاقة", other: "أخرى" };
 
@@ -27,7 +27,7 @@ export function StatementView({ statement, title }: { statement: PartnerStatemen
             <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-[#557d78]">لا مستحقات</span>
           ) : (
             balances.map((b) => (
-              <span key={b.currency} className={`tv-tnum rounded-full px-3 py-1 ${b.owed > 0 ? "bg-[#fff4e0] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"}`}>
+              <span key={b.currency} className={`tv-tnum rounded-full px-3 py-1 ${b.owed > 0 ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"}`}>
                 {b.owed > 0 ? "المستحق" : "الرصيد لكم"}: <DirText dir="ltr">{`${money(Math.abs(b.owed))} ${b.currency}`}</DirText>
               </span>
             ))

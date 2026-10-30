@@ -19,7 +19,7 @@ import type { ReceptionSetup } from "@/lib/data/app-settings";
 
 const field =
   "tv-field h-9 w-full rounded-[8px] border px-2.5 text-[12.5px] font-semibold";
-const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]";
+const card = "tv-card rounded-[14px] border p-4";
 
 /**
  * Whether the message can still reach a client after WhatsApp's 24 hours: its

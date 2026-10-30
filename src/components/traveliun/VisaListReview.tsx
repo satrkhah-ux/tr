@@ -6,9 +6,9 @@ import type { VisaIssue, VisaReview } from "@/lib/data/visa-review";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
 const TONE: Record<VisaIssue, string> = {
-  lostWhenHidden: "border-[#f2c9d3] bg-[#fdf3f5] text-[#c22850]",
-  noRequirements: "border-[#f2c9d3] bg-[#fdf3f5] text-[#c22850]",
-  noCountry: "border-[#f2c9d3] bg-[#fdf3f5] text-[#c22850]",
+  lostWhenHidden: "border-[#f2c9d3] bg-tv-status-danger-bg text-tv-status-danger",
+  noRequirements: "border-[#f2c9d3] bg-tv-status-danger-bg text-tv-status-danger",
+  noCountry: "border-[#f2c9d3] bg-tv-status-danger-bg text-tv-status-danger",
   noPrice: "border-[#f1dca7] bg-[#fff8e6] text-[#7a5a12]",
   notSar: "border-[#f1dca7] bg-[#fff8e6] text-[#7a5a12]",
   runOn: "border-[#f1dca7] bg-[#fff8e6] text-[#7a5a12]",
@@ -24,7 +24,7 @@ export function VisaListReview({ total, reviews }: { total: number; reviews: Vis
   const { t } = useTraveliunUI();
   const todo = reviews.length;
   return (
-    <details open={todo > 0} className="mb-4 rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <details open={todo > 0} className="tv-card mb-4 rounded-2xl border px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1">
         {todo ? <AlertTriangle className="size-4 text-[#b7791f]" aria-hidden /> : <CheckCircle2 className="size-4 text-[#0f7a52]" aria-hidden />}
         <span className="text-[14px] font-extrabold text-[#003c3a]">{t("data.visas.review.title")}</span>

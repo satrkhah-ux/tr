@@ -78,7 +78,7 @@ function GenericTraveliunDataPage({ page }: TraveliunDataPageProps) {
       <div className="tv-fade-up">
       {page.filters ? <FilterCard page={page} /> : null}
 
-      <section className="rounded-2xl border border-[#e2ebe7] bg-white p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
+      <section className="tv-card rounded-2xl border p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
         <TableToolbar
           page={page}
           query={query}
@@ -207,7 +207,7 @@ function TraveliunOffersPage({ page }: TraveliunDataPageProps) {
         </div>
       </div>
 
-      <section className="rounded-2xl border border-[#e2ebe7] bg-white p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
+      <section className="tv-card rounded-2xl border p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
         <div className="mb-[21px] flex flex-col gap-4 lg:flex-row lg:items-center">
           <Link
             href="/offer"
@@ -245,7 +245,7 @@ function TraveliunOffersPage({ page }: TraveliunDataPageProps) {
 function FilterCard({ page }: TraveliunDataPageProps) {
   const { t } = useTraveliunUI();
   return (
-    <section className="mb-3 rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card mb-3 rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {page.filters?.map((filter) => (
           <label

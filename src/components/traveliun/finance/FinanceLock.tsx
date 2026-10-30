@@ -23,7 +23,7 @@ export function FinanceLock({ mode }: { mode: "set" | "ask" }) {
   }
 
   const field = "tv-field w-full rounded-lg border px-3 py-2 text-base";
-  return <form dir="rtl" onSubmit={(e) => void submit(e)} className="mx-auto mt-10 max-w-sm space-y-3 rounded-2xl border border-[#dbe6e1] bg-white p-6 text-[#10231f]">
+  return <form dir="rtl" onSubmit={(e) => void submit(e)} className="tv-card mx-auto mt-10 max-w-sm space-y-3 rounded-2xl border p-6 text-[#10231f]">
     <h1 className="text-xl font-extrabold text-[#185045]">الحسابات المالية</h1>
     <p className="text-sm text-[#5b6b66]">{mode === "set"
       ? "ضع كلمة سر للقسم المالي. ستُطلب مرة واحدة في كل جلسة، ولا يمكن تغييرها من هنا."

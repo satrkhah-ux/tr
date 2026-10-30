@@ -84,7 +84,7 @@ function SearchSourceCard({ suppliers, initial }: { suppliers: SupplierView[]; i
   }
 
   return (
-    <section className="mb-5 rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card mb-5 rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.searchSource.title")}</h2>
       <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.searchSource.hint")}</p>
       <div role="radiogroup" aria-label={t("settings.searchSource.title")} className="flex flex-wrap gap-2">
@@ -168,7 +168,7 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
   }
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       {/* header */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>

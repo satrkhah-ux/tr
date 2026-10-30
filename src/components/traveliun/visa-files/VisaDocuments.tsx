@@ -18,8 +18,8 @@ import { docState, docTotals, fmtDate, importTargets, settle, sortedDocs, type D
 import { Notice, btn, btnDanger, card, field, heading, label, type Message } from "./visa-ui";
 
 const STATE_CHIP: Record<DocState, { text: string; tone: string }> = {
-  received: { text: "مستلم", tone: "bg-[#e9f7f0] text-[#0f7a52]" },
-  missing: { text: "ناقص", tone: "bg-[#fdecef] text-[#c22850]" },
+  received: { text: "مستلم", tone: "bg-tv-status-success-bg text-tv-status-success" },
+  missing: { text: "ناقص", tone: "bg-tv-status-danger-bg text-tv-status-danger" },
   optional: { text: "اختياري", tone: "bg-[#eef1f4] text-[#5b6b78]" },
 };
 type Attachment = TeletelPull["attachments"][number];
@@ -122,7 +122,7 @@ export function VisaDocuments({
     <section id="documents" aria-labelledby="documents-h" className={`${card} scroll-mt-24 space-y-3`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="documents-h" className={heading}>المستندات — ماذا أرفق</h2>
-        <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${totals.missing > 0 ? "bg-[#fdecef] text-[#c22850]" : "bg-[#e9f7f0] text-[#0f7a52]"}`}>
+        <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${totals.missing > 0 ? "bg-tv-status-danger-bg text-tv-status-danger" : "bg-tv-status-success-bg text-tv-status-success"}`}>
           {totals.required === 0 ? "لا مستندات مطلوبة بعد" : totals.missing > 0 ? `ناقص ${totals.missing} من ${totals.required}` : `اكتملت المستندات (${totals.required})`}
         </span>
       </div>

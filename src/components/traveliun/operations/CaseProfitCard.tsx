@@ -25,7 +25,7 @@ const amountIn = (list: Money[], currency: string) => list.find((m) => m.currenc
 export function CaseProfitCard({ profit, showReport }: { profit: CaseProfitView; showReport: boolean }) {
   const { t } = useTraveliunUI();
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-extrabold text-[#185045]">
           <TrendingUp className="size-4" />

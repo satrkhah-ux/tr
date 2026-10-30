@@ -122,7 +122,7 @@ export function SupplierOrderPanel({ draftId }: { draftId: string }) {
         <div className="space-y-3">
           <p className="text-[12.5px] font-bold text-[#185045]">
             {t("rp.order.supplier")}: <span className="text-[#0f3d38]">{draft.to_label}</span>{" "}
-            <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${draft.supplier.registered ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
+            <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${draft.supplier.registered ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
               {draft.supplier.registered ? t("rp.order.registered") : t("rp.order.unregistered")}
             </span>
           </p>

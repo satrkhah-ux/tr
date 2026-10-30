@@ -71,7 +71,7 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
   return (
     <div className="space-y-3">
       {/* who travels — the passports against what the offer was priced for */}
-      <div className={`rounded-[12px] px-4 py-3 text-[12.5px] font-bold ${summary.mismatch ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#f2fbf6] text-[#0f7a52]"}`}>
+      <div className={`rounded-[12px] px-4 py-3 text-[12.5px] font-bold ${summary.mismatch ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"}`}>
         <p className="flex items-start gap-2">
           {summary.mismatch ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" />}
           <span>

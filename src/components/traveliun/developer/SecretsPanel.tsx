@@ -50,7 +50,7 @@ function Row({ row, vault, onChanged }: { row: SecretRow; vault: boolean; onChan
     catch { setMsg("تعذّر الاتصال."); } finally { setBusy(null); }
   }
 
-  return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
+  return <div className="tv-card rounded-xl border p-3">
     <div className="flex flex-wrap items-center gap-2">
       <code dir="ltr" className="text-sm font-bold text-[#185045]">{row.name}</code>
       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${row.set ? "bg-emerald-50 text-emerald-800" : "bg-[#f4f6f3] text-tv-text-faint"}`}>

@@ -35,7 +35,7 @@ export function ManagementDecisions({ initial }: { initial: Data }) {
       </button>)}</div>
       {!data.signals.length && <p>لا توجد مؤشرات متاحة الآن. يمكنك تسجيل قرار يدوي.</p>}
     </section>
-    <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="rounded-2xl border bg-white p-5">
+    <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="tv-card rounded-2xl border p-5">
       <fieldset disabled={busy || !!data.error} className="grid gap-4 md:grid-cols-2">
         <label className="md:col-span-2">الإجراء المطلوب<textarea required maxLength={500} value={title} onChange={(e) => setTitle(e.target.value)} className={field} /></label>
         {sourceKey && <p className="md:col-span-2 text-sm">مرتبط بمؤشر من شاشة المدير. <button type="button" onClick={() => setSource("")} className="underline">إلغاء الربط</button></p>}
@@ -46,7 +46,7 @@ export function ManagementDecisions({ initial }: { initial: Data }) {
     </form>
     <p role="status">{message}</p>
     <section className="space-y-3"><div className="flex items-center justify-between"><h2 className="font-bold">متابعة القرارات ({data.rows.length})</h2><button disabled={busy} onClick={() => void load().catch(() => setMessage("تعذّر التحديث"))} className="underline">تحديث</button></div>
-      {data.rows.map((r) => <article key={r.id} className="rounded-xl border bg-white p-5">
+      {data.rows.map((r) => <article key={r.id} className="tv-card rounded-xl border p-5">
         <h3 className="font-bold">{r.title}</h3><p className="my-2 text-sm">{r.evidence}</p>
         <div className="flex flex-wrap items-center gap-4 text-sm"><span>المسؤول: {data.employees.find((e) => e.id === r.owner_id)?.arabic_name ?? "موظف غير نشط"}</span><span>الموعد: {r.due_on}</span>
           <select aria-label={`حالة ${r.title}`} disabled={busy} value={r.status} onChange={(e) => void status(r, e.target.value as ManagementDecision["status"])} className="rounded-lg border p-2">{Object.entries(states).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>

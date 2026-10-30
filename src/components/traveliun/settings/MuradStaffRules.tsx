@@ -65,7 +65,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
     </header>
 
     {open && <>
-    {(["a", "b", "s"] as const).map((sec) => <div key={sec} className="rounded-2xl border bg-white p-5">
+    {(["a", "b", "s"] as const).map((sec) => <div key={sec} className="tv-card rounded-2xl border p-5">
       <div className="mb-1 flex flex-wrap items-center gap-3">
         <h3 className="font-bold">{STAFF_RULE_SECTIONS[sec].title}</h3>
         <span className="rounded-full border px-3 py-0.5 text-xs">{STAFF_RULE_SECTIONS[sec].tag}</span>
@@ -97,7 +97,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
       </div>
     </div>)}
 
-    <div className="rounded-2xl border bg-white p-5">
+    <div className="tv-card rounded-2xl border p-5">
       <h3 className="mb-1 font-bold">قواعد تضيفها أنت</h3>
       <p className="mb-3 text-sm text-[#5b7a71]">اكتب أي قاعدة تريد إضافتها للاعتماد، بأي صياغة.</p>
       <div className="space-y-2">
@@ -113,7 +113,7 @@ export function MuradStaffRules({ initial }: { initial: MuradStaffRulesDoc }) {
       </div>
     </div>
 
-    <div className="sticky bottom-3 rounded-2xl border bg-white p-4 shadow-sm">
+    <div className="tv-card sticky bottom-3 rounded-2xl border p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <span className="flex-1 tabular-nums">نفّذ <b>{counts.approve}</b> · لا تنفّذ <b>{counts.reject}</b> · تعديل <b>{counts.edit}</b> · بلا قرار <b>{undecided}</b></span>
         {doc.approvedAt && <span className="font-bold text-emerald-700">اعتُمدت في {new Date(doc.approvedAt).toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" })}</span>}

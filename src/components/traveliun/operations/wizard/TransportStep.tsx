@@ -41,7 +41,7 @@ import { DriverSend } from "../DriversPanel";
 import { PullNotice } from "./FlightsStep";
 
 import { buttonTone } from "@/components/ui/button-variants";
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
@@ -278,10 +278,10 @@ function CityCard({
         <span
           className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
             city.request === "confirmed"
-              ? "bg-[#e1f3e9] text-[#0f7a52]"
+              ? "bg-tv-status-success-bg text-tv-status-success"
               : city.request === "sent"
                 ? "bg-[#eaf1ff] text-[#2b57c4]"
-                : "bg-[#fff4e0] text-[#a86a10]"
+                : "bg-tv-status-warning-bg text-tv-status-warning"
           }`}
         >
           {t(`ops.sup.state.${city.request}` as TranslationKey, { h: String(city.sentAt ? hoursSince(city.sentAt, now) : 0) })}

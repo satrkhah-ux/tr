@@ -14,16 +14,16 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
 import { OpsLinkButton } from "./OpsLinkButton";
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
 
 const KIND_TONE: Record<ServiceKind, string> = {
-  reception: "bg-[#e9f7f0] text-[#0f7a52]",
+  reception: "bg-tv-status-success-bg text-tv-status-success",
   farewell: "bg-[#eaf1ff] text-[#2b57c4]",
   transfer: "bg-[#eef4f1] text-[#557d78]",
-  tour: "bg-[#fff4e0] text-[#a86a10]",
+  tour: "bg-tv-status-warning-bg text-tv-status-warning",
 };
 
 /**

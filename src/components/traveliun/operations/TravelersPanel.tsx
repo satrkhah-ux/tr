@@ -28,7 +28,7 @@ import { acceptClientPassport, type PendingClientPassport } from "@/lib/data/cli
 import { ClientPassportReview, useClientPassports } from "./ClientPassportReview";
 
 import { buttonTone } from "@/components/ui/button-variants";
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";

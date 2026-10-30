@@ -20,7 +20,7 @@ import { SuggestInput } from "../../SuggestInput";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
 
-export const wzCard = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+export const wzCard = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 export const wzField =
   "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 export const wzLabel = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
@@ -149,7 +149,7 @@ export function PullNotice({ operationId }: { operationId: string }) {
 export function NameRow({ check }: { check: NameCheck }) {
   const { t } = useTraveliunUI();
   const tone =
-    check.status === "ok" ? "border-[#cfe9dc] bg-[#eef8f3] text-[#0f7a52]" : check.status === "likely" ? "border-[#f1dfb8] bg-[#fff8ea] text-[#a86a10]" : "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]";
+    check.status === "ok" ? "border-[#cfe9dc] bg-tv-status-success-bg text-tv-status-success" : check.status === "likely" ? "border-[#f1dfb8] bg-tv-status-warning-bg text-tv-status-warning" : "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger";
   return (
     <li className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-[9px] border px-3 py-1.5 text-[12px] font-bold ${tone}`}>
       {check.status === "mismatch" ? <AlertTriangle className="size-3.5" /> : <Check className="size-3.5" />}
@@ -323,7 +323,7 @@ function FlightCard({
             {t("wz.flights.ourRef")}: <DirText>{booking.company_ref ?? "—"}</DirText>
           </p>
         </div>
-        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff4e0] text-[#a86a10]"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
           {done ? t("wz.flights.ticketed") : t("wz.flights.waiting")}
         </span>
       </div>

@@ -145,7 +145,7 @@ export function ExecutiveOverview() {
       {loading ? (
         <LoadingState />
       ) : data && !data.authorized ? (
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
         </section>
       ) : error || !data ? (
@@ -156,7 +156,7 @@ export function ExecutiveOverview() {
           </button>
         </section>
       ) : data.rows.length === 0 ? (
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <EmptyState icon={Package} title={t("exec.noData")} description={t("exec.noDataDesc")} />
         </section>
       ) : (
@@ -283,7 +283,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
   return (
     <>
       {/* header + filters */}
-      <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+      <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
         <p className="mb-3 text-[12.5px] font-semibold text-tv-text-faint">{t("exec.subtitle")}</p>
         <div className="flex flex-wrap items-end gap-3">
           <Field label={t("exec.filter.destination")}>
@@ -353,7 +353,7 @@ function ExecutiveContent({ data }: { data: ExecutiveDashboard }) {
       </section>
 
       {/* table */}
-      <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] lg:p-5">
+      <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] lg:p-5">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("exec.table.title")}</h2>
           <span className="text-[12px] font-semibold text-tv-text-faint">
@@ -432,7 +432,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function KpiCard({ label, value, unit, hint, icon: Icon, color }: { label: string; value: string; unit?: string; hint: string; icon: LucideIcon; color: string }) {
   return (
-    <article className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
+    <article className="tv-card rounded-[15px] border p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
       <div className="flex items-start justify-between">
         <p className="text-[12.5px] font-bold text-tv-text-faint">{label}</p>
         <span className="flex size-[38px] items-center justify-center rounded-[11px]" style={{ color, background: `${color}1a` }}>
@@ -450,7 +450,7 @@ export function KpiCard({ label, value, unit, hint, icon: Icon, color }: { label
 
 export function ChartCard({ title, caption, children }: { title: string; caption: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] lg:p-5">
+    <div className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] lg:p-5">
       <h3 className="text-sm font-extrabold text-[#003c3a]">{title}</h3>
       <p className="mb-3 mt-0.5 text-[11.5px] font-semibold text-tv-text-faint">{caption}</p>
       {children}

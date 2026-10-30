@@ -22,13 +22,13 @@ export function SupervisionReport({ initial }: { initial: Data }) {
         {[7, 30, 90].map((d) => <option key={d} value={d}>آخر {d} يوماً</option>)}
       </select>
     </div>
-    <div className="overflow-x-auto rounded-xl border border-[#dfe8e4] bg-white">
+    <div className="tv-card overflow-x-auto rounded-xl border">
       <table className="w-full min-w-[640px] text-sm">
         <thead className="bg-[#f4f8f6]"><tr>{["الموظف", "المستحق", "المنجز", "المتأخر", "الالتزام", "وقت المعالجة", "التأجيلات"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
         <tbody>{data.employees.map((r) => <tr key={r.key}><td className={td}>{name(r.key)}</td><td className={td}>{r.due}</td><td className={td}>{r.done}</td><td className={td}>{r.overdue}</td><td className={td}>{r.compliance}%</td><td className={td}>{mins(r.avgHandleMinutes)}</td><td className={td}>{r.postpones}</td></tr>)}</tbody>
       </table>
     </div>
-    {data.supervisors.length > 0 && <div className="overflow-x-auto rounded-xl border border-[#dfe8e4] bg-white">
+    {data.supervisors.length > 0 && <div className="tv-card overflow-x-auto rounded-xl border">
       <table className="w-full min-w-[560px] text-sm">
         <thead className="bg-[#f4f8f6]"><tr>{["المشرف", "وصلته", "عالجها قبل التصعيد", "صُعّدت للإدارة", "متوسط استجابته"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
         <tbody>{data.supervisors.map((r) => <tr key={r.supervisorId}><td className={td}>{name(r.supervisorId)}</td><td className={td}>{r.reached}</td><td className={td}>{r.actedBeforeEscalation}</td><td className={td}>{r.escalated}</td><td className={td}>{mins(r.avgResponseMinutes)}</td></tr>)}</tbody>

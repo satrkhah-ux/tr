@@ -245,10 +245,10 @@ export function GeneratorFlow({
               role="status"
               className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${
                 saveState === "error"
-                  ? "bg-[#fdeef2] text-[#c22850]"
+                  ? "bg-tv-status-danger-bg text-tv-status-danger"
                   : saveState === "saving"
-                    ? "bg-[#fff8e8] text-[#a86a10]"
-                    : "bg-[#e9f7f0] text-[#0f7a52]"
+                    ? "bg-tv-status-warning-bg text-tv-status-warning"
+                    : "bg-tv-status-success-bg text-tv-status-success"
               }`}
             >
               {saveState === "saving" ? (
@@ -389,7 +389,7 @@ export function GeneratorFlow({
 
           {current !== "preview" && previewOpen ? (
             <aside className="order-2 hidden xl:block">
-              <div className="sticky top-[90px] overflow-hidden rounded-2xl border border-[#e2ebe7] bg-white p-3">
+              <div className="tv-card sticky top-[90px] overflow-hidden rounded-2xl border p-3">
                 <div className="origin-top scale-[0.62]" style={{ width: "161%" }}>
                   <OfferDocument
                     variant="client"
@@ -534,7 +534,7 @@ function ProduceBar({
   }
 
   return (
-    <div className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3">
+    <div className="tv-card rounded-2xl border px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[12px] font-semibold text-tv-text-faint">{t("pg.previewNote")}</p>
         <button

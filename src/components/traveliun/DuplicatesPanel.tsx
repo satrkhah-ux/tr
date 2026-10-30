@@ -46,7 +46,7 @@ export function DuplicatesPanel({ data }: { data: Duplicates }) {
 
   if (data.groups.length === 0 && data.spellings.length === 0) return null;
   return (
-    <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
+    <section className="tv-card rounded-[16px] border p-3 sm:p-4">
       <h2 className="inline-flex items-center gap-2 text-[14px] font-extrabold text-[#003c3a]">
         <Copy className="size-4 text-[#a86a10]" />
         بيانات مكررة

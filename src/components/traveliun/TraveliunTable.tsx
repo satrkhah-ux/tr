@@ -340,7 +340,7 @@ export function TraveliunTable({
           </div>
         ) : null}
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
+        <section className="tv-card rounded-2xl border p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
           <div className="mb-[21px] flex flex-col flex-wrap gap-4 sm:flex-row sm:items-center">
             <div className="relative h-[46px] w-full max-w-[280px]">
               <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" aria-hidden />
@@ -605,7 +605,7 @@ function CardsView({
     return (
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="rounded-[14px] border border-[#e2ebe7] bg-white p-4">
+          <div key={index} className="tv-card rounded-[14px] border p-4">
             <div className="tv-shimmer mb-3 h-4 w-28 rounded-md" />
             <div className="tv-shimmer mb-2 h-3 w-full rounded-md" />
             <div className="tv-shimmer h-3 w-2/3 rounded-md" />
@@ -621,7 +621,7 @@ function CardsView({
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {rows.map((row) => (
-        <article key={String(row.id)} className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
+        <article key={String(row.id)} className="tv-card rounded-[14px] border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
           <div className="mb-3 flex items-start justify-between gap-2">
             <div className="min-w-0 text-[15px] font-extrabold text-[#003c3a]">
               {primary ? <Cell column={primary} row={row} /> : null}
@@ -726,7 +726,7 @@ function FilterBar({
 }) {
   const { t } = useTraveliunUI();
   return (
-    <section className="mb-3 rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card mb-3 rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {config.isOffers ? (
           <>
@@ -973,7 +973,7 @@ export function RecordForm({
   return (
     <RefOptionsContext.Provider value={filterOptions}>
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" aria-label={title} dir={dir}>
-      <form inert={Boolean(adding)} onSubmit={submit} className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[860px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+      <form inert={Boolean(adding)} onSubmit={submit} className="tv-card max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[860px] overflow-y-auto rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-5 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <div>
             <h2 className="text-lg font-extrabold">{title}</h2>
@@ -1256,7 +1256,7 @@ function RowActionModal({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/20 p-4" role="dialog" aria-modal="true" dir={dir}>
-      <div className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+      <div className="tv-card max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[620px] overflow-y-auto rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <h2 className="text-lg font-extrabold">{t("details")}</h2>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}><X className="size-5" /></button>

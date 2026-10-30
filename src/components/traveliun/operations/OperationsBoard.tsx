@@ -132,7 +132,7 @@ export function OperationsBoard({
     <TraveliunShell title="nav.operations">
       <div className="tv-fade-up space-y-4">
         {/* a slim head — the title, the four lists as chips, search, upload — so the cards come first (the owner, 2026-10-23) */}
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ops.title")}</h1>
             <p className="text-[12px] font-semibold text-tv-text-faint">{t("ops.subtitle")}</p>
@@ -197,7 +197,7 @@ export function OperationsBoard({
         </section>
 
         {rows.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState
               icon={filter === "needs_action" && counts.all > 0 ? CheckCircle2 : ClipboardCheck}
               title={filter === "needs_action" && counts.all > 0 ? t("ops.allClear") : t("ops.noOperations")}

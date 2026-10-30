@@ -29,7 +29,7 @@ export function SecretaryEditRequest() {
   }
 
   if (!files.length) return null;
-  return <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+  return <section className="tv-card rounded-2xl border p-4">
     <div className="mb-1 flex items-center gap-2">
       <FilePenLine className="size-4 text-[#557d78]" />
       <h2 className="font-bold">نفّذ طلب العميل على الملف</h2>

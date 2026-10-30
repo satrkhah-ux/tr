@@ -41,7 +41,7 @@ export function DataAdditionsReview({ initial, enabled }: { initial: AdditionFor
         {pending ? `${pending} إضافة بانتظار المراجعة — صحّح الاسم إن لزم ثم اعتمده لكل الموظفين.` : "لا توجد إضافات بانتظار المراجعة."}
       </p>
       {error ? <p className="text-[12.5px] font-bold text-[#c22850]">{error}</p> : null}
-      <div className="overflow-x-auto rounded-2xl border border-[#dbe6e1] bg-white dark:border-[#294039] dark:bg-[#14231f]">
+      <div className="tv-card overflow-x-auto rounded-2xl border">
         <table className="w-full min-w-[720px] text-[12.5px]">
           <thead className="bg-[#f2f7f5] text-[#557d78] dark:bg-[#1b2d27]">
             <tr>

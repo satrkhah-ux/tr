@@ -51,8 +51,8 @@ describe("the board's counters", () => {
     const quiet = visaBoard();
     quiet.counts = { ...quiet.counts, missingDocs: 0, replyOverdue: 0, actionDue: 0, toDeliver: 0, unpaid: { files: 0, due: {} } };
     const html = view(ready(quiet));
-    expect(html).not.toContain("bg-[#fdecef] text-[#c22850] hover:bg-[#fbdde4]");
-    expect(view(ready())).toContain("bg-[#fdecef] text-[#c22850] hover:bg-[#fbdde4]");
+    expect(html).not.toContain("bg-tv-status-danger-bg text-tv-status-danger hover:bg-[#fbdde4]");
+    expect(view(ready())).toContain("bg-tv-status-danger-bg text-tv-status-danger hover:bg-[#fbdde4]");
   });
 });
 

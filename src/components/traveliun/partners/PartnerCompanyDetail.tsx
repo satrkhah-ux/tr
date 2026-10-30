@@ -24,7 +24,7 @@ import type { Tier } from "@/lib/partners/tiers";
  * its files and history stay.
  */
 
-const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]";
+const card = "tv-card rounded-[14px] border p-4";
 const STATUS_LABEL: Record<string, string> = {
   approved: "معتمدة",
   suspended: "موقوفة",
@@ -61,7 +61,7 @@ export function PartnerCompanyDetailView({ detail, statement, tiers }: { detail:
             </div>
             <span
               className={`rounded-full px-3 py-1 text-[12px] font-bold ${
-                company.status === "approved" ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fdeef2] text-[#c22850]"
+                company.status === "approved" ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-danger-bg text-tv-status-danger"
               }`}
             >
               {STATUS_LABEL[company.status] ?? company.status}

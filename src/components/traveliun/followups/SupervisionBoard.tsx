@@ -109,7 +109,7 @@ export function SupervisionBoard({ initial }: { initial: Board }) {
     </div>
 
     {!board.rows.length ? <p className="rounded-xl border border-[#dfe8e4] bg-white p-4 text-sm text-[#185045]">لا حالات {filters.status === "closed" ? "مغلقة في هذه الفترة" : "تحتاج إشرافاً الآن"} ✅</p> :
-    <div className="overflow-x-auto rounded-xl border border-[#dfe8e4] bg-white">
+    <div className="tv-card overflow-x-auto rounded-xl border">
       <table className="w-full min-w-[980px] text-start text-sm">
         <thead className="bg-[#f4f8f6] text-xs text-[#557d78]">
           <tr>{["العميل", "السبب", "التأخير", "الموظف / المشرف", "آخر رسالة للعميل", "آخر إجراء / الموعد", "الأولوية", canAct ? "الإجراء" : "الحالة"].map((h) => <th key={h} className="p-2 text-start font-bold">{h}</th>)}</tr>

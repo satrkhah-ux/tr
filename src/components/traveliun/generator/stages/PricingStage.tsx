@@ -273,7 +273,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
               const open = openGroup === type;
               const listHref = LIST_HREF[type];
               return (
-                <div key={type} className="rounded-[12px] border border-[#e2ebe7] bg-white">
+                <div key={type} className="tv-card rounded-[12px] border">
                   <button
                     type="button"
                     onClick={() => setOpenGroup(open ? null : type)}

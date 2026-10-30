@@ -116,7 +116,7 @@ export function PartnerWelcome({ home = "/b2b", homeLabel = "العودة لبو
 
   if (phase === "checking") {
     return (
-      <div className="grid place-items-center rounded-2xl border border-[#e2ebe7] bg-white p-10">
+      <div className="tv-card grid place-items-center rounded-2xl border p-10">
         <Loader2 className="size-6 animate-spin text-[#185045]" />
       </div>
     );

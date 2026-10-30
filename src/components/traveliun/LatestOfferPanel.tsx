@@ -60,7 +60,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
   return (
     <div className="space-y-[18px]" dir={dir}>
             <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="flex items-center justify-between border-b border-[#eef2f0] px-5 py-4">
                   <h2 className="text-lg font-extrabold text-[#003c3a]">{t("hub.readyOffer")}</h2>
                   <span className="rounded-full bg-[#e4f6ef] px-3 py-1 text-xs font-bold text-[#10966b]">{t("hub.latestBadge")}</span>
@@ -84,7 +84,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                 ) : null}
               </article>
 
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="mb-4 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <BrainCircuit className="size-5 text-[#2aa87a]" />
@@ -124,7 +124,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
             </section>
 
             <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="text-lg font-extrabold text-[#003c3a]">{t("hub.clientLink")}</h2>
                   <Sparkles className="size-5 text-[#f4b400]" />
@@ -145,7 +145,7 @@ export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
                 </div>
               </article>
 
-              <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+              <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="mb-4 flex items-center gap-2">
                   <Activity className="size-5 text-[#00a7b2]" />
                   <h2 className="text-lg font-extrabold text-[#003c3a]">{t("hub.itinerary")}</h2>
@@ -197,7 +197,7 @@ function Stage({ label }: { label: string }) {
 
 function ListPanel({ title, items, icon: Icon }: { title: string; items: string[]; icon: LucideIcon }) {
   return (
-    <article className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <article className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-4 flex items-center gap-2">
         <Icon className="size-5 text-[#557d78]" />
         <h2 className="text-lg font-extrabold text-[#003c3a]">{title}</h2>

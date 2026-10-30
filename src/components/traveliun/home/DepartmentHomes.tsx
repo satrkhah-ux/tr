@@ -72,7 +72,7 @@ export function DepartmentHomes({ opsSummary, mine, visaBoard }: { opsSummary: O
   return (
     <div className="space-y-4">
       {kinds.length > 1 ? (
-        <div className="flex max-w-full overflow-x-auto rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex dark:border-[#24423a] dark:bg-[#12261f]">
+        <div className="tv-card flex max-w-full overflow-x-auto rounded-[12px] border p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex">
           {kinds.map((k) => (
             <button
               key={k}

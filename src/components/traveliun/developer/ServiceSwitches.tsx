@@ -61,7 +61,7 @@ export function ServiceSwitches({ flags, changes }: { flags: FeatureFlags; chang
   const nameOf = (feature: string) => (isFeature(feature) ? t(FEATURE_TEXT[feature].label) : feature);
 
   return (
-    <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("dev.services")}</h2>
       <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("dev.services.hint")}</p>
 
@@ -77,8 +77,8 @@ export function ServiceSwitches({ flags, changes }: { flags: FeatureFlags; chang
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
                       on
-                        ? "bg-[#e3f6ee] text-[#0f7a52] dark:bg-[#123a2c] dark:text-[#6fe0b0]"
-                        : "bg-[#fdeaef] text-[#c22850] dark:bg-[#3d1621] dark:text-[#f68aa5]"
+                        ? "bg-tv-status-success-bg text-tv-status-success"
+                        : "bg-tv-status-danger-bg text-tv-status-danger"
                     }`}
                   >
                     {t(on ? "dev.services.on" : "dev.services.off")}

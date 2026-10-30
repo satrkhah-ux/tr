@@ -71,7 +71,7 @@ export function TraveliunDashboardClient({ opsSummary, mine, latest = null, visa
         ) : dashboardView === "employee" ? (
           <EmployeeHome opsSummary={opsSummary} mine={mine} visaBoard={visaBoard} salesCard={salesCard} />
         ) : (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
           </section>
         )}
@@ -153,7 +153,7 @@ function ReadySections() {
       </div>
 
       {prepared.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-[13px] border border-[#e8efeb] bg-white px-4 py-3">
+        <div className="tv-card flex flex-wrap items-center gap-2 rounded-[13px] border px-4 py-3">
           <span className="text-[11.5px] font-extrabold text-[#557d78]">{t("dash.preparedSettings")}</span>
           {prepared.map((p) => (
             <Link
@@ -193,7 +193,7 @@ function PreviousSections() {
   if (count === 0) return null;
 
   return (
-    <details className="group rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <details className="tv-card group rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-5 py-4 marker:content-none">
         <ChevronDown className="size-4 text-[#557d78] transition-transform duration-200 group-open:rotate-180" />
         <span className="text-sm font-extrabold text-[#185045]">{t("dash.previousSections")}</span>
@@ -247,7 +247,7 @@ function AdminHome({ opsSummary, mine, latest, salesCard }: { opsSummary: OpsSum
 
   return (
     <div className="space-y-4">
-      <div className="flex max-w-full overflow-x-auto rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex">
+      <div className="tv-card flex max-w-full overflow-x-auto rounded-[12px] border p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex">
         <button type="button" onClick={() => setTab("mine")} className={tabClass(tab === "mine")}>
           <UserRound className="size-4" /> {t("dash.tab.mine")}
         </button>
@@ -305,7 +305,7 @@ function EmployeeHome({ opsSummary, mine, visaBoard, salesCard }: { opsSummary: 
 // ---------- KPI card primitives (shared visual) ----------
 function KpiCard({ label, value, detail, icon: Icon, color }: { label: string; value: string; detail?: string; icon: LucideIcon; color: string }) {
   return (
-    <article className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
+    <article className="tv-card rounded-[15px] border p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
       <div className="flex items-start justify-between">
         <p className="text-[12.5px] font-bold text-tv-text-faint">{label}</p>
         <span className="flex size-[38px] items-center justify-center rounded-[11px]" style={{ color, background: `${color}1a` }}>
@@ -320,7 +320,7 @@ function KpiCard({ label, value, detail, icon: Icon, color }: { label: string; v
 
 function CardSkeleton() {
   return (
-    <div className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px]">
+    <div className="tv-card rounded-[15px] border p-[18px]">
       <div className="tv-shimmer mb-3 h-4 w-24 rounded-md" />
       <div className="tv-shimmer h-8 w-16 rounded-md" />
     </div>
@@ -428,7 +428,7 @@ function TeamOperations() {
   return (
     <div className="space-y-4">
       {/* toolbar: employee search + customize */}
-      <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+      <section className="tv-card flex flex-wrap items-center gap-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
         <div className="relative h-11 w-full max-w-[320px]">
           <Search className="absolute end-3 top-1/2 size-5 -translate-y-1/2 text-tv-text-faint" />
           <input
@@ -504,14 +504,14 @@ function TeamOperations() {
       </section>
 
       {visibleCards.length === 0 ? (
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <EmptyState icon={Contact} title={t("dash.allHidden")} description={t("dash.allHiddenDesc")} />
         </section>
       ) : null}
 
       {/* not-responded employees list */}
       {!loading && metrics && metrics.notRespondedNames.length > 0 ? (
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
             <AlertTriangle className="size-5 text-[#e0577f]" /> {t("dash.pendingList")}
           </h2>

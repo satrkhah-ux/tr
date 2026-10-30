@@ -791,7 +791,7 @@ export function BasicEditor({
   // over first: `left` is clamped at 0, so a file one night too long also has none left
   const nightsNote =
     used > trip.nights ? tx("over", { n: used - trip.nights }) : trip.nights > 0 && left === 0 ? tx("complete") : tx("remaining", { n: left });
-  const nightsTone = trip.nights > 0 && used === trip.nights ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-white text-[#a86a10]";
+  const nightsTone = trip.nights > 0 && used === trip.nights ? "bg-tv-status-success-bg text-tv-status-success" : "bg-white text-[#a86a10]";
 
   // where the international flights land and leave from — the two ends of the domestic moves
   const intlLegs = data.flights.filter((f) => f.leg_order !== "internal").sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""));
@@ -1653,7 +1653,7 @@ export function BasicEditor({
       <div className="space-y-3">
         {datesFit}
         {citiesNote && !focus ? (
-          <p role="status" className={`flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[12px] font-bold ${citiesNote === "flightCities" ? "bg-[#eef6f2] text-[#185045]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
+          <p role="status" className={`flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[12px] font-bold ${citiesNote === "flightCities" ? "bg-[#eef6f2] text-[#185045]" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
             <Plane className="size-4 shrink-0" />
             <span className="flex-1">{tx(citiesNote)}</span>
             <button type="button" onClick={() => setCitiesNote(null)} aria-label={tx("dismiss")} className="text-[#557d78]">×</button>
@@ -2191,7 +2191,7 @@ export function BasicEditor({
             <span
               role="status"
               className={`inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-bold ${
-                saveState === "error" ? "bg-[#fdeef2] text-[#c22850]" : saveState === "saving" ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
+                saveState === "error" ? "bg-tv-status-danger-bg text-tv-status-danger" : saveState === "saving" ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"
               }`}
             >
               {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : saveState === "error" ? <XCircle className="size-3.5" /> : <Check className="size-3.5" />}

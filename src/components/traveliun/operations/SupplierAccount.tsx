@@ -18,7 +18,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 import { PaymentList, SupplierPaymentForm, money } from "./SupplierPanel";
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const back =
   "inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]";
 
@@ -35,7 +35,7 @@ function BalanceChips({ balances }: { balances: SupplierBalance[] }) {
         <span
           key={b.currency}
           className={`tv-tnum rounded-full px-2.5 py-0.5 text-[11.5px] font-bold ${
-            b.balance > 0 ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
+            b.balance > 0 ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"
           }`}
         >
           {t(b.balance > 0 ? "ops.sup.weOwe" : "ops.sup.theyOwe")}{" "}

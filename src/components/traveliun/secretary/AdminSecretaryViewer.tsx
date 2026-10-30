@@ -31,7 +31,7 @@ export function AdminSecretaryViewer({ employees }: { employees: { id: string; n
   const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" });
   const who = (m: SecretaryMsg) => (m.role === "user" ? "الموظف" : m.role === "plan" ? "🗂 خطة اليوم" : "السكرتير");
 
-  return <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+  return <section className="tv-card rounded-2xl border p-4">
     <div className="mb-1 flex items-center gap-2">
       <Eye className="size-4 text-[#557d78]" />
       <h2 className="font-bold">مشاهدة الإدارة — سكرتير موظف</h2>

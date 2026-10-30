@@ -10,7 +10,7 @@ export async function TripReceipts({ token }: { token: string }) {
   if (receipts.length === 0) return null;
 
   return (
-    <section className="mt-4 rounded-2xl border border-[#e2ebe7] bg-white p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card mt-4 rounded-2xl border p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <h2 className="text-[15px] font-extrabold">سندات القبض</h2>
       <ul className="mt-3 space-y-2">
         {receipts.map((r) => (

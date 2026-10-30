@@ -279,7 +279,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
         {!isWeatherEmpty(day.weather) && day.weather ? (
           <span
             className={`tv-tnum inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
-              day.weather.source === "forecast" ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#eef2fb] text-[#3c5a9a]"
+              day.weather.source === "forecast" ? "bg-tv-status-success-bg text-tv-status-success" : "bg-[#eef2fb] text-[#3c5a9a]"
             }`}
             title={`${weatherSourceAr(day.weather.source)} · ${day.weather.fetched_at.slice(0, 10)}`}
           >
@@ -294,7 +294,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
         {current === arrivalIndex && arrivalNote ? (
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
-              dayOneUsable ? "bg-[#eef2fb] text-[#3c5a9a]" : "bg-[#fff8e8] text-[#a86a10]"
+              dayOneUsable ? "bg-[#eef2fb] text-[#3c5a9a]" : "bg-tv-status-warning-bg text-tv-status-warning"
             }`}
           >
             <PlaneLanding className="size-3" />

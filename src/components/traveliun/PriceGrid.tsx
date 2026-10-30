@@ -73,7 +73,7 @@ export function PriceGrid({ cities }: { cities: GridCity[] }) {
 
   return (
     <TraveliunShell title="data.model.grid.title">
-      <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+      <section className="tv-card rounded-[14px] border p-4">
         <div role="tablist" className="mb-3 inline-flex overflow-hidden rounded-[11px] bg-[#e2ede9] p-1 text-[13px]">
           {(["transfers", "tours"] as const).map((m) => (
             <button

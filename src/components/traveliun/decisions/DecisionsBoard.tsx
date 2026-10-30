@@ -21,7 +21,7 @@ import { buttonTone } from "@/components/ui/button-variants";
  */
 
 const card =
-  "rounded-2xl border border-[#E3E8E4] bg-white p-4 dark:border-[#294039] dark:bg-[#14231f]";
+  "tv-card rounded-2xl border p-4";
 const btn =
   `${buttonTone({ variant: "secondary" })} inline-flex min-h-10 items-center justify-center rounded-xl border px-3 text-sm font-bold disabled:opacity-40`;
 const primary =

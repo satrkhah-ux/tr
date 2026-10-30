@@ -25,7 +25,7 @@ export function IssuesPanel({ operationId }: { operationId: string }) {
   }, [load]);
 
   return (
-    <section id="issues" className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section id="issues" className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[14px] font-extrabold text-[#003c3a]">{t("ops.issue.title")}</h2>
         {state?.rating ? (

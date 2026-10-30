@@ -22,7 +22,7 @@ import { buttonTone } from "@/components/ui/button-variants";
  * the day's status buttons — who pressed what, when, for how long, and whether it closed itself at the limit.
  */
 
-const card = "rounded-2xl border border-[#E3E8E4] bg-white p-4 dark:border-[#294039] dark:bg-[#14231f]";
+const card = "tv-card rounded-2xl border p-4";
 const btn =
   `${buttonTone({ variant: "secondary" })} inline-flex min-h-10 items-center justify-center rounded-xl border px-3 text-sm font-bold disabled:opacity-40`;
 const primary = `${buttonTone({ variant: "default" })} inline-flex min-h-10 items-center justify-center rounded-xl px-4 text-sm font-bold disabled:opacity-40`;

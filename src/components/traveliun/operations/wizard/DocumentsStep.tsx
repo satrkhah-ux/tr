@@ -138,7 +138,7 @@ export function AutoIssue({ data }: { data: WizardCase }) {
   return (
     <div className="space-y-1.5">
       {busy || errors.length ? (
-        <div className={`rounded-[11px] px-3 py-2 text-[12px] font-bold ${errors.length ? "bg-[#fdecef] text-[#c22850]" : "bg-[#eef4f1] text-[#185045]"}`}>
+        <div className={`rounded-[11px] px-3 py-2 text-[12px] font-bold ${errors.length ? "bg-tv-status-danger-bg text-tv-status-danger" : "bg-[#eef4f1] text-[#185045]"}`}>
           {busy ? (
             <p className="flex items-center gap-1.5">
               <Loader2 className="size-3.5 animate-spin" />

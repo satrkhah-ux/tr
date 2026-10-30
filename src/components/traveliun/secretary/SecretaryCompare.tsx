@@ -31,7 +31,7 @@ function StayCompare({ proposal, stay }: { proposal: Proposal; stay: ProposalSta
     } catch { setError("تعذّر الاتصال."); } finally { setBusy(false); }
   }
 
-  return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
+  return <div className="tv-card rounded-xl border p-3">
     <ComparePanel
       query={{ hotelName: stay.hotelName, cityEn: stay.cityEn, cityAr: stay.cityAr, checkIn: stay.checkIn, checkOut: stay.checkOut, adults: proposal.adults, rooms: stay.roomsCount }}
       current={stay.currentTotal}
@@ -63,7 +63,7 @@ export function SecretaryCompare() {
   if (!proposals.length) return null;
   const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" });
 
-  return <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+  return <section className="tv-card rounded-2xl border p-4">
     <div className="mb-1 flex items-center gap-2">
       <Scale className="size-4 text-[#557d78]" />
       <h2 className="font-bold">عروض مقترحة من سكرتيرك — قارن بنفسك</h2>

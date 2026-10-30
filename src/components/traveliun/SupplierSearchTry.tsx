@@ -115,7 +115,7 @@ export function SupplierSearchTry({ code, countries }: { code: string; countries
         <h1 className="text-lg font-extrabold text-[#003c3a]">{t("settings.supplierTry.title")}</h1>
         <p className="mt-1 mb-5 text-[12.5px] font-semibold text-tv-text-faint">{t("settings.supplierTry.subtitle")}</p>
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className={labelClass}>
               {t("settings.supplierTry.country")}
@@ -256,7 +256,7 @@ function ListedHotels({ code, hotels, priced, initial }: { code: string; hotels:
   const wanted = query.trim().toLowerCase();
   const list = hotels.filter((h) => (!wanted || h.name.toLowerCase().includes(wanted) || h.code === wanted) && (!stars || h.stars === stars));
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[14.5px] font-extrabold text-[#003c3a]">{t("settings.supplierTry.listed.title")}</h2>
         <span className="tv-tnum text-[12px] font-bold text-[#557d78]">{t("settings.supplierTry.listed.count", { shown: list.length, total: hotels.length })}</span>
@@ -412,7 +412,7 @@ function HotelRow({ hotel }: { hotel: SearchTryHotel }) {
   const [all, setAll] = useState(false);
   const shown = all ? hotel.rates : hotel.rates.slice(0, 4);
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <DirText dir="ltr" className="text-[14.5px] font-extrabold text-[#003c3a]">{hotel.name}</DirText>
         <span className="flex items-center gap-2 text-[11.5px] font-bold text-tv-text-faint">

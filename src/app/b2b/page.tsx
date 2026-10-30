@@ -52,7 +52,7 @@ export default async function B2BPage() {
   if (await isStaffSession()) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[#f4f8f6] px-4" dir="rtl">
-        <div className="max-w-md rounded-2xl border border-[#e2ebe7] bg-white p-8 text-center">
+        <div className="tv-card max-w-md rounded-2xl border p-8 text-center">
           <h1 className="text-lg font-extrabold text-[#003c3a]">هذه بوابة الشركات المتعاونة</h1>
           <p className="mt-2 text-[13px] font-semibold text-[#557d78]">
             حسابك حساب موظف — الشركات تدخل من هنا بحساباتها الخاصة، وأنت تديرها من قسم الشركات

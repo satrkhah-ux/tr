@@ -242,7 +242,7 @@ function FieldHead({ label, confident, confirmLabel, onConfirm }: { label: strin
     <div className="flex items-center justify-between">
       <span className="text-[13px] font-bold text-[#185045]">{label}</span>
       <span className="flex items-center gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${confident ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${confident ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
           {confident ? t("rp.review.confident") : t("rp.review.uncertain")}
         </span>
         {!confident ? (

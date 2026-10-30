@@ -33,7 +33,7 @@ export default async function ClientOfferPage({ params }: { params: Promise<{ se
     <main className="min-h-screen bg-[#eef3f1] py-6" dir="rtl">
       <style dangerouslySetInnerHTML={{ __html: PREVIEW_FONT }} />
       {!published ? (
-        <section className="mx-auto max-w-[560px] rounded-2xl border border-[#f1d1d1] bg-white p-10 text-center shadow-sm">
+        <section className="tv-card mx-auto max-w-[560px] rounded-2xl border p-10 text-center shadow-sm">
           <div className="mx-auto mb-4 flex size-[76px] items-center justify-center rounded-[20px] bg-[#fdeef2] text-[#c43d3d]">
             <ShieldCheck className="size-9" />
           </div>

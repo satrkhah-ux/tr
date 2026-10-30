@@ -68,7 +68,7 @@ export function PartnerSignIn() {
     <div className="mx-auto grid w-full max-w-4xl gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <form
         onSubmit={onSubmit}
-        className="rounded-2xl border border-[#e2ebe7] bg-white p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]"
+        className="tv-card rounded-2xl border p-6 shadow-[0_1px_2px_rgba(0,60,58,0.04)]"
       >
         <h2 className="text-base font-extrabold text-[#003c3a]">دخول الشركات</h2>
         <p className="mb-4 mt-1 text-[12px] font-semibold text-tv-text-faint">

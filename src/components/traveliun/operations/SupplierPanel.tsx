@@ -26,7 +26,7 @@ import { useSafeTransition } from "../useSafeTransition";
 import { OpsLinkButton } from "./OpsLinkButton";
 
 import { buttonTone } from "@/components/ui/button-variants";
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-10 w-full rounded-[10px] border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[11.5px] font-bold text-[#185045]";
@@ -285,10 +285,10 @@ function SupplierGroup({
 
 const STATE_STYLE: Record<CaseBookingSupplier["state"], string> = {
   none: "bg-[#eef4f1] text-[#557d78]",
-  sent: "bg-[#fff8e8] text-[#a86a10]",
-  overdue: "bg-[#fdecef] text-[#c22850]",
-  confirmed: "bg-[#e9f7f0] text-[#0f7a52]",
-  declined: "bg-[#fdecef] text-[#c22850]",
+  sent: "bg-tv-status-warning-bg text-tv-status-warning",
+  overdue: "bg-tv-status-danger-bg text-tv-status-danger",
+  confirmed: "bg-tv-status-success-bg text-tv-status-success",
+  declined: "bg-tv-status-danger-bg text-tv-status-danger",
 };
 
 function SupplierBookingRow({ booking, info, work }: { booking: OperationBooking; info: CaseBookingSupplier | undefined; work: SupplierWork }) {

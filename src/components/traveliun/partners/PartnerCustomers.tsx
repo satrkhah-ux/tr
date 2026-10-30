@@ -37,7 +37,7 @@ export function PartnerCustomers({ customers }: { customers: PartnerCustomer[] }
           </label>
         </header>
 
-        <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+        <section className="tv-card rounded-[14px] border p-4">
           {shown.length === 0 ? (
             <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
               {customers.length === 0 ? "يظهر عملاؤكم هنا مع أول عرض تُصدرونه باسم عميل." : "لا نتائج لهذا البحث."}

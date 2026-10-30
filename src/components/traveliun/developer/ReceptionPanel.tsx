@@ -41,7 +41,7 @@ export function ReceptionPanel({ data }: { data: ReceptionPanelData }) {
   }
 
   return (
-    <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">مُراد — المستقبل الآلي</h2>
       <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">
         يرحّب بالعميل الجديد باسمه ويحوّله إلى قسمه في Teletel لحظة وصول رسالته. جدول الأقسام والدوام في «رسائل العميل». {data.on ? "" : "متوقف الآن من «خدمات النظام»."}

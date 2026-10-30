@@ -107,7 +107,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
   return (
     <TraveliunShell title="nav.extension">
       <div className="mx-auto max-w-3xl space-y-4 p-4">
-        <section className="rounded-[14px] border border-[#dbe6e1] bg-white p-5">
+        <section className="tv-card rounded-[14px] border p-5">
           <h1 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
             <Puzzle className="size-5 text-[#e0a92a]" />
             إضافة المتصفح
@@ -140,7 +140,7 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
           ) : null}
         </section>
 
-        <section className="rounded-[14px] border border-[#dbe6e1] bg-white p-5">
+        <section className="tv-card rounded-[14px] border p-5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="flex-1 text-[14px] font-extrabold text-[#003c3a]">الأجهزة المربوطة</h2>
             {initial.length > 0 ? (

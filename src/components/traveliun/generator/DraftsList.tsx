@@ -39,7 +39,7 @@ import { usePartnerBrand } from "@/lib/partners/PartnerContext";
  * duration — none of which the cards showed.
  */
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const MONEY = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 /**

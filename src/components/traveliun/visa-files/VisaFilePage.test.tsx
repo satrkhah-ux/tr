@@ -95,9 +95,9 @@ describe("chips", () => {
   });
 
   it("keeps the unpaid red, the partial amber and the paid green", () => {
-    expect(renderToStaticMarkup(<PaymentChip state="unpaid" />)).toContain("text-[#c22850]");
-    expect(renderToStaticMarkup(<PaymentChip state="partial" />)).toContain("text-[#a86a10]");
-    expect(renderToStaticMarkup(<PaymentChip state="paid" />)).toContain("text-[#0f7a52]");
+    expect(renderToStaticMarkup(<PaymentChip state="unpaid" />)).toContain("text-tv-status-danger");
+    expect(renderToStaticMarkup(<PaymentChip state="partial" />)).toContain("text-tv-status-warning");
+    expect(renderToStaticMarkup(<PaymentChip state="paid" />)).toContain("text-tv-status-success");
   });
 
   it("gives every status its label", () => {

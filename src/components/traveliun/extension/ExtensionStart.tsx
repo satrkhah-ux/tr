@@ -30,7 +30,7 @@ export function ExtensionStart({ lead }: { lead: { id: string; name: string; pho
   return (
     <TraveliunShell title="nav.extension">
       <div className="mx-auto max-w-xl p-4">
-        <section className="rounded-[14px] border border-[#dbe6e1] bg-white p-5">
+        <section className="tv-card rounded-[14px] border p-5">
           {lead ? (
             <>
               <p className="text-[12px] font-bold text-tv-text-faint">عميل المحادثة</p>

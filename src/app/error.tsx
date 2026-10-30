@@ -9,7 +9,7 @@ import { errorReportFrom, sendErrorToMurad } from "@/components/traveliun/secret
  */
 export default function AppError({ error, unstable_retry }: { error: Error & { digest?: string }; unstable_retry: () => void }) {
   return <main dir="rtl" className="flex min-h-[60vh] items-center justify-center p-6">
-    <div data-murad-own role="alert" className="w-full max-w-md rounded-2xl border border-[#dfe8e4] bg-white p-6 text-center shadow-sm">
+    <div data-murad-own role="alert" className="tv-card w-full max-w-md rounded-2xl border p-6 text-center shadow-sm">
       <h1 className="text-lg font-extrabold text-[#185045]">تعذّر فتح هذه الصفحة</h1>
       <p className="mt-2 text-sm leading-7 text-[#557d78]">حدث خطأ غير متوقع. ما حفظته سابقاً باقٍ. أعد المحاولة، أو أرسل الخطأ لمُراد ليشرح لك السبب.</p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">

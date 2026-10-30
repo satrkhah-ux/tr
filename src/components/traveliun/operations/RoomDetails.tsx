@@ -24,7 +24,7 @@ import { useSafeTransition } from "../useSafeTransition";
 const field = "tv-field h-10 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 const chip = (on: boolean) =>
-  `inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-[#e9f7f0] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"}`;
+  `inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-tv-status-success-bg text-tv-status-success" : "border-[#dbe6e1] text-[#557d78]"}`;
 
 const BED_STATUSES: BedStatus[] = ["guaranteed", "on_request", "unspecified"];
 const num = (v: string) => (v.trim() === "" ? null : Math.trunc(Number(v)));

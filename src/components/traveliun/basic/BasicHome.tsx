@@ -111,7 +111,7 @@ export function BasicHome({
   return (
     <TraveliunShell title="nav.basic">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-5">
+        <section className="tv-card rounded-[16px] border p-5">
           <h1 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
             <Zap className="size-5 text-[#e0a92a]" />
             {t("nav.basic")}
@@ -188,7 +188,7 @@ export function BasicHome({
           {error ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
         </section>
 
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-5">
+        <section className="tv-card rounded-[16px] border p-5">
           <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a]">{tx("recent")}</h2>
           <RecentFiles
             drafts={drafts}

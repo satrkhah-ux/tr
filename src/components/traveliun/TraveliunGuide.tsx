@@ -20,7 +20,7 @@ export function TraveliunGuide({ files }: { files: GuideFile[] }) {
     <TraveliunShell title="nav.guide">
       <div className="tv-fade-up">
         {files.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState
               icon={FileText}
               title={t("guide.emptyTitle")}
@@ -28,7 +28,7 @@ export function TraveliunGuide({ files }: { files: GuideFile[] }) {
             />
           </section>
         ) : (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <h2 className="mb-4 text-xl font-bold text-[#185045]">{t("guide.filesTitle")}</h2>
             <div className="grid gap-3 md:grid-cols-2">
               {files.map((file) => {

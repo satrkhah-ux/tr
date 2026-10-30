@@ -27,7 +27,7 @@ export function UnlinkedMail({ emails, operations }: { emails: UnlinkedEmail[]; 
   const act = (work: () => Promise<unknown>) => startTransition(async () => { await work(); router.refresh(); });
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <h2 className="flex items-center gap-2 text-[14px] font-extrabold text-[#003c3a]">
         <Mail className="size-4 text-[#557d78]" />
         {t("ops.mail.title", { n: emails.length })}

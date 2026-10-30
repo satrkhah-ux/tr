@@ -93,7 +93,7 @@ export function TraveliunKanban() {
   return (
     <TraveliunShell title="nav.kanban">
       <div className="tv-fade-up">
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card mb-4 flex flex-wrap items-center gap-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="inline-flex overflow-hidden rounded-[11px] bg-[#e2ede9] p-1 text-sm">
             {filterButtons.map((btn) => (
               <button
@@ -126,7 +126,7 @@ export function TraveliunKanban() {
         {loading ? (
           <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             {KANBAN_STAGES.map((s) => (
-              <div key={s.key} className="min-h-[220px] rounded-2xl border border-[#e2ebe7] bg-white p-3">
+              <div key={s.key} className="tv-card min-h-[220px] rounded-2xl border p-3">
                 <div className="tv-shimmer mb-3 h-8 rounded-md" />
                 <div className="tv-shimmer mb-2 h-20 rounded-md" />
                 <div className="tv-shimmer h-20 rounded-md" />
@@ -188,7 +188,7 @@ export function TraveliunKanban() {
 
       {selected ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/20 p-4" role="dialog" aria-modal="true" dir={dir} onClick={() => setSelected(null)}>
-          <div className="w-full max-w-[520px] rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]" onClick={(e) => e.stopPropagation()}>
+          <div className="tv-card w-full max-w-[520px] rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
               <div>
                 <h2 className="tv-tnum text-lg font-extrabold"><DirText dir="ltr">{selected.serial}</DirText></h2>

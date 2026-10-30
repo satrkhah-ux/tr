@@ -14,7 +14,7 @@ const n = (x: number) => Math.round(x).toLocaleString("en-US");
 export function SalesTargetCard({ data }: { data: MySalesCard }) {
   const p = data.progress;
   return (
-    <section dir="rtl" className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:p-5">
+    <section dir="rtl" className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:p-5">
       <div className="grid grid-cols-3 gap-2 sm:gap-2.5 lg:grid-cols-4">
         <Figure label="مبيعاتك هذا الشهر" value={n(data.sales)} unit="ر.س" />
         <div className="order-first col-span-3 rounded-xl border border-[#e2ebe7] bg-[#fbfdfc] p-3 lg:order-none lg:col-span-1">

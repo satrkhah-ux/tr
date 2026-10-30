@@ -158,7 +158,7 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
   return (
     <TraveliunShell title="fc.title">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <Link href="/repackage" className="mb-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#557d78] hover:text-[#185045]">
             <ArrowRight className="size-3.5" />
             {t("nav.repackage")}

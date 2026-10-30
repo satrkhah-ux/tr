@@ -20,7 +20,7 @@ import { useRole } from "@/lib/roles/RoleContext";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { TraveliunShell } from "../TraveliunShell";
 
-const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_2px_10px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-[14px] border p-4 shadow-[0_2px_10px_rgba(0,60,58,0.04)]";
 const chip = "rounded-full border px-2.5 py-1 text-[11.5px] font-bold";
 
 // the owner's sheet has no tiers: an offer is fine, «بها خطأ» (the sheet contradicts itself), or not published
@@ -99,7 +99,7 @@ export function ReadyOffersCatalog({
                       ? "border-[#c22850] bg-[#c22850] text-white"
                       : "border-[#185045] bg-[#185045] text-white"
                     : key === "problems"
-                      ? "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850] hover:bg-[#fbe2e9]"
+                      ? "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger hover:bg-[#fbe2e9]"
                       : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
                 }`}
               >
@@ -594,9 +594,9 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
 
 function Stat({ label, value, tone }: { label: string; value: number; tone: "good" | "warn" | "bad" | "mute" }) {
   const tones = {
-    good: "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]",
+    good: "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success",
     warn: "border-[#f0e2c4] bg-[#fdf9ee] text-[#8a6d1f]",
-    bad: "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]",
+    bad: "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger",
     mute: "border-[#dbe6e1] bg-[#f6faf8] text-[#557d78]",
   }[tone];
   return (

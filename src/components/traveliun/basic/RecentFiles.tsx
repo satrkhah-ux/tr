@@ -73,9 +73,9 @@ const SVC_LABEL: Record<ServiceKind, "svcK_flight" | "svcK_hotel" | "svcK_transp
   visa: "svcK_visa",
 };
 const SVC_TONE: Record<ServiceSummary["state"], string> = {
-  done: "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]",
-  progress: "border-[#f4d9a6] bg-[#fff8e8] text-[#a86a10]",
-  problem: "border-[#f2b8c6] bg-[#fdeef2] text-[#c22850]",
+  done: "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success",
+  progress: "border-[#f4d9a6] bg-tv-status-warning-bg text-tv-status-warning",
+  problem: "border-[#f2b8c6] bg-tv-status-danger-bg text-tv-status-danger",
 };
 
 /** the company's day, whatever the browser's clock zone */

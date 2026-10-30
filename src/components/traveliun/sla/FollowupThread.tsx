@@ -64,7 +64,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
 
   return (
     <div className="grid gap-4">
-      <section className="rounded-[12px] border border-[#e3ece8] bg-white p-4">
+      <section className="tv-card rounded-[12px] border p-4">
         <Link href={data.manager ? "/sla" : "/dashboard"} className="inline-flex items-center gap-1 text-[12px] font-bold text-[#557d78] hover:underline">
           <ArrowRight className="size-3.5 rtl:rotate-0 ltr:rotate-180" />
           {tx("back")}
@@ -97,7 +97,7 @@ export function FollowupThread({ data }: { data: OkThread }) {
         </div>
       </section>
 
-      <section className="rounded-[12px] border border-[#e3ece8] bg-white p-4">
+      <section className="tv-card rounded-[12px] border p-4">
         <h2 className="text-[13px] font-extrabold text-[#185045]">{tx("thread")}</h2>
         {data.messages === null ? (
           <p className="mt-2 text-[12.5px] font-bold text-[#c22850]">{tx("threadUnreachable")}</p>

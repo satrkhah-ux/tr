@@ -24,9 +24,9 @@ const GROUPS: { group: CheckGroup; label: TranslationKey }[] = [
 ];
 
 const TONES: Record<CheckStatus, { label: TranslationKey; badge: string; dot: string }> = {
-  ok: { label: "dev.status.ok", badge: "bg-[#e3f6ee] text-[#0f7a52] dark:bg-[#123a2c] dark:text-[#6fe0b0]", dot: "bg-[#0f7a52] dark:bg-[#6fe0b0]" },
-  warn: { label: "dev.status.warn", badge: "bg-[#fdf3e1] text-[#a86a10] dark:bg-[#3a2c10] dark:text-[#f2c46b]", dot: "bg-[#a86a10] dark:bg-[#f2c46b]" },
-  down: { label: "dev.status.down", badge: "bg-[#fdeaef] text-[#c22850] dark:bg-[#3d1621] dark:text-[#f68aa5]", dot: "bg-[#c22850] dark:bg-[#f68aa5]" },
+  ok: { label: "dev.status.ok", badge: "bg-tv-status-success-bg text-tv-status-success", dot: "bg-[#0f7a52] dark:bg-[#6fe0b0]" },
+  warn: { label: "dev.status.warn", badge: "bg-tv-status-warning-bg text-tv-status-warning", dot: "bg-[#a86a10] dark:bg-[#f2c46b]" },
+  down: { label: "dev.status.down", badge: "bg-tv-status-danger-bg text-tv-status-danger", dot: "bg-[#c22850] dark:bg-[#f68aa5]" },
   unconfigured: { label: "dev.status.unconfigured", badge: "bg-[#eef1f4] text-[#5b6b78] dark:bg-[#1b2d27] dark:text-[#9fb3ac]", dot: "bg-[#5b6b78] dark:bg-[#9fb3ac]" },
   idle: { label: "dev.status.idle", badge: "bg-[#dff1f4] text-[#0e7490] dark:bg-[#0f3440] dark:text-[#7fd0e0]", dot: "bg-[#0e7490] dark:bg-[#7fd0e0]" },
 };

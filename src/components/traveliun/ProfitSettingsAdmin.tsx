@@ -36,7 +36,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
 
   return (
     <TraveliunShell title="nav.profitPolicy">
-      <section className="max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+      <section className="tv-card max-w-3xl rounded-[14px] border p-4">
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.profit.title")}</h2>
         <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.profit.hint")}</p>
         <div role="radiogroup" aria-label={t("settings.profit.title")} className="flex flex-wrap gap-2">
@@ -94,7 +94,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement
         ) : null}
       </section>
 
-      <section className="mt-4 max-w-3xl rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+      <section className="tv-card mt-4 max-w-3xl rounded-[14px] border p-4">
         <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.usd.title")}</h2>
         <p className="mt-1 mb-3 text-[12px] font-semibold text-tv-text-faint">{t("settings.usd.hint")}</p>
         <div className="flex flex-wrap items-end gap-2">

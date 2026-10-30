@@ -57,7 +57,7 @@ import { RoomDetails } from "./RoomDetails";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
@@ -302,7 +302,7 @@ export function DocumentsPanel({
                 onClick={() => issue(kind)}
                 className={`inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3.5 text-[12.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                   already
-                    ? "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]"
+                    ? "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success"
                     : "border-[#b7d0c7] bg-white text-[#185045] hover:bg-[#f0f7f4]"
                 }`}
               >
@@ -822,7 +822,7 @@ function BookingRow({
                 })
               }
               className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold transition-colors disabled:opacity-60 ${
-                booking.is_paid ? "bg-[#185045] text-white" : "border border-[#f2e2b4] bg-[#fff8e8] text-[#a86a10]"
+                booking.is_paid ? "bg-[#185045] text-white" : "border border-[#f2e2b4] bg-tv-status-warning-bg text-tv-status-warning"
               }`}
             >
               <Ticket className="size-3.5" />

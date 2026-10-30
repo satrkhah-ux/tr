@@ -125,7 +125,7 @@ export function BasicFileStatus({
     // the list's row already says where the file stands: that at once, the rest when it comes
     if (variant !== "panel" || !known) return null;
     return (
-      <div className="mt-3 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
+      <div className="tv-card mt-3 space-y-3 rounded-[12px] border p-3">
         <div className="flex flex-wrap items-center gap-2">
           <FileStateChip state={known.state} version={known.version} sentVersion={known.sentVersion} stale={known.stale} />
           {known.operationId ? (
@@ -228,7 +228,7 @@ export function BasicFileStatus({
   const quiet = "inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline";
 
   return (
-    <div ref={panelRef} className="mt-3 scroll-mt-20 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
+    <div ref={panelRef} className="tv-card mt-3 scroll-mt-20 space-y-3 rounded-[12px] border p-3">
       {/* ① where the file stands, one line */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="tv-tnum text-[12.5px] font-extrabold text-[#103f37]" dir="ltr">

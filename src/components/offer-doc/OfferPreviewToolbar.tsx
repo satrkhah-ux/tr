@@ -171,7 +171,7 @@ export function OfferPreviewToolbar({
 
       {/* whose document, and with or without a price — the two decisions that
           turn one offer into a file a partner can resell */}
-      <div className="flex w-full flex-wrap items-center gap-2 rounded-[12px] border border-[#e2ebe7] bg-white px-3 py-2.5">
+      <div className="tv-card flex w-full flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2.5">
         <span className="text-[11.5px] font-extrabold text-[#557d78]">الإصدار باسم</span>
         <select
           value={brandId ?? "ours"}

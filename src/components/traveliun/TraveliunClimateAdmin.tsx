@@ -92,7 +92,7 @@ export function TraveliunClimateAdmin({ cities }: { cities: ClimateCity[] }) {
   return (
     <TraveliunShell title="nav.climate">
       <div className="tv-fade-up space-y-4" dir={dir}>
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h1 className="text-lg font-extrabold text-[#003c3a]">{t("climate.title")}</h1>
           <p className="mt-1 text-[13px] font-medium text-tv-text-faint">{t("climate.subtitle")}</p>
           <div className="mt-4 max-w-[420px]">
@@ -116,11 +116,11 @@ export function TraveliunClimateAdmin({ cities }: { cities: ClimateCity[] }) {
         </section>
 
         {!cityId ? (
-          <section className="rounded-2xl border border-dashed border-[#cfe0d9] bg-white p-10 text-center text-sm font-semibold text-tv-text-faint">
+          <section className="tv-card rounded-2xl border border-dashed p-10 text-center text-sm font-semibold text-tv-text-faint">
             {t("climate.pickCityFirst")}
           </section>
         ) : (
-          <section className="overflow-x-auto rounded-2xl border border-[#e2ebe7] bg-white p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card overflow-x-auto rounded-2xl border p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <table className="min-w-[980px] border-collapse text-start text-sm">
               <thead>
                 <tr className="bg-[#185045] text-white">

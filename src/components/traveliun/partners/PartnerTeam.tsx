@@ -24,7 +24,7 @@ export function PartnerTeam({ team }: { team: TeamMember[] }) {
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   return (
-    <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-5 dark:border-[#22443b] dark:bg-[#12241f]">
+    <section className="tv-card rounded-[14px] border p-5">
       <h2 className="text-[14px] font-extrabold text-[var(--tv-brand)]">فريق الشركة</h2>
       <p className="mb-3 mt-0.5 text-[12px] font-semibold text-tv-text-faint">
         مدير الحساب يرى كشف الحساب ويدير الفريق؛ موظف المبيعات يُصدر العروض ويسجّل تأكيد العملاء.

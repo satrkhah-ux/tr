@@ -255,7 +255,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#e3ece8] bg-white p-3">
+      <div className="tv-card flex flex-wrap items-center gap-2 rounded-[12px] border p-3">
         <div className="inline-flex overflow-hidden rounded-[9px] border border-[#cfe0d9]">
           {PERIODS.map(([k, label]) => (
             <button key={k} type="button" onClick={() => go({ kind: k })} className={`h-8 px-3 text-[12px] font-extrabold max-sm:min-h-10 ${kind === k ? "bg-[#185045] text-white" : "bg-white text-[#185045] hover:bg-[#f0f7f4]"}`}>
@@ -321,7 +321,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
       {note ? <p className="rounded-[9px] bg-[#fff8eb] px-3 py-2 text-[12px] font-bold text-[#8a5a00]">{note}</p> : null}
 
       {view !== "review" ? (
-        <div className="space-y-2 rounded-[12px] border border-[#e3ece8] bg-white p-3">
+        <div className="tv-card space-y-2 rounded-[12px] border p-3">
           <textarea
             value={text}
             onChange={(e) => setManual({ base: generated, text: e.target.value })}
@@ -357,7 +357,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
           </p>
         </div>
       ) : (
-        <div className="space-y-2 rounded-[12px] border border-[#e3ece8] bg-white p-3">
+        <div className="tv-card space-y-2 rounded-[12px] border p-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[14rem] flex-1">
               <Search className="pointer-events-none absolute start-2.5 top-2 size-4 text-tv-text-faint" />

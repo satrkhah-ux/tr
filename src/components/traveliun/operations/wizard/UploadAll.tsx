@@ -485,7 +485,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
   const ticked = payments.reduce((sum, i) => sum + (inCase(Number(i.amount), i.currency)?.amount ?? Number(i.amount)), 0);
 
   return (
-    <section className="rounded-2xl border border-[#cfe0d9] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <h2 className="text-[14px] font-extrabold text-[#185045]">{t("wz.up.title")}</h2>

@@ -66,7 +66,7 @@ function Stat({
   hint?: string;
 }) {
   return (
-    <div className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+    <div className="tv-card rounded-[14px] border p-4">
       <div className="flex items-center gap-2 text-[12px] font-bold text-tv-text-faint">
         <Icon className="size-4 text-[var(--tv-brand)]" />
         {label}
@@ -147,7 +147,7 @@ export function PartnerHome({
         </section>
 
         {data.awaiting.length > 0 ? (
-          <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+          <section className="tv-card rounded-[14px] border p-4">
             <h2 className="text-[14px] font-extrabold text-[var(--tv-brand)]">بانتظار تأكيد العميل</h2>
             <p className="mb-3 mt-0.5 text-[12px] font-semibold text-tv-text-faint">
               حين يوافق عميلكم سجّلوا ذلك هنا — يصل الطلب لقسم العمليات عندنا فوراً ويبدأ الحجز.
@@ -163,7 +163,7 @@ export function PartnerHome({
         {data.reports.length > 0 ? <MonthlyReports reports={data.reports} /> : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+          <section className="tv-card rounded-[14px] border p-4">
             <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">
               الدول المستهدفة ومرات استخدامها
             </h2>
@@ -188,7 +188,7 @@ export function PartnerHome({
             )}
           </section>
 
-          <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+          <section className="tv-card rounded-[14px] border p-4">
             <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">الطلبات قيد التنفيذ</h2>
             {data.requests.length === 0 ? (
               <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
@@ -233,7 +233,7 @@ export function PartnerHome({
 
         {statement ? <StatementView statement={statement} title="كشف حسابكم معنا" /> : null}
 
-        <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+        <section className="tv-card rounded-[14px] border p-4">
           <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">سجل الحسابات المالية</h2>
           {data.ledger.length === 0 ? (
             <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-tv-text-faint">
@@ -332,7 +332,7 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
         </span>
         {item.destination ? <span className="text-[12px] font-bold text-[#557d78]">{item.destination}</span> : null}
         {item.valid_until ? (
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.expired ? "bg-[#fdeef2] text-[#c22850]" : "bg-[#eef4f1] text-[#557d78]"}`}>
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.expired ? "bg-tv-status-danger-bg text-tv-status-danger" : "bg-[#eef4f1] text-[#557d78]"}`}>
             {item.expired ? (item.renewed ? "منتهٍ — جُدّد" : "انتهت صلاحية الأسعار") : <>صالح حتى <DirText dir="ltr">{item.valid_until}</DirText></>}
           </span>
         ) : null}
@@ -504,7 +504,7 @@ function RenewButton({ item }: { item: PartnerAwaiting }) {
 /** «تقريركم الشهري»: this month beside the last one. */
 function MonthlyReports({ reports }: { reports: PartnerHomeData["reports"] }) {
   return (
-    <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">تقريركم الشهري</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         {reports.map((r, i) => (

@@ -64,7 +64,7 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
       {/* on paper: the sheet alone */}
       <style>{`@media print { body * { visibility: hidden !important; } .drv-sheet, .drv-sheet * { visibility: visible !important; } .drv-sheet { position: absolute; inset: 0; padding: 10mm; } .drv-noprint { display: none !important; } }`}</style>
       <div className="tv-fade-up space-y-4">
-        <section className="drv-noprint rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card drv-noprint rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
               <CalendarDays className="size-5" />
@@ -121,7 +121,7 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
         </section>
 
         {shown.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState icon={CalendarDays} title={t("ops.drv.empty")} description="" />
           </section>
         ) : (
@@ -131,7 +131,7 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
               {city ? ` — ${city}` : ""}
             </p>
             {groups.map((g) => (
-              <section key={g.city} className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] print:rounded-none print:border-black print:shadow-none">
+              <section key={g.city} className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] print:rounded-none print:border-black print:shadow-none">
                 <h2 className="mb-2 text-[14px] font-extrabold text-[#185045]">
                   {g.city || "—"} <span className="tv-tnum text-[12px] text-tv-text-faint">({g.rows.length})</span>
                 </h2>

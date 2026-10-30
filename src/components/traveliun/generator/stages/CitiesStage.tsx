@@ -766,7 +766,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           {cov ? (
                             <span
                               className={`tv-tnum rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                                short ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
+                                short ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-tv-status-success-bg text-tv-status-success"
                               }`}
                             >
                               <DirText dir="ltr">{`${cov.covered - cov.extra}/${cov.needed}`}</DirText> ليالٍ مغطّاة

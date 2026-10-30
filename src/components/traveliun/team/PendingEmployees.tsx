@@ -86,7 +86,7 @@ function PendingRow({
   }
 
   return (
-    <div className="rounded-[12px] border border-[#e2ebe7] bg-white p-3">
+    <div className="tv-card rounded-[12px] border p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[13px] font-extrabold text-[#003c3a]">

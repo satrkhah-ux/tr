@@ -34,7 +34,7 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  * one sentence of consequence under each.
  */
 
-const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const card = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
   "tv-field h-11 w-full rounded-[10px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-tv-action-focus";
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
@@ -235,7 +235,7 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
               <span
                 key={m.id}
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-bold ${
-                  m.status === "Active" ? "bg-[#eef4f1] text-[#185045]" : "bg-[#fdeef2] text-[#c22850]"
+                  m.status === "Active" ? "bg-[#eef4f1] text-[#185045]" : "bg-tv-status-danger-bg text-tv-status-danger"
                 }`}
               >
                 {m.arabic_name}
@@ -372,7 +372,7 @@ function RoleForm({
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[12.5px] font-bold text-[#185045]">{t(PERM_LABEL(item.key))}</span>
-                        <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${item.kind === "view" ? "bg-[#eef4f1] text-[#557d78]" : "bg-[#e9f7f0] text-[#0f7a52]"}`}>
+                        <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${item.kind === "view" ? "bg-[#eef4f1] text-[#557d78]" : "bg-tv-status-success-bg text-tv-status-success"}`}>
                           {item.kind === "view" ? t("team.sees") : t("team.does")}
                         </span>
                         {item.sensitive ? (

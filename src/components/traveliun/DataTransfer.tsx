@@ -80,7 +80,7 @@ export function DataTransfer() {
   return (
     <TraveliunShell title="nav.dataTransfer">
       <div className="tv-fade-up mx-auto max-w-2xl space-y-4">
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("data.transferTitle")}</h2>
           <p className="mt-1.5 text-[12.5px] font-semibold leading-6 text-tv-text-faint">{t("data.transferHint")}</p>
 

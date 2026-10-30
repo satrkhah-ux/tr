@@ -107,7 +107,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
   return (
     <TraveliunShell title="nav.integrations">
       <div className="space-y-4">
-        <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+        <section className="tv-card rounded-[14px] border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-[15px] font-extrabold text-[#003c3a]">الربط الخارجي</h2>
@@ -160,7 +160,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
         </section>
 
         {INTEGRATION_KINDS.filter((k) => rows.some((r) => r.kind === k)).map((kind) => (
-          <section key={kind} className="rounded-[14px] border border-[#cfe0d9] bg-white p-3">
+          <section key={kind} className="tv-card rounded-[14px] border p-3">
             <h3 className="mb-2 text-[13px] font-extrabold text-[#185045]">{KIND_AR[kind]}</h3>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1040px] text-start text-[12px]">

@@ -521,7 +521,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
         {pane === "clients" ? (
         <>
         {/* ---------- «لوحة اليوم» (the owner's list, 2026-10-18): requests, bookings, the follow-up queue ---------- */}
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <h2 className="text-[15px] font-extrabold text-[#003c3a]">لوحة اليوم</h2>
           <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             {(
@@ -550,7 +550,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
         </section>
 
         {/* ---------- the daily classification («اجماليات المحادثات») ---------- */}
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#003c3a]">
               <Users className="size-5 text-[#0f7a52]" />
@@ -622,7 +622,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- «رؤية للإعلانات»: the range's clients, kinds, receivers and the 14-day trend ---------- */}
         {pane === "ads" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <h2 className="inline-flex items-center gap-2 text-[15px] font-extrabold text-[#003c3a]">
             <BarChart3 className="size-4 text-[#0f7a52]" />
             رؤية للإعلانات
@@ -798,7 +798,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- «حصر الطلبات اليومية»: the last 14 days by kind ---------- */}
         {pane === "daily" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <div className="mt-3 overflow-x-auto rounded-[12px] border border-[#e3ece8]">
             <table className="w-full min-w-[640px] text-start text-[11.5px]">
               <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حصر الطلبات اليومية — آخر 14 يوماً حسب نوع الطلب</caption>
@@ -835,14 +835,14 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- «وقت الذروة» ---------- */}
         {pane === "peak" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <PeakHours rows={inRange} />
         </section>
         ) : null}
 
         {/* ---------- «أداء الموظفين» ---------- */}
         {pane === "team" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <h3 className="mt-4 text-[13px] font-extrabold text-[#003c3a]">أداء الموظفين</h3>
           <p className="text-[11px] font-semibold text-tv-text-faint">
             لكل موظف: كم محادثة وصلته، وكم احتاج حتى ردّ عليها، وكم احتاج حتى أسندها لغيره — من سجل الإسناد في Teletel، للمدة المختارة أعلاه.
@@ -863,7 +863,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
         {/* ---------- a new conversation, and the conversations ---------- */}
         {pane === "clients" ? (
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
+        <section className="tv-card rounded-[16px] border p-3 sm:p-4">
           <form
             className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_9rem_minmax(0,1fr)_auto]"
             onSubmit={(e) => {
@@ -1036,7 +1036,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                           type="button"
                           disabled={busy !== null}
                           onClick={() => void open(l)}
-                          className={`inline-flex h-8 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold max-sm:min-h-10 ${l.file ? "border border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#185045] text-white hover:bg-[#0f4439]"}`}
+                          className={`inline-flex h-8 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[11.5px] font-bold max-sm:min-h-10 ${l.file ? "border border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success" : "bg-[#185045] text-white hover:bg-[#0f4439]"}`}
                         >
                           {busy === `p-${l.id}` ? <Loader2 className="size-3.5 animate-spin" /> : null}
                           {l.file ? l.file.destination || "فتح البرنامج" : "ابدأ برنامج"}

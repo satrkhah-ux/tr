@@ -511,7 +511,7 @@ function BookingRef({ value }: { value: string | null }) {
 
 function Money({ label, value, currency, strong }: { label: string; value: number; currency: string; strong?: boolean }) {
   return (
-    <div className={`rounded-[11px] px-2 py-2.5 ${strong ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#f4f8f6]"}`}>
+    <div className={`rounded-[11px] px-2 py-2.5 ${strong ? "bg-tv-status-warning-bg text-tv-status-warning" : "bg-[#f4f8f6]"}`}>
       <p className="text-[11px] font-bold opacity-70">{label}</p>
       <p className="mt-0.5 break-words text-[14.5px] font-extrabold">
         <bdi dir="ltr">{`${value.toLocaleString("en-US")} ${currency}`}</bdi>
@@ -573,7 +573,7 @@ function FlightItem({ f }: { f: TripFlight }) {
 
 function ServiceItem({ s, today, withDate }: { s: TripService; today: string; withDate?: boolean }) {
   return (
-    <li className="overflow-hidden rounded-[12px] border border-[#c8dad6] bg-white">
+    <li className="tv-card overflow-hidden rounded-[12px] border">
       <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--trip)] px-3 py-2 text-white">
         <p className="min-w-0 break-words text-[13px] font-extrabold">
           {SERVICE_LABEL[s.kind]}

@@ -48,7 +48,7 @@ export function SupervisionSetup({ initial }: { initial: Data }) {
 
   if (!data.enabled) return <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-[#5a4300]">الإشراف لم يُفعَّل بعد — ينتظر إنشاء جداوله في قاعدة البيانات.</p>;
   return <div className="space-y-5">
-    <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+    <section className="tv-card rounded-2xl border p-4">
       <h3 className="mb-2 font-bold">مشرفو المتابعة</h3>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <select value={form.supervisorId} onChange={(e) => setForm({ ...form, supervisorId: e.target.value })} className={field} aria-label="المشرف">
@@ -74,7 +74,7 @@ export function SupervisionSetup({ initial }: { initial: Data }) {
         </li>)}</ul>}
     </section>
 
-    <section className="rounded-2xl border border-[#dfe8e4] bg-white p-4">
+    <section className="tv-card rounded-2xl border p-4">
       <h3 className="mb-2 font-bold">مدد التنبيه والتصعيد (بأوقات الدوام)</h3>
       <div className="overflow-x-auto"><table className="min-w-[560px] text-sm">
         <thead><tr><th className="p-1 text-start text-xs text-[#557d78]" />{(["high", "normal", "low"] as const).map((p) => <th key={p} className="p-1 text-xs text-[#557d78]">{PRIORITY_LABEL[p]}</th>)}</tr></thead>

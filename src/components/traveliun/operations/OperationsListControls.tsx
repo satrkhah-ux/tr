@@ -101,7 +101,7 @@ export function ArrivalsCalendar<T extends ListedCase & { id: string }>({ operat
   ];
 
   return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <section className="tv-card rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-[#185045]">
           <CalendarDays className="size-4" />

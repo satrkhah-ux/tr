@@ -15,7 +15,7 @@ import { PaymentLinkPanel } from "../PaymentLinkPanel";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
 
-const PAID_TONE = { paid: "bg-[#e9f7f0] text-[#0f7a52]", partial: "bg-[#fff8e8] text-[#a86a10]", unpaid: "bg-[#fdecef] text-[#c22850]" } as const;
+const PAID_TONE = { paid: "bg-tv-status-success-bg text-tv-status-success", partial: "bg-tv-status-warning-bg text-tv-status-warning", unpaid: "bg-tv-status-danger-bg text-tv-status-danger" } as const;
 
 /**
  * Step 5 — «الدفع»: the amount owed next is already in the form (the deposit,

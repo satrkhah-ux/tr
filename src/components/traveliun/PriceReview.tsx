@@ -67,7 +67,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
   return (
     <TraveliunShell title="nav.priceReview">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+        <section className="tv-card rounded-[16px] border p-4 sm:p-5">
           <h1 className="text-lg font-extrabold text-[#003c3a]">مراجعة الأسعار</h1>
           <p className="mt-1 max-w-[75ch] text-[12.5px] font-semibold leading-6 text-[#557d78]">
             اكتب السعر الصحيح ثم «حفظ»، أو «اعتماد كما هو» إن كان الحالي صحيحاً. كل حفظ يُكتب في بيانات النظام مباشرة، ويُسجَّل باسم من عدّله في «آخر التحديثات» أسفل الصفحة.
@@ -94,7 +94,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
           <p className="mt-2 text-[12px] font-semibold text-tv-text-faint">{KINDS.find((k) => k.key === tab)?.note}</p>
         </section>
 
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
+        <section className="tv-card rounded-[16px] border p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-2">
             <select value={country} onChange={(e) => setCountry(e.target.value)} aria-label="الدولة" className={FIELD}>
               <option value="">كل الدول ({ofTab.length})</option>
@@ -190,7 +190,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
                           disabled={busy !== null || (done && !t?.price)}
                           onClick={() => void save(r)}
                           className={`inline-flex h-9 w-full items-center justify-center gap-1 rounded-[8px] px-2 text-[12px] font-bold disabled:opacity-60 max-sm:min-h-10 ${
-                            done && !t?.price ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#185045] text-white hover:bg-[#0f4439]"
+                            done && !t?.price ? "bg-tv-status-success-bg text-tv-status-success" : "bg-[#185045] text-white hover:bg-[#0f4439]"
                           }`}
                         >
                           {busy === r.key ? <Loader2 className="size-3.5 animate-spin" /> : done && !t?.price ? <CheckCircle2 className="size-3.5" /> : null}
@@ -210,7 +210,7 @@ export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplic
         {duplicates ? <DuplicatesPanel data={duplicates} /> : null}
 
         {/* who changed what — the audit trail of this page */}
-        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
+        <section className="tv-card rounded-[16px] border p-3 sm:p-4">
           <h2 className="inline-flex items-center gap-2 text-[14px] font-extrabold text-[#003c3a]">
             <History className="size-4 text-[#0f7a52]" />
             آخر التحديثات

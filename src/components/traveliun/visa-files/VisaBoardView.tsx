@@ -189,7 +189,7 @@ function Counter({ title, count, on, onPress, alert, note }: { title: string; co
         on
           ? "border-[#185045] bg-[#185045] text-white"
           : alert
-            ? "border-[#f3c9d3] bg-[#fdecef] text-[#c22850] hover:bg-[#fbdde4]"
+            ? "border-[#f3c9d3] bg-tv-status-danger-bg text-tv-status-danger hover:bg-[#fbdde4]"
             : "border-[#e2ebe7] bg-white text-[#185045] hover:bg-[#f4f8f6]"
       }`}
     >

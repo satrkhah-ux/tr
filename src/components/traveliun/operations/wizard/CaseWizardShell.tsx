@@ -44,9 +44,9 @@ const SCREENS: Record<WizardStep, ComponentType<StepProps>> = {
 
 /** A tile's colour is its readiness (index.ts stepTone): red blocks «جاهز للسفر», yellow warns, green is done. */
 const TONE: Record<StepTone, string> = {
-  red: "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]",
-  yellow: "border-[#f0d9a8] bg-[#fff8e8] text-[#a86a10]",
-  green: "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]",
+  red: "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger",
+  yellow: "border-[#f0d9a8] bg-tv-status-warning-bg text-tv-status-warning",
+  green: "border-[#bfe5d4] bg-tv-status-success-bg text-tv-status-success",
   grey: "border-[#eef2f0] bg-[#f6f8f7] text-tv-text-faint",
 };
 
@@ -99,7 +99,7 @@ export function CaseWizardShell({
           </Link>
         </div>
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <h1 className="truncate text-[16px] font-extrabold text-[#003c3a]">{op.customer_name || "—"}</h1>
@@ -154,7 +154,7 @@ export function CaseWizardShell({
         <CasePresence operationId={op.id} />
         <AutoIssue data={data} />
 
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <h2 className="text-[15px] font-extrabold text-[#003c3a]">
               <span className="tv-tnum me-1.5 text-tv-text-faint">{index + 1}.</span>

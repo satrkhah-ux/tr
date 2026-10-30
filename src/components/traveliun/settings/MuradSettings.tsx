@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 type Setup = NonNullable<Awaited<ReturnType<typeof getMuradControl>>>;
 const field = "tv-field min-h-11 w-full min-w-0 rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#185045]/10";
-const card = "min-w-0 rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-6 dark:border-[#294039] dark:bg-[#12241f]";
+const card = "tv-card min-w-0 rounded-2xl border p-4 sm:p-6";
 const hint = "text-sm leading-6 text-tv-text-faint dark:text-[#9db8ae]";
 const lines = (v: string) => v.split(/[\n,،]+/).map(x => x.trim()).filter(Boolean);
 const editable = (c: MuradControl) => ({ ...c, admins: c.admins ?? [], noHandoff: c.noHandoff ?? [] });
@@ -129,7 +129,7 @@ export function MuradSettings({ setup, routingDefaults, knowledge, offers, monit
       {monitoring ? <details className={card}><summary className="cursor-pointer font-bold">التشغيل الفعلي وسجل النشاط — للمطور</summary><div className="mt-4 space-y-5">{monitoring}</div></details> : null}
     </div>
 
-    {editing || dirty || message ? <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#c9ddd3] bg-white p-3 shadow-[0_-4px_24px_#123c3010] sm:gap-3 sm:p-4 lg:bottom-0 dark:bg-[#12241f]">
+    {editing || dirty || message ? <div className="tv-card sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-3 shadow-[0_-4px_24px_#123c3010] sm:gap-3 sm:p-4 lg:bottom-0">
       <div aria-live="polite" className="text-sm"><p className={cn("flex items-center gap-2 font-bold", dirty ? "text-[#97681d]" : "text-[#557d78]")}>{dirty ? <span className="h-2 w-2 rounded-full bg-amber-500" /> : <Check size={17} />}{dirty ? "تعديلات لم تُحفظ" : "الإعدادات محفوظة"}</p>{message ? <p role={message.ok ? "status" : "alert"} className={cn("mt-1 text-xs", message.ok ? "text-[#0f7a52]" : "text-[#b22e4b]")}>{message.text}</p> : null}</div>
       <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto"><button type="button" aria-label="تراجع عن التعديلات" disabled={busy || !dirty} onClick={() => reset(saved)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#dbe6e1] px-3 text-sm font-bold disabled:opacity-40"><RotateCcw size={16} /><span>تراجع<span className="hidden sm:inline"> عن التعديلات</span></span></button><button type="button" aria-label="حفظ إعدادات مُراد" onClick={save} disabled={busy || !dirty || changedElsewhere} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#185045] px-3 text-sm font-bold text-white disabled:opacity-50 sm:px-5">{busy ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}{busy ? "جارٍ الحفظ…" : <span>حفظ<span className="hidden sm:inline"> إعدادات مُراد</span></span>}</button></div>
     </div> : null}

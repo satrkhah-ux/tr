@@ -686,10 +686,10 @@ function LayoverBar({ leg, airport }: { leg: JourneyLeg<DraftFlight>; airport: s
   const wait = formatWaitAr(leg.layoverMinutes);
   const impossible = leg.layoverMinutes !== null && leg.layoverMinutes < 0;
   const tone = impossible || leg.layoverTooShort
-    ? "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]"
+    ? "border-[#f4c9d4] bg-tv-status-danger-bg text-tv-status-danger"
     : leg.layoverLong
-      ? "border-[#f2e2b4] bg-[#fff8e8] text-[#a86a10]"
-      : "border-[#d6eadf] bg-[#f2fbf6] text-[#0f7a52]";
+      ? "border-[#f2e2b4] bg-tv-status-warning-bg text-tv-status-warning"
+      : "border-[#d6eadf] bg-tv-status-success-bg text-tv-status-success";
 
   return (
     <div className={`my-1.5 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[11.5px] font-bold ${tone}`}>
@@ -935,7 +935,7 @@ function FlightRow({
               <span
                 title={dayShiftNoteAr(timing.dayOffset) ?? undefined}
                 className={`tv-tnum inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-extrabold ${
-                  timing.dayOffset > 0 ? "bg-[#eaf1ff] text-[#2b57c4]" : "bg-[#fdeef2] text-[#c22850]"
+                  timing.dayOffset > 0 ? "bg-[#eaf1ff] text-[#2b57c4]" : "bg-tv-status-danger-bg text-tv-status-danger"
                 }`}
               >
                 <DirText dir="ltr">{`${timing.dayOffset > 0 ? "+" : "−"}${Math.abs(timing.dayOffset)}`}</DirText>

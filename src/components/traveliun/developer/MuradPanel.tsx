@@ -17,9 +17,9 @@ import { buttonTone } from "@/components/ui/button-variants";
 
 const MODE: Record<string, TranslationKey> = { auto: "murad.mode.auto", suggest: "murad.mode.suggest", skipped: "murad.mode.skipped" };
 const chip = "rounded-full px-2 py-0.5 text-[10.5px] font-extrabold";
-const onChip = "bg-[#e3f6ee] text-[#0f7a52] dark:bg-[#123a2c] dark:text-[#6fe0b0]";
-const offChip = "bg-[#fdeaef] text-[#c22850] dark:bg-[#3d1621] dark:text-[#f68aa5]";
-const warnChip = "bg-[#fdf3e1] text-[#a86a10] dark:bg-[#3a2c10] dark:text-[#f2c46b]";
+const onChip = "bg-tv-status-success-bg text-tv-status-success";
+const offChip = "bg-tv-status-danger-bg text-tv-status-danger";
+const warnChip = "bg-tv-status-warning-bg text-tv-status-warning";
 const button =
   `${buttonTone({ variant: "secondary" })} inline-flex h-8 items-center rounded-[9px] border px-2.5 text-[11.5px] font-extrabold disabled:opacity-60 max-sm:min-h-10`;
 
@@ -55,7 +55,7 @@ export function MuradPanel({ data, flags }: { data: MuradPanelData; flags: { sug
   const provider = data.provider ? `${data.provider.provider === "claude" ? "Claude" : "OpenAI"} · ${data.provider.model}` : t("murad.provider.none");
 
   return (
-    <section className="rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+    <section className="tv-card rounded-[14px] border p-4">
       <h2 className="text-[14px] font-extrabold text-[#185045]">{t("murad.title")}</h2>
       <p className="mt-1 text-[12px] font-semibold text-tv-text-faint">{t("murad.hint")}</p>
 

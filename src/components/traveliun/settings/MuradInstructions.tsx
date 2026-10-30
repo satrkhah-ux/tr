@@ -27,7 +27,7 @@ export function MuradInstructions({ data }: { data: { instructions: InstructionR
   async function toggle(l: LessonRow) {
     if ((await setLessonActive(l.id, !l.active).catch(() => ({ ok: false }))).ok) router.refresh();
   }
-  return <section dir="rtl" className="min-w-0 space-y-5 rounded-2xl border border-[#dbe6e1] bg-white p-4 text-[#185045] sm:p-6 dark:border-[#294039] dark:bg-[#12241f] dark:text-[#eaf3ef]">
+  return <section dir="rtl" className="tv-card min-w-0 space-y-5 rounded-2xl border p-4 text-[#185045] sm:p-6 dark:text-[#eaf3ef]">
     <div><h2 className="text-xl font-extrabold">تعليمات الإدارة لمُراد</h2>
       <p className="mt-2 text-sm leading-6 text-tv-text-faint dark:text-[#9db8ae]">اكتب قراراً أو معلومة يعتمدها مُراد. تُطبّق عند الضغط على «نفّذ»، ويظهر لك ما تغيّر.</p></div>
     <textarea aria-label="تعليمات الإدارة لمُراد" rows={3} maxLength={2000} className={field} value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب التعليمات هنا…" disabled={busy} />

@@ -48,7 +48,7 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
   return (
     <TraveliunShell title="nav.repackage">
       <div className="tv-fade-up space-y-4">
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+        <section className="tv-card flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <div>
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("rp.title")}</h1>
             <p className="mt-1 text-[12.5px] font-semibold text-tv-text-faint">{t("rp.subtitle")}</p>
@@ -100,13 +100,13 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
         ) : null}
 
         {rows.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <section className="tv-card rounded-2xl border shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState icon={FileText} title={t("rp.empty")} description={t("rp.subtitle")} />
           </section>
         ) : (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {rows.map((row) => (
-              <article key={row.id} className="flex flex-col justify-between rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
+              <article key={row.id} className="tv-card flex flex-col justify-between rounded-[14px] border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
                 <div>
                   <div className="mb-1 flex items-start justify-between gap-2">
                     <h2 className="min-w-0 truncate text-[15px] font-extrabold text-[#185045]">{row.title || t("rp.untitled")}</h2>

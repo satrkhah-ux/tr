@@ -205,7 +205,7 @@ export function HotelMergeDialog({
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" aria-labelledby="hotel-merge-title" dir={dir}>
-      <div className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[720px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+      <div className="tv-card max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[720px] overflow-y-auto rounded-2xl border p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <h2 id="hotel-merge-title" className="flex items-center gap-2 text-lg font-extrabold">
             <GitMerge className="size-5" aria-hidden /> {t("data.tools.merge.title")}

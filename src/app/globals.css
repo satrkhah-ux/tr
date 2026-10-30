@@ -132,7 +132,7 @@
   --tv-status-success-bg: #e9f7f0;
   --tv-status-danger: #c22850;
   --tv-status-danger-bg: #fdeef2;
-  --tv-status-warning: #a86a10;
+  --tv-status-warning: #9f640f; /* was #a86a10 (4.19:1 on its bg) — same hue, 4.61:1 */
   --tv-status-warning-bg: #fff8e8;
 }
 .dark {
@@ -185,6 +185,12 @@
   &:hover:not(:disabled) {
     background-color: var(--tv-surface-sunken);
   }
+}
+
+/* A card / panel surface — before every colour utility, so a screen's own tint on top still wins. */
+@utility tv-card {
+  border-color: var(--tv-border-subtle);
+  background-color: var(--tv-surface-raised);
 }
 
 @utility tv-field {
