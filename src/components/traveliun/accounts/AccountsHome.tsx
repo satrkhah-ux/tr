@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BadgePercent, BarChart3, BookOpen, ClipboardCheck, FileSignature, FileText, Landmark, Lock, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgePercent, BarChart3, Gavel, Siren, BookOpen, ClipboardCheck, FileSignature, FileText, Landmark, Lock, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
 import type { AccountsHomeView } from "@/lib/data/accounts";
 import { TraveliunShell } from "../TraveliunShell";
 import { profitTone } from "../operations/CaseProfitCard";
@@ -77,6 +77,36 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
             ))}
           </div>
         </section>
+
+        {home.alerts.length > 0 && (
+          <section className={`${card} border-tv-status-danger/30`} aria-labelledby="finance-alerts">
+            <h2 id="finance-alerts" className="mb-1 flex items-center gap-2 text-[15px] font-extrabold text-tv-status-danger">
+              <Siren className="size-4" />
+              الإنذارات المالية <Num>{String(home.alerts.length)}</Num>
+            </h2>
+            <p className="mb-2 text-[11.5px] font-semibold text-tv-text-faint">تصل الإدارة والحسابات صباحاً مرة واحدة لكل إنذار. «اقترح قراراً» يفتح «القرارات الإدارية» بنصٍّ جاهز تراجعه الإدارة وتصدره — لا يصدر شيء تلقائياً.</p>
+            <ul className="divide-y divide-tv-border-subtle">
+              {home.alerts.slice(0, 12).map((a) => (
+                <li key={a.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-bold text-tv-text-strong">{a.title}</span>
+                    <span className="text-[11.5px] font-semibold text-tv-text-faint">{a.detail}</span>
+                  </span>
+                  <Link href={a.href} className="inline-flex min-h-9 items-center rounded-full border border-tv-border-default px-3 text-[12px] font-bold text-tv-text-brand hover:bg-tv-surface-sunken">افتح</Link>
+                  {home.canDecide && a.decision && (
+                    <Link
+                      href={`/employees/decisions?draft=${encodeURIComponent(a.decision.text)}${a.decision.employee_id ? `&for=${a.decision.employee_id}` : ""}`}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-tv-action-primary px-3 text-[12px] font-bold text-tv-action-on-primary"
+                    >
+                      <Gavel className="size-3.5" />
+                      اقترح قراراً
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Kpi label="صافي المبيعات" value={sar(home.sales)} hint={`${home.count} ملف مؤكد هذا الشهر`} />

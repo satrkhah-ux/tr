@@ -13,6 +13,8 @@ import { quotesView, type Quote, type QuotesView } from "@/lib/accounts/quotes";
 import { journal } from "@/lib/accounts/journal";
 import { byCurrency, caseProfit } from "@/lib/operations/money";
 import { clientDebts, employeeResults, periodOf, supplierSpend, type Period, type ReportCase } from "@/lib/accounts/reports";
+import { financeAlerts, type FinanceAlert } from "@/lib/accounts/alerts";
+import { notifyEmployee } from "@/lib/notifications/notify";
 import { loadCases, type LoadedCase } from "./operation-money";
 
 /**
@@ -48,6 +50,10 @@ export type AccountsHomeView = AccountsHome & {
   supplierOwed: number;
   /** the month's salaries, rents and instalments from «الحسابات المالية» — only to whoever unlocked the book; else null */
   ownerFixed: number | null;
+  /** «الإنذارات المالية» as of today (stage 6) */
+  alerts: FinanceAlert[];
+  /** may open «القرارات الإدارية» with a suggested decision (employees.manage) */
+  canDecide: boolean;
 };
 
 export async function getAccountsHome(monthParam?: string): Promise<AccountsHomeView | null> {
@@ -93,18 +99,20 @@ export async function getAccountsHome(monthParam?: string): Promise<AccountsHome
 
   const clients = await clientNames(db, home.overdue.invoices.map((i) => i.id));
 
-  const [reports, spent, suppliersList, ownerFixed] = await Promise.all([
+  const [reports, spent, suppliersList, ownerFixed, alerts, canDecide] = await Promise.all([
     (async () => (await currentCan("pricing.internal")) && !(await gateManager()))(),
     readExpenses(db, month),
     listSupplierAccounts(),
     financeFixedCost(month),
+    computeFinanceAlerts(db, today),
+    currentCan("employees.manage"),
   ]);
   const expenses = expenseTotals(spent, month);
   const supplierOwed = (suppliersList?.suppliers ?? [])
     .flatMap((s) => s.balances)
     .filter((b) => b.currency === "SAR" && b.balance > 0)
     .reduce((sum, b) => sum + b.balance, 0);
-  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100, ownerFixed };
+  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100, ownerFixed, alerts, canDecide };
 }
 
 /** the cases' client names, by case id */
@@ -345,20 +353,7 @@ export async function getReports(periodParam?: string): Promise<ReportsView | nu
   for (const r of [staff, sups, pays, targets]) if (r.error) throw r.error;
   const names = Object.fromEntries(((staff.data ?? []) as { id: string; arabic_name: string | null }[]).map((e) => [e.id, e.arabic_name ?? ""]));
 
-  const report: ReportCase[] = cases.map((c) => ({
-    id: c.id,
-    serial: c.serial,
-    client: clients[c.id] ?? "",
-    seller: c.employee_id ? (names[c.employee_id] ?? "") : "",
-    employee_id: c.employee_id,
-    month: c.month,
-    confirmed_on: c.confirmed_on,
-    travel_start: c.travel_start,
-    total: c.total,
-    paid: c.paid,
-    installments: c.installments,
-    profit: caseProfit(c.facts).expected.find((l) => l.currency === "SAR")?.profit ?? 0,
-  }));
+  const report = toReportCases(cases, clients, names);
   type Sup = { amount: number | string; currency: string; kind: "payment" | "refund"; created_by: string | null; company_suppliers: unknown };
   const supRows = (sups.data ?? []) as Sup[];
   const recordedBy = [
@@ -382,4 +377,98 @@ export async function getReports(periodParam?: string): Promise<ReportsView | nu
       recordedBy,
     }),
   };
+}
+
+function toReportCases(cases: LoadedCase[], clients: Record<string, string>, names: Record<string, string>): ReportCase[] {
+  return cases.map((c) => ({
+    id: c.id,
+    serial: c.serial,
+    client: clients[c.id] ?? "",
+    seller: c.employee_id ? (names[c.employee_id] ?? "") : "",
+    employee_id: c.employee_id,
+    month: c.month,
+    confirmed_on: c.confirmed_on,
+    travel_start: c.travel_start,
+    total: c.total,
+    paid: c.paid,
+    installments: c.installments,
+    profit: caseProfit(c.facts).expected.find((l) => l.currency === "SAR")?.profit ?? 0,
+  }));
+}
+
+// ---------------------------------------------------- «الإنذارات المالية» ----
+
+/** Today's alerts, from the records (stage 6). No gate here: the home and the morning job call it behind their own. */
+export async function computeFinanceAlerts(supabase: SupabaseClient, today: string): Promise<FinanceAlert[]> {
+  const month = today.slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+  const soon = new Date(Date.UTC(y, m - 1, Number(today.slice(8, 10)) + 4)).toISOString();
+
+  const cases = (await loadCases(supabase)).filter((c) => invoiceable(c) && c.currency === "SAR");
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const [clients, staff, targets, spentNow, spentLast, books] = await Promise.all([
+    clientNames(supabase, cases.map((c) => c.id)),
+    supabase.from("employees").select("id, arabic_name"),
+    supabase.from("sales_targets").select("employee_id, month, amount"),
+    readExpenses(supabase, month),
+    readExpenses(supabase, last),
+    supabase
+      .from("operation_bookings")
+      .select("id, operation_id, title, supplier_name, cancellation_deadline, net_charged, quoted_net, currency")
+      .eq("detail->>refund_mode", "pay_by")
+      .eq("is_paid", false)
+      .neq("status", "cancelled")
+      .gte("cancellation_deadline", new Date(`${today}T00:00:00+03:00`).toISOString())
+      .lt("cancellation_deadline", soon),
+  ]);
+  for (const r of [staff, targets, books]) if (r.error) throw r.error;
+  const names = Object.fromEntries(((staff.data ?? []) as { id: string; arabic_name: string | null }[]).map((e) => [e.id, e.arabic_name ?? ""]));
+  const report = toReportCases(cases, clients, names);
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const salesOf = (mm: string) => sum(report.filter((c) => c.month === mm).map((c) => c.total ?? 0));
+
+  const targetRows = ((targets.data ?? []) as { employee_id: string; month: string | null; amount: number | string }[]).map((t) => ({ employee_id: t.employee_id, month: t.month ? t.month.slice(0, 7) : null, amount: Number(t.amount) }));
+  const sellers = employeeResults({ months: [month], cases: report, names, targets: targetRows, recordedBy: [] })
+    .map((e) => ({ employee_id: e.employee_id, name: e.name, sales: e.sales, target: e.target }));
+  // a seller with a target and no sale yet this month is the weakest of all — counted too
+  for (const t of targetRows) {
+    if (sellers.some((s) => s.employee_id === t.employee_id)) continue;
+    const own = targetRows.filter((x) => x.employee_id === t.employee_id);
+    const target = own.find((x) => x.month === month)?.amount ?? own.find((x) => x.month === null)?.amount ?? null;
+    if (target) sellers.push({ employee_id: t.employee_id, name: names[t.employee_id] ?? "", sales: 0, target });
+  }
+
+  type Book = { id: string; operation_id: string; title: string; supplier_name: string | null; cancellation_deadline: string; net_charged: number | null; quoted_net: number | null; currency: string | null };
+  return financeAlerts({
+    today,
+    month,
+    expenses: { now: sum(spentNow.filter((e) => e.currency === "SAR").map((e) => e.amount)), last: sum(spentLast.filter((e) => e.currency === "SAR").map((e) => e.amount)) },
+    sales: { now: salesOf(month), last: salesOf(last) },
+    cases: report.map((c) => ({ id: c.id, serial: c.serial, client: c.client, month: c.month, sale: c.total ?? 0, profit: c.profit })),
+    late: clientDebts(report, today).rows.filter((d) => d.lateDays > 0).map((d) => ({ id: d.id, serial: d.serial, client: d.client, seller: d.seller, due: d.due, lateDays: d.lateDays })),
+    unpaidBookings: ((books.data ?? []) as Book[])
+      .filter((b) => (b.currency || "SAR") === "SAR")
+      .map((b) => ({ id: b.id, operation_id: b.operation_id, serial: byId.get(b.operation_id)?.serial ?? "", title: b.title, supplier: b.supplier_name ?? "", payBy: riyadhDate(b.cancellation_deadline), cost: Number(b.net_charged ?? b.quoted_net ?? 0) })),
+    sellers,
+  });
+}
+
+/**
+ * The morning job (runOpsDaily): each new alert once, to the management (dashboard.admin) and «الحسابات»
+ * (finance.accounts) — the bell and «تنبيهاتي». The key goes in first: a second run sends nothing.
+ */
+export async function sendFinanceAlerts(today: string): Promise<number> {
+  const supabase = db();
+  let sent = 0;
+  for (const a of await computeFinanceAlerts(supabase, today)) {
+    if (a.sentElsewhere) continue;
+    const { error } = await supabase.from("finance_alerts").insert({ key: a.key, kind: a.kind, title: a.title.slice(0, 300) });
+    if (error) continue; // the primary key: already sent
+    for (const permission of ["dashboard.admin", "finance.accounts"] as const) {
+      await notifyEmployee({ permission, kind: "finance", title: a.title, body: a.detail, href: a.href, source: "accounts", dedupeKey: `finance:${a.key}` });
+    }
+    sent += 1;
+  }
+  return sent;
 }

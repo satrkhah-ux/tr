@@ -16,6 +16,7 @@ import { readyLabel } from "./wizard/index";
 import { BNPL_METHODS, settlementReminder } from "@/lib/payments/methods";
 import { tellEmployee } from "./payment-links-poll";
 import { notifyEmployee } from "@/lib/notifications/notify";
+import { sendFinanceAlerts } from "@/lib/data/accounts";
 import { endOfRiyadhDay, reminderStep, reminderText, riyadhDay } from "./refund-mode";
 import { dueReminder } from "./agreement";
 
@@ -166,6 +167,12 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
   result.alerts += await notifyDueWaits(supabase, today);
   result.alerts += await settlementReminders(supabase, today);
   result.alerts += await refundDeadlineReminders(supabase, ops, today);
+  // «الإنذارات المالية» to the management and the accounts team (accounts stage 6); never holds up the operations morning
+  try {
+    result.alerts += await sendFinanceAlerts(today);
+  } catch (e) {
+    console.error("[finance-alerts]", e);
+  }
   return result;
 }
 

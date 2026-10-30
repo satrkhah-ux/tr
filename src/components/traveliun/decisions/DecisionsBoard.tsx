@@ -47,9 +47,12 @@ const day = (iso: string) =>
 export function DecisionsBoard({
   data,
   filter,
+  prefill,
 }: {
   data: DecisionsArchive;
   filter: ArchiveFilter;
+  /** a suggested decision (accounts «اقترح قراراً»): the form opens with it — the management still saves and issues */
+  prefill?: { text: string; employee: string | null };
 }) {
   const [notice, setNotice] = useState("");
   return (
@@ -73,7 +76,7 @@ export function DecisionsBoard({
           </p>
         )}
       </section>
-      <IssueForm data={data} onNotice={setNotice} />
+      <IssueForm data={data} onNotice={setNotice} prefill={prefill} />
       <Filters data={data} filter={filter} />
       {filter.employeeId ? (
         <EmployeeArchive data={data} />
@@ -89,15 +92,17 @@ export function DecisionsBoard({
 function IssueForm({
   data,
   onNotice,
+  prefill,
 }: {
   data: DecisionsArchive;
   onNotice: (s: string) => void;
+  prefill?: { text: string; employee: string | null };
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [kind, setKind] = useState(data.settings.kinds[0] ?? "");
-  const [audience, setAudience] = useState<Audience>({});
-  const [text, setText] = useState("");
+  const [audience, setAudience] = useState<Audience>(prefill?.employee ? { employees: [prefill.employee] } : {});
+  const [text, setText] = useState(prefill?.text ?? "");
   const [draft, setDraft] = useState<{
     id: string;
     count: number;

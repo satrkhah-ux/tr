@@ -16,6 +16,9 @@ export default async function DecisionsPage({
     from?: string;
     to?: string;
     ack?: string;
+    /** a suggested decision from «الإنذارات المالية» (accounts stage 7): its text, and whom it is about */
+    draft?: string;
+    for?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -35,7 +38,14 @@ export default async function DecisionsPage({
   if (!data) redirect("/employees");
   return (
     <TraveliunShell title="nav.decisions">
-      <DecisionsBoard data={data} filter={filter} />
+      <DecisionsBoard
+        data={data}
+        filter={filter}
+        prefill={{
+          text: q.draft?.slice(0, 4000) ?? "",
+          employee: q.for && /^[0-9a-f-]{36}$/i.test(q.for) ? q.for : null,
+        }}
+      />
     </TraveliunShell>
   );
 }
