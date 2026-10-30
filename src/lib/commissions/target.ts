@@ -2,13 +2,13 @@
  * «أهداف المبيعات» (the owner, 2026-10-30): each seller's monthly sales target
  * in riyals, typed by the administration in «العمولات» → «أهداف المبيعات».
  * One standing target per employee, and an optional override for a given month.
- * Stored as JSON in app_settings («sales_targets»). Pure: tested without a database.
+ * Stored in public.sales_targets (20261030100000, closed: service client after currentCan).
+ * Pure: tested without a database.
  *
  * Achieved = «العمولات»'s own monthly sales (commissionMonth): the revenue of the
  * files whose client finished paying this month.
  */
 
-export const SALES_TARGETS_KEY = "sales_targets";
 export const MAX_TARGET = 100_000_000;
 
 export type SalesTargets = {
@@ -19,49 +19,26 @@ export type SalesTargets = {
 };
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
-const okAmount = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n > 0 && n <= MAX_TARGET;
+export const isTargetAmount = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n > 0 && n <= MAX_TARGET;
+export const isTargetMonth = (m: unknown): m is string => typeof m === "string" && MONTH.test(m);
 
-function cleanMap(raw: unknown): Record<string, number> {
-  if (!raw || typeof raw !== "object") return {};
-  return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter((e): e is [string, number] => okAmount(e[1])));
-}
+export type SalesTargetRow = { employee_id: string; month: string | null; amount: number | string };
 
-/** whatever is stored (or nothing) → a clean value; a bad entry is dropped, never guessed */
-export function parseTargets(raw: string | null | undefined): SalesTargets {
-  let v: unknown = null;
-  try {
-    v = raw ? JSON.parse(raw) : null;
-  } catch {
-    v = null;
+/** the table's rows → the lookup shape; month is a date ("YYYY-MM-01") or null; a bad row is dropped, never guessed */
+export function rowsToTargets(rows: readonly SalesTargetRow[]): SalesTargets {
+  const t: SalesTargets = { monthly: {}, months: {} };
+  for (const r of rows) {
+    const amount = Number(r.amount);
+    if (!isTargetAmount(amount)) continue;
+    if (r.month === null) t.monthly[r.employee_id] = amount;
+    else if (isTargetMonth(r.month.slice(0, 7))) (t.months[r.month.slice(0, 7)] ??= {})[r.employee_id] = amount;
   }
-  const o = (v && typeof v === "object" ? v : {}) as { monthly?: unknown; months?: unknown };
-  const months: SalesTargets["months"] = {};
-  if (o.months && typeof o.months === "object") {
-    for (const [m, map] of Object.entries(o.months as Record<string, unknown>)) {
-      const clean = cleanMap(map);
-      if (MONTH.test(m) && Object.keys(clean).length) months[m] = clean;
-    }
-  }
-  return { monthly: cleanMap(o.monthly), months };
+  return t;
 }
 
 /** the month's override, else the standing target, else null (no target set) */
 export function targetFor(t: SalesTargets, employeeId: string, month: string): number | null {
   return t.months[month]?.[employeeId] ?? t.monthly[employeeId] ?? null;
-}
-
-/**
- * Set or clear (amount null) one target. month null = the standing target.
- * Returns null when the input is invalid.
- */
-export function withTarget(t: SalesTargets, employeeId: string, month: string | null, amount: number | null): SalesTargets | null {
-  if (!employeeId || (month !== null && !MONTH.test(month)) || (amount !== null && !okAmount(amount))) return null;
-  const next: SalesTargets = { monthly: { ...t.monthly }, months: Object.fromEntries(Object.entries(t.months).map(([m, map]) => [m, { ...map }])) };
-  const map = month === null ? next.monthly : (next.months[month] ??= {});
-  if (amount === null) delete map[employeeId];
-  else map[employeeId] = Math.round(amount);
-  if (month !== null && !Object.keys(next.months[month]).length) delete next.months[month];
-  return next;
 }
 
 /** share of the target reached: pct as a whole number (may pass 100), bar capped 0–100 for the progress bar */

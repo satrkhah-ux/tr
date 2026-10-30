@@ -1,30 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { daysLeftInMonth, isTargetQuestion, parseTargets, progress, riyadhMonthOf, targetFor, withTarget } from "./target";
+import { daysLeftInMonth, isTargetAmount, isTargetMonth, isTargetQuestion, progress, riyadhMonthOf, rowsToTargets, targetFor } from "./target";
 
 describe("sales targets", () => {
-  it("parses and drops bad entries", () => {
-    const t = parseTargets(JSON.stringify({ monthly: { a: 50000, b: -1, c: "x" }, months: { "2026-11": { a: 70000 }, bad: { a: 1 }, "2026-12": { a: 0 } } }));
-    expect(t).toEqual({ monthly: { a: 50000 }, months: { "2026-11": { a: 70000 } } });
-    expect(parseTargets("not json")).toEqual({ monthly: {}, months: {} });
-    expect(parseTargets(null)).toEqual({ monthly: {}, months: {} });
+  const rows = [
+    { employee_id: "a", month: null, amount: "50000.00" },
+    { employee_id: "a", month: "2026-11-01", amount: 70000 },
+    { employee_id: "b", month: null, amount: -1 },
+    { employee_id: "c", month: "2026-13-01", amount: 1000 },
+  ];
+
+  it("rows → lookup, bad rows dropped", () => {
+    expect(rowsToTargets(rows)).toEqual({ monthly: { a: 50000 }, months: { "2026-11": { a: 70000 } } });
+    expect(rowsToTargets([])).toEqual({ monthly: {}, months: {} });
   });
 
   it("month override wins, else standing target, else null", () => {
-    const t = parseTargets(JSON.stringify({ monthly: { a: 50000 }, months: { "2026-11": { a: 70000 } } }));
+    const t = rowsToTargets(rows);
     expect(targetFor(t, "a", "2026-11")).toBe(70000);
     expect(targetFor(t, "a", "2026-10")).toBe(50000);
     expect(targetFor(t, "b", "2026-10")).toBeNull();
   });
 
-  it("sets and clears without touching others", () => {
-    const t0 = parseTargets(null);
-    const t1 = withTarget(t0, "a", null, 40000.4)!;
-    const t2 = withTarget(t1, "a", "2026-11", 60000)!;
-    expect(t2).toEqual({ monthly: { a: 40000 }, months: { "2026-11": { a: 60000 } } });
-    expect(t1.months).toEqual({});
-    expect(withTarget(t2, "a", "2026-11", null)).toEqual({ monthly: { a: 40000 }, months: {} });
-    expect(withTarget(t2, "a", "2026-13", 1)).toBeNull();
-    expect(withTarget(t2, "a", null, -5)).toBeNull();
+  it("validates what the manager types", () => {
+    expect(isTargetAmount(40000)).toBe(true);
+    expect(isTargetAmount(0)).toBe(false);
+    expect(isTargetAmount(-5)).toBe(false);
+    expect(isTargetAmount(Number.NaN)).toBe(false);
+    expect(isTargetAmount(100_000_001)).toBe(false);
+    expect(isTargetMonth("2026-11")).toBe(true);
+    expect(isTargetMonth("2026-13")).toBe(false);
   });
 
   it("progress: whole percent, bar capped, nothing without a target", () => {

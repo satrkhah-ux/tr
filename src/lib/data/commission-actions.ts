@@ -5,8 +5,8 @@ import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { parseCommissionPolicy } from "@/lib/commissions/policy";
 import { logAudit } from "@/lib/data/audit";
-import { SALES_TARGETS_KEY, withTarget } from "@/lib/commissions/target";
-import { activePolicy, calculate, readSalesTargets, isMonth, liveCycleOf, service, DEFAULT_MONTHLY_COST, type Adjustment, type CycleRow } from "@/lib/data/commissions";
+import { isTargetAmount, isTargetMonth } from "@/lib/commissions/target";
+import { activePolicy, calculate, isMonth, liveCycleOf, service, DEFAULT_MONTHLY_COST, type Adjustment, type CycleRow } from "@/lib/data/commissions";
 
 /**
  * The commission cycle's steps (0092). Each one asks for its permission again —
@@ -181,22 +181,30 @@ export async function discardPolicyDraft(policyId: string): Promise<ActionResult
  * commissions.manage; audited with before and after.
  */
 export async function setSalesTarget(employeeId: string, month: string | null, amount: number | null): Promise<ActionResult> {
-  if (!(await gate("commissions.manage"))) return fail("لا تملك صلاحية إدارة العمولات");
+  const me = await gate("commissions.manage");
+  if (!me) return fail("لا تملك صلاحية إدارة العمولات");
   if (typeof employeeId !== "string" || !/^[0-9a-f-]{36}$/i.test(employeeId)) return fail("موظف غير موجود");
+  if ((month !== null && !isTargetMonth(month)) || (amount !== null && !isTargetAmount(amount))) return fail("المبلغ أو الشهر غير صحيح");
   const db = service();
-  // ponytail: read-modify-write of one JSON value; two managers saving in the same second can lose one edit — a table if that ever happens
   const { data: person } = await db.from("employees").select("id").eq("id", employeeId).maybeSingle();
   if (!person) return fail("موظف غير موجود");
-  const before = await readSalesTargets(db);
-  const next = withTarget(before, employeeId, month, amount);
-  if (!next) return fail("المبلغ أو الشهر غير صحيح");
-  const { error } = await db.from("app_settings").upsert({ key: SALES_TARGETS_KEY, value: JSON.stringify(next), updated_at: new Date().toISOString() });
+  const day = month ? `${month}-01` : null;
+  const read = db.from("sales_targets").select("amount").eq("employee_id", employeeId);
+  const { data: was } = await (day ? read.eq("month", day) : read.is("month", null)).maybeSingle();
+  const before = was ? Number((was as { amount: number | string }).amount) : null;
+  const drop = db.from("sales_targets").delete().eq("employee_id", employeeId);
+  const { error } =
+    amount === null
+      ? await (day ? drop.eq("month", day) : drop.is("month", null))
+      : await db
+          .from("sales_targets")
+          .upsert({ employee_id: employeeId, month: day, amount: Math.round(amount), updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "employee_id,month" });
   if (error) return fail("تعذّر الحفظ");
   await logAudit({
     action: "settings.updated",
-    entity: "app_settings",
-    entity_id: SALES_TARGETS_KEY,
-    meta: { employee_id: employeeId, month, before: month ? (before.months[month]?.[employeeId] ?? null) : (before.monthly[employeeId] ?? null), after: amount },
+    entity: "sales_targets",
+    entity_id: employeeId,
+    meta: { employee_id: employeeId, month, before, after: amount === null ? null : Math.round(amount) },
   });
   return done();
 }

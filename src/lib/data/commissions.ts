@@ -15,7 +15,7 @@ import {
   type CommissionCalculationSnapshot,
   type CommissionPolicyDocument,
 } from "@/lib/commissions/policy";
-import { daysLeftInMonth, parseTargets, progress, SALES_TARGETS_KEY, targetFor, type SalesTargets } from "@/lib/commissions/target";
+import { daysLeftInMonth, progress, rowsToTargets, targetFor, type SalesTargetRow, type SalesTargets } from "@/lib/commissions/target";
 
 /**
  * «العمولات» (0092): the month's commission from the files themselves — no
@@ -243,9 +243,12 @@ export async function getPolicyView(): Promise<PolicyView | null> {
 
 // ------------------------------------------------ «أهداف المبيعات» ----
 
-export async function readSalesTargets(db: SupabaseClient): Promise<SalesTargets> {
-  const { data } = await db.from("app_settings").select("value").eq("key", SALES_TARGETS_KEY).maybeSingle();
-  return parseTargets((data as { value?: string } | null)?.value);
+/** public.sales_targets (closed table): callers check the permission first; employeeId narrows to one person's rows */
+export async function readSalesTargets(db: SupabaseClient, employeeId?: string): Promise<SalesTargets> {
+  let q = db.from("sales_targets").select("employee_id, month, amount");
+  if (employeeId) q = q.eq("employee_id", employeeId);
+  const { data } = await q;
+  return rowsToTargets((data ?? []) as SalesTargetRow[]);
 }
 
 /** The home card (the owner, 2026-10-30): this month's own figures from «عمولتي», and the target. Null = no commissions.view. */
@@ -264,7 +267,7 @@ export async function getMySalesCard(nowMs = Date.now()): Promise<MySalesCard | 
   const mine = await getMyCommission();
   const me = mine && (await getCurrentEmployeeId());
   if (!mine || !me) return null;
-  const targets = await readSalesTargets(service());
+  const targets = await readSalesTargets(service(), me);
   const target = targetFor(targets, me, mine.month);
   return {
     month: mine.month,
