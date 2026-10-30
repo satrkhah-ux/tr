@@ -131,7 +131,7 @@ export function BasicFileStatus({
           {known.operationId ? (
             <Link
               href={`/operations/${known.operationId}`}
-              className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              className="ms-auto inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
             >
               <BriefcaseBusiness className="size-3.5" />
               {tx("openOperations")}
@@ -238,7 +238,7 @@ export function BasicFileStatus({
         {view.canOpenCase && view.operationId ? (
           <Link
             href={`/operations/${view.operationId}`}
-            className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            className="ms-auto inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
           >
             <BriefcaseBusiness className="size-3.5" />
             {tx("openOperations")}

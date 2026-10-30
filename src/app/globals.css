@@ -380,3 +380,13 @@ input[type="time"]::-webkit-date-and-time-value,
 input[type="datetime-local"]::-webkit-date-and-time-value {
   text-align: start;
 }
+
+/* a wide table read as cards on a phone (the owner, 2026-10-30): each cell names its column (data-label) */
+@media (max-width: 639px) {
+  .tv-stack { min-width: 0 !important; }
+  .tv-stack thead { display: none; }
+  .tv-stack tr { display: block; padding: 0.5rem 0; }
+  .tv-stack td { display: flex; gap: 0.5rem; padding: 0.15rem 0; text-align: start; }
+  .tv-stack td[dir="ltr"] { flex-direction: row-reverse; }
+  .tv-stack td[data-label]::before { content: attr(data-label); min-width: 5.5rem; flex-shrink: 0; color: #557d78; font-size: 11.5px; font-weight: 700; }
+}

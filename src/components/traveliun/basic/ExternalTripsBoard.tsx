@@ -217,7 +217,7 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
           </div>
           {rows.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px] text-right text-[12.5px]">
+              <table className="tv-stack w-full min-w-[860px] text-right text-[12.5px]">
                 <thead className="text-[11.5px] text-[#557d78]">
                   <tr>
                     <th className="py-1.5 font-bold">العميل</th>
@@ -235,15 +235,15 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id} className="border-t border-[#eef3f1] text-[#0f3d38]">
-                      <td className="py-1.5 font-bold">{r.client_name ?? "—"}</td>
-                      <td dir="ltr" className="text-right">{showPhone(r.phone)}</td>
-                      <td>{r.destination}</td>
-                      <td dir="ltr" className="text-right">{r.travel_start} ← {externalTripEnd(r.travel_start, r.days)}</td>
-                      <td>{r.days}</td>
-                      <td><span className={`rounded-full px-2 py-0.5 text-[11.5px] font-bold ${STATUS_COLOR[r.status]}`}>{EXTERNAL_STATUS[r.status]}</span></td>
-                      <td>{r.paid_amount == null ? "—" : `${r.paid_amount.toLocaleString("en-US")} ريال`}</td>
-                      <td className="text-[#335f59]">{r.confirmed_items.join("، ") || "—"}</td>
-                      <td>{r.employee_name ?? "—"}</td>
+                      <td data-label="العميل" className="py-1.5 font-bold">{r.client_name ?? "—"}</td>
+                      <td data-label="الجوال" dir="ltr" className="text-right">{showPhone(r.phone)}</td>
+                      <td data-label="الوجهة">{r.destination}</td>
+                      <td data-label="السفر" dir="ltr" className="text-right">{r.travel_start} ← {externalTripEnd(r.travel_start, r.days)}</td>
+                      <td data-label="الأيام">{r.days}</td>
+                      <td data-label="الحالة"><span className={`rounded-full px-2 py-0.5 text-[11.5px] font-bold ${STATUS_COLOR[r.status]}`}>{EXTERNAL_STATUS[r.status]}</span></td>
+                      <td data-label="المدفوع">{r.paid_amount == null ? "—" : `${r.paid_amount.toLocaleString("en-US")} ريال`}</td>
+                      <td data-label="ما تم تأكيده" className="text-[#335f59]">{r.confirmed_items.join("، ") || "—"}</td>
+                      <td data-label="أدخله">{r.employee_name ?? "—"}</td>
                       <td className="whitespace-nowrap">
                         {canChange(r) ? (
                           <>

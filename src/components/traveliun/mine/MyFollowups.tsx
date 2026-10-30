@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Clock, ExternalLink, NotebookPen, Settings, UserRound } from "lucide-react";
+import { Bell, Check, Clock, ExternalLink, NotebookPen, Phone, Settings, UserRound } from "lucide-react";
 import { markMyDone, remindMe, saveMyNote, saveMySettings, type MyFollowupItem, type MyFollowupsView } from "@/lib/data/my-followups";
 import { dayCounts, KIND_LABEL, KIND_ORDER, type DayKind, type DaySettings } from "@/lib/mine/rank";
 import { NEXT_LABEL } from "@/lib/followups/summary-core";
@@ -198,9 +198,15 @@ function ItemCard({ item: i, now, readOnly, busy, run }: { item: MyFollowupItem;
       {i.canReply === false && <p className="text-xs text-[#9A3412]">مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل: لا يصله إلا قالب معتمد أو اتصال.</p>}
 
       <div className="flex flex-wrap gap-2 pt-1">
+        {/* one tap to call from a phone (the owner, 2026-10-30: «الاستخدام اليسير للموظف على الموبايل») */}
+        {i.phone && (
+          <a href={`tel:${i.phone.replace(/[^\d+]/g, "")}`} className={btnPrimary}>
+            <Phone size={15} /> اتصال
+          </a>
+        )}
         {i.url && (
           <a href={i.url} target="_blank" rel="noreferrer" className={btnPrimary}>
-            <ExternalLink size={15} /> فتح في تيلي تيل
+            <ExternalLink size={15} /> <span className="max-sm:sr-only">فتح في </span>تيلي تيل
           </a>
         )}
         {i.followupId && (
@@ -211,16 +217,16 @@ function ItemCard({ item: i, now, readOnly, busy, run }: { item: MyFollowupItem;
         {!readOnly && (
           <>
             <button className={btn} disabled={busy} onClick={() => run(() => markMyDone(i.key), "أُزيل من قائمتك حتى يجدّ جديد.")}>
-              <Check size={15} /> تمّت
+              <Check size={15} /> <span className="max-sm:sr-only">تمّت</span>
             </button>
             {i.conversationId !== null && (
               <button className={btn} onClick={() => setPanel(panel === "later" ? "" : "later")}>
-                <Clock size={15} /> ذكّرني بعد…
+                <Clock size={15} /> <span className="max-sm:sr-only">ذكّرني بعد…</span>
               </button>
             )}
             {i.conversationId !== null && (
               <button className={btn} onClick={() => setPanel(panel === "note" ? "" : "note")}>
-                <NotebookPen size={15} /> ملاحظة
+                <NotebookPen size={15} /> <span className="max-sm:sr-only">ملاحظة</span>
               </button>
             )}
           </>

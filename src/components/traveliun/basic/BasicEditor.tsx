@@ -188,7 +188,7 @@ function Chip({ on, icon: Icon, label, onClick }: { on: boolean; icon: typeof Ca
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-2.5 py-1 text-[12px] font-semibold transition-colors duration-150 hover:border-[#165749] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#73B7A4] motion-reduce:transition-none max-sm:text-[11px] ${
+      className={`inline-flex min-h-8 max-sm:min-h-10 items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-2.5 py-1 text-[12px] font-semibold transition-colors duration-150 hover:border-[#165749] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#73B7A4] motion-reduce:transition-none max-sm:text-[11px] ${
         on ? "border-[#BCE4D3] bg-[#EAF8F2] text-[#0F4339]" : "border-[#DBE4E2] bg-white text-[#687F7B]"
       }`}
     >
@@ -809,7 +809,7 @@ export function BasicEditor({
         <select
           value={mode}
           onChange={(e) => setHop(a, b, e.target.value as TransportMode)}
-          className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
+          className="h-7 max-sm:h-10 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
         >
           {MODE_CHIPS.map((m) => (
             <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
@@ -1089,7 +1089,7 @@ export function BasicEditor({
           <span className="min-w-0 flex-1">
             {tx("datesFitAsk", { a: dayMonth(dateFit.arrival_date), b: dayMonth(dateFit.departure_date), c: dayMonth(trip.arrival_date), d: dayMonth(trip.departure_date) })}
           </span>
-          <button type="button" onClick={adoptFlightDates} className="h-8 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white">
+          <button type="button" onClick={adoptFlightDates} className="h-8 max-sm:h-10 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white">
             {tx("datesFitYes")}
           </button>
           <button type="button" onClick={() => setKeptDates(dateFitKey)} className="text-[11.5px] font-bold text-[#185045] underline">
@@ -1414,7 +1414,7 @@ export function BasicEditor({
   // themselves when it is chosen (moveTripCountry); more are picked or typed here
   const termsButton = (
     <Dialog>
-      <DialogTrigger className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
+      <DialogTrigger className="inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
         <ScrollText className="size-3.5" />
         {t("pg.terms")} <span className="tv-tnum">({data.services.terms.length})</span>
       </DialogTrigger>
@@ -1435,7 +1435,7 @@ export function BasicEditor({
           onChange={(e) =>
             patch({ pricing: { ...data.pricing, display_currency: e.target.value, ...(data.source ? {} : { final_total: null }) } })
           }
-          className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
+          className="h-8 max-sm:h-10 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
         >
           {currencyOptions(lookups.countries, display).map((c) => (
             <option key={c} value={c}>{c}</option>
@@ -1446,7 +1446,7 @@ export function BasicEditor({
         type="button"
         onClick={() => void calculate()}
         disabled={pricingBusy}
-        className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+        className="inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
       >
         {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
         {pricingBusy ? tx("calcBusy") : tx("calc")}
@@ -1689,7 +1689,7 @@ export function BasicEditor({
         )}
         {/* the add bar, like the company's system — gone once every night has its city */}
         {focus || (trip.nights > 0 && used === trip.nights) ? null : (
-        <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] sm:px-2.5">
+        <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] max-sm:static sm:px-2.5">
           <div className="flex flex-wrap items-end gap-1.5">
             {/* a group may cross into a neighbouring country */}
             <label className={`${basicLabel} w-24 shrink-0 sm:w-32`}>
@@ -1947,7 +1947,7 @@ export function BasicEditor({
                           type="button"
                           onClick={() => void saveGroup(g.key, !bad)}
                           disabled={saveState === "saving"}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                          className="inline-flex h-8 max-sm:h-10 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
                         >
                           {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
                           {tx("saveCard")}
@@ -2179,7 +2179,7 @@ export function BasicEditor({
               <button
                 type="button"
                 onClick={() => void flush().finally(() => window.location.reload())}
-                className="inline-flex h-8 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white"
+                className="inline-flex h-8 max-sm:h-10 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white"
               >
                 {tx("reload")}
               </button>
@@ -2201,7 +2201,7 @@ export function BasicEditor({
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="inline-flex h-8 items-center rounded-[8px] bg-[#c22850] px-2.5 text-[11.5px] font-bold text-white"
+                className="inline-flex h-8 max-sm:h-10 items-center rounded-[8px] bg-[#c22850] px-2.5 text-[11.5px] font-bold text-white"
               >
                 {tx("reload")}
               </button>
@@ -2210,7 +2210,7 @@ export function BasicEditor({
               <button
                 type="button"
                 onClick={() => setRestoredSeen(true)}
-                className="inline-flex h-8 items-center gap-1 rounded-full bg-[#e8f1fb] px-2.5 text-[11.5px] font-bold text-[#1d5fa8]"
+                className="inline-flex h-8 max-sm:h-10 items-center gap-1 rounded-full bg-[#e8f1fb] px-2.5 text-[11.5px] font-bold text-[#1d5fa8]"
               >
                 {tx("restored")} ×
               </button>
