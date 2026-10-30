@@ -3360,6 +3360,7 @@ export const ar: Dictionary = {
   "ops.pay.receiptIssue": "إصدار سند القبض",
   "ops.pay.deleteConfirm": "حذف هذه الدفعة؟ يتوقف رابط سند قبضها ويُسجَّل الحذف.",
   "ops.pay.schedule": "جدول الأقساط",
+  "ops.pay.agreementUnset": "لم يُحدَّد الاتفاق المالي",
   "ops.pay.scheduleDefault": "افتراضي: ٥٠٪ عربون عند التأكيد، والباقي قبل السفر بـ١٤ يوماً.",
   "ops.pay.scheduleEdit": "تعديل الجدول",
   "ops.pay.scheduleReset": "العودة للافتراضي",

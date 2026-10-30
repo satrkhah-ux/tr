@@ -15,6 +15,8 @@ import { costInSellCurrency } from "@/lib/repackage/offer-input";
 import type { FileError } from "./file-status";
 import { loadFileStatus } from "./file-status-core";
 import { confirmOffer } from "./operations";
+import { applyAgreement, checkAgreement, offerAgreementContext, type AgreementContext } from "./payment-agreement";
+import type { Agreement, AgreementError } from "@/lib/operations/agreement";
 import { getCurrentEmployeeId } from "./metrics";
 import { logAudit } from "./audit";
 import { sendBookingRequest } from "./operation-assign";
@@ -125,7 +127,8 @@ export async function getRepackageFile(id: string): Promise<RepackageFileView | 
 export async function confirmRepackageOrder(
   id: string,
   channel: "whatsapp" | "phone" | "office",
-): Promise<{ ok: true; operationId: string; canOpen: boolean; already: boolean } | Fail> {
+  agreement?: Agreement,
+): Promise<{ ok: true; operationId: string; canOpen: boolean; already: boolean; agreementFailed?: AgreementError | "failed" } | Fail | { ok: false; error: `agree_${AgreementError}` }> {
   try {
     const file = await issuedRepackage(id, true);
     if (failed(file)) return file;
@@ -133,13 +136,23 @@ export async function confirmRepackageOrder(
     const canOpen = await currentCanOpen("/operations");
     const open = await caseOf(file.offer.id);
     if (open) return { ok: true, operationId: open.id, canOpen, already: true };
+    const invalid = await checkAgreement(file.offer.id, agreement);
+    if (invalid === "failed") return { ok: false, error: "failed" };
+    if (invalid) return { ok: false, error: `agree_${invalid}` };
     const ch = channel === "phone" || channel === "office" ? channel : "whatsapp";
     const result = await confirmOffer({ offer_id: file.offer.id, channel: ch });
     if (!result.ok) return { ok: false, error: "failed" };
-    return { ok: true, operationId: result.id, canOpen, already: false };
+    const agreed = await applyAgreement(result.id, agreement);
+    return { ok: true, operationId: result.id, canOpen, already: false, ...(agreed.ok ? {} : { agreementFailed: agreed.error }) };
   } catch {
     return { ok: false, error: "failed" };
   }
+}
+
+/** What the agreement dialog starts from (payment-agreement.ts), for this repackaged file. */
+export async function repackageAgreementContext(id: string): Promise<AgreementContext | null> {
+  const file = await issuedRepackage(id, false).catch(() => null);
+  return file && !failed(file) ? offerAgreementContext(file.offer.id) : null;
 }
 
 // ---------------- the supplier's order ----------------

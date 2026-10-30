@@ -55,6 +55,8 @@ export type AuditAction =
   | "payment.proof_viewed"
   | "payment.schedule_set"
   | "payment.agreed_total_set"
+  | "payment.agreement_set"
+  | "payment.agreement_later"
   // the case itself: its owner, what the client page says, and the team's notes
   // (a note IS an audit row — locked to the service role, shown in the activity log)
   | "operation.assigned"

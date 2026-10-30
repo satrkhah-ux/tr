@@ -413,14 +413,15 @@ function Schedule({
   const router = useRouter();
   const today = riyadhDate();
   const stored = installments.length > 0;
-  const schedule = stored
+  const schedule: { due_date: string | null; amount: number; note?: string | null }[] = stored
     ? installments
     : defaultSchedule({ total: operation.total, confirmed_on: riyadhDate(operation.confirmed_at), travel_start: operation.travel_start });
   const rows = installmentStates(schedule, paid, today);
-  const [draft, setDraft] = useState<{ due_date: string; amount: string }[] | null>(() =>
+  // the note carries the agreed way of paying («الوسيلة: …», agreement.ts) — kept through an edit
+  const [draft, setDraft] = useState<{ due_date: string; amount: string; note?: string | null }[] | null>(() =>
     startEditing && canManage
       ? schedule.length > 0
-        ? schedule.map((r) => ({ due_date: r.due_date ?? "", amount: String(r.amount) }))
+        ? schedule.map((r) => ({ due_date: r.due_date ?? "", amount: String(r.amount), note: r.note ?? null }))
         : [{ due_date: today, amount: operation.total != null ? String(operation.total) : "" }]
       : null,
   );
@@ -430,7 +431,7 @@ function Schedule({
   const draftSum = (draft ?? []).reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const mismatch = draft && operation.total != null && Math.abs(draftSum - operation.total) > 0.005;
 
-  const save = (next: { due_date: string; amount: number }[]) =>
+  const save = (next: { due_date: string; amount: number; note?: string | null }[]) =>
     startTransition(async () => {
       setError(null);
       const res = await saveInstallments(operation.id, next);
@@ -441,7 +442,7 @@ function Schedule({
       }
     });
 
-  const setRow = (i: number, patch: Partial<{ due_date: string; amount: string }>) =>
+  const setRow = (i: number, patch: Partial<{ due_date: string; amount: string; note?: string | null }>) =>
     setDraft((d) => (d ?? []).map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   return (
@@ -464,7 +465,7 @@ function Schedule({
               onClick={() =>
                 setDraft(
                   schedule.length > 0
-                    ? schedule.map((r) => ({ due_date: r.due_date ?? "", amount: String(r.amount) }))
+                    ? schedule.map((r) => ({ due_date: r.due_date ?? "", amount: String(r.amount), note: r.note ?? null }))
                     : [{ due_date: today, amount: operation.total != null ? String(operation.total) : "" }],
                 )
               }
@@ -476,7 +477,13 @@ function Schedule({
           </div>
         )}
       </div>
-      {stored ? null : <p className="mt-1 text-[11px] font-semibold text-tv-text-faint">{t("ops.pay.scheduleDefault")}</p>}
+      {stored ? null : (
+        <>
+          {/* confirmed with «لاحقاً» (or before the question existed): the agreement is still to be made */}
+          <p className="mt-1 inline-flex rounded-full bg-tv-status-warning-bg px-2.5 py-0.5 text-[11.5px] font-extrabold text-tv-status-warning">{t("ops.pay.agreementUnset")}</p>
+          <p className="mt-1 text-[11px] font-semibold text-tv-text-faint">{t("ops.pay.scheduleDefault")}</p>
+        </>
+      )}
 
       {draft ? (
         <div className="mt-2 space-y-2">
@@ -521,7 +528,7 @@ function Schedule({
             <button
               type="button"
               disabled={pending || draft.length === 0 || draft.some((r) => !r.due_date || !(Number(r.amount) > 0))}
-              onClick={() => save(draft.map((r) => ({ due_date: r.due_date, amount: Number(r.amount) })))}
+              onClick={() => save(draft.map((r) => ({ due_date: r.due_date, amount: Number(r.amount), note: r.note })))}
               className="tv-btn-primary inline-flex h-9 items-center gap-2 rounded-[10px] px-4 text-[12.5px] font-bold disabled:opacity-60 max-sm:min-h-10"
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -540,6 +547,7 @@ function Schedule({
             <li key={i} className="flex items-center justify-between gap-2 text-[12px] font-bold">
               <span className="tv-tnum text-[#557d78]">
                 {r.due_date ? <DirText dir="ltr">{r.due_date}</DirText> : t("ops.pay.noDueDate")}
+                {r.note ? <span className="ms-1.5 text-[11px] font-semibold text-tv-text-faint">{r.note}</span> : null}
               </span>
               <span className="flex items-center gap-2">
                 <span className="tv-tnum text-[#0f3d38]">
