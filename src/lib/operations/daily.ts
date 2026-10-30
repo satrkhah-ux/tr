@@ -15,6 +15,7 @@ import { translate } from "@/lib/i18n";
 import { readyLabel } from "./wizard/index";
 import { BNPL_METHODS, settlementReminder } from "@/lib/payments/methods";
 import { tellEmployee } from "./payment-links-poll";
+import { dueReminder } from "./agreement";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -134,6 +135,9 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       const paid = paidTotal(((pays ?? []) as { amount: number | string; kind: string }[]).map((p) => ({ amount: Number(p.amount), kind: p.kind })));
       for (const row of installmentStates(schedule, paid, today)) {
         if (row.state === "overdue" && row.due_date && (await alertOnce(supabase, op.id, "installment_overdue", row.due_date, `💳 قسط متأخر منذ ${row.due_date}: ${(row.amount - row.covered).toLocaleString("en-US")} — ${head}`))) result.alerts += 1;
+        // due soon (3 days) and due today — the agreed schedule's own reminders (the owner, 2026-10-30)
+        const due = dueReminder(row, today);
+        if (due && row.due_date && (await alertOnce(supabase, op.id, `installment_due_${due}`, row.due_date, `💳 قسط مستحق ${due === "today" ? "اليوم" : "بعد ٣ أيام"} (${row.due_date}): ${(row.amount - row.covered).toLocaleString("en-US")} — ${head}`))) result.alerts += 1;
       }
     }
 

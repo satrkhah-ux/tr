@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ClipboardCheck, Eye, Loader2, Search, X } from "lucide-react";
+import { CalendarDays, Eye, Loader2, Search, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { StatusBadge, statusTone } from "@/components/ui/StatusBadge";
 import { listKanban, updateOfferStage, type KanbanCard, type KanbanColumn } from "@/lib/data/offers";
-import { confirmOffer } from "@/lib/data/operations";
+import { confirmOfferWithAgreement, offerAgreementContext } from "@/lib/data/payment-agreement";
+import { ClientConfirmedButton } from "./basic/ClientConfirmedButton";
 import { KANBAN_STAGES } from "@/lib/data/pipeline";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "./TraveliunShell";
@@ -229,34 +230,10 @@ export function TraveliunKanban() {
  * click lands on the same case rather than creating a duplicate.
  */
 function ConfirmToOperations({ offerId }: { offerId: string }) {
-  const { t } = useTraveliunUI();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function run() {
-    setBusy(true);
-    setError(null);
-    const res = await confirmOffer({ offer_id: offerId, channel: "whatsapp" });
-    if (!res.ok) {
-      setError(t(res.error));
-      setBusy(false);
-      return;
-    }
-    window.location.assign(`/operations/${res.id}`);
-  }
-
+  // Basic's own «العميل أكّد»: the channel, then «كيف تم الاتفاق المالي؟» (the owner, 2026-10-30)
   return (
     <div className="mt-5">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void run()}
-        className="tv-btn-primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] text-sm font-bold disabled:opacity-60"
-      >
-        {busy ? <Loader2 className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
-        {busy ? t("ops.confirming") : t("ops.confirm")}
-      </button>
-      {error ? <p className="mt-1.5 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
+      <ClientConfirmedButton draftId={offerId} confirm={confirmOfferWithAgreement} context={offerAgreementContext} className="h-11 w-full text-sm" />
     </div>
   );
 }

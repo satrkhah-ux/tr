@@ -59,6 +59,7 @@ export function CaseWizardShell({
   canReadMrz,
   openUpload = false,
   canSeeCost = false,
+  initialStep,
 }: {
   data: WizardCase;
   canManage: boolean;
@@ -67,12 +68,16 @@ export function CaseWizardShell({
   openUpload?: boolean;
   /** pricing.internal — the uploader reads suppliers' invoices (cost) only then */
   canSeeCost?: boolean;
+  /** ?step=payment — e.g. a confirmation whose payment agreement could not be saved */
+  initialStep?: string;
 }) {
   const { t } = useTraveliunUI();
   const [uploading, setUploading] = useState(openUpload);
   const op = data.operation;
   const states = stepStates(data);
-  const [step, setStep] = useState<WizardStep>(() => firstOpenStep(data));
+  const [step, setStep] = useState<WizardStep>(() =>
+    (WIZARD_STEPS as readonly string[]).includes(initialStep ?? "") ? (initialStep as WizardStep) : firstOpenStep(data),
+  );
   const Screen = SCREENS[step];
   const index = WIZARD_STEPS.indexOf(step);
   const finished = WIZARD_STEPS.filter((s) => states[s] === "done" || states[s] === "na").length;

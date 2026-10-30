@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CheckCircle2, ExternalLink, Info } from "lucide-react";
-import { confirmRepackageOrder, type RepackageFileView } from "@/lib/data/repackage-order";
+import { confirmRepackageOrder, repackageAgreementContext, type RepackageFileView } from "@/lib/data/repackage-order";
 import { ClientConfirmedButton } from "../basic/ClientConfirmedButton";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { sectionClass } from "./stage-props";
@@ -62,6 +62,7 @@ export function RepackageConfirm({
                 draftId={draftId}
                 expired={file.state === "expired"}
                 confirm={confirmRepackageOrder}
+                context={repackageAgreementContext}
                 onConfirmed={onConfirmed}
               />
             </div>

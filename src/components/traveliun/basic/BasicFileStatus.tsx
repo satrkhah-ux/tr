@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BriefcaseBusiness, CheckCircle2, Copy, Eye, FileText, History, Loader2, XCircle } from "lucide-react";
-import { cancelFile, confirmFromBasic, getFileStatus, type FileError, type FileStatusView } from "@/lib/data/file-status";
+import { basicAgreementContext, cancelFile, confirmFromBasic, getFileStatus, type FileError, type FileStatusView } from "@/lib/data/file-status";
+import type { AgreementContext } from "@/lib/data/payment-agreement";
+import type { Agreement } from "@/lib/operations/agreement";
+import { PaymentAgreementDialog } from "./PaymentAgreementDialog";
 import { AWAITING_CLIENT, SENDABLE, type FileState, type TimelineEntry } from "@/lib/offer/file-state";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -13,7 +16,7 @@ import type { CoverStyle } from "@/components/offer-doc/cover-image";
 import { TripLinkSend } from "./TripLinkSend";
 import { PayLinkTools } from "./PayLinkTools";
 import { FileStateChip } from "./FileStateChip";
-import { useBasicLabels } from "./labels";
+import { useBasicLabels, type BasicLabel } from "./labels";
 
 const ERR: Partial<Record<FileError, "fileErr_forbidden" | "fileErr_cancelled" | "fileErr_empty" | "fileErr_partner" | "fileErr_inOperations" | "fileErr_already">> = {
   forbidden: "fileErr_forbidden",
@@ -93,6 +96,8 @@ export function BasicFileStatus({
   const [tick, setTick] = useState(0);
   const [channel, setChannel] = useState<"whatsapp" | "phone" | "office">("whatsapp");
   const [busy, setBusy] = useState<"confirm" | "cancel" | null>(null);
+  const [agreeOpen, setAgreeOpen] = useState(false);
+  const [agreeCtx, setAgreeCtx] = useState<AgreementContext | null | undefined>(undefined);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState("");
@@ -152,13 +157,29 @@ export function BasicFileStatus({
   };
   const fail = (e: FileError) => setMessage({ text: tx(ERR[e] ?? "fileErr_failed"), ok: false });
 
-  async function confirm() {
+  // «كيف تم الاتفاق المالي؟» (the owner, 2026-10-30) before the confirmation itself
+  function askAgreement() {
     if (view?.state === "expired" && !window.confirm(tx("confirmExpired"))) return;
+    setAgreeOpen(true);
+    setMessage(null);
+    if (agreeCtx === undefined) basicAgreementContext(draftId).then(setAgreeCtx, () => setAgreeCtx(null));
+  }
+
+  async function confirm(agreement: Agreement) {
     setBusy("confirm");
     setMessage(null);
     try {
-      const r = await confirmFromBasic(draftId, channel);
-      if (!r.ok) return fail(r.error);
+      const r = await confirmFromBasic(draftId, channel, agreement);
+      if (!r.ok) {
+        if (r.error.startsWith("agree_")) return setMessage({ text: tx(r.error as BasicLabel), ok: false });
+        setAgreeOpen(false);
+        return fail(r.error as FileError);
+      }
+      setAgreeOpen(false);
+      if (r.agreementFailed) {
+        setMessage({ text: tx("agree_failed"), ok: false });
+        return changed();
+      }
       // stay here: the next step is the bookings' link to the client (step ③), the case one click away;
       // a partner's client hears from the partner, and without the case's door the team takes it on
       setMessage({ text: r.canOpen && !view?.partner ? tx("confirmDoneNext") : tx("confirmDoneTeam"), ok: true });
@@ -304,6 +325,14 @@ export function BasicFileStatus({
         >
           {view.canAct && awaiting ? (
             <div className="flex flex-wrap items-center gap-2">
+              <PaymentAgreementDialog
+                open={agreeOpen}
+                context={agreeCtx}
+                busy={busy === "confirm"}
+                error={agreeOpen && message && !message.ok ? message.text : null}
+                onBack={() => setAgreeOpen(false)}
+                onSubmit={(a) => void confirm(a)}
+              />
               <label className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#557d78]">
                 {tx("confirmChannel")}
                 <select
@@ -318,7 +347,7 @@ export function BasicFileStatus({
               </label>
               <button
                 type="button"
-                onClick={() => void confirm()}
+                onClick={askAgreement}
                 disabled={busy !== null}
                 className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:flex-1 max-sm:min-h-10 ${
                   sentOnce && !view.stale ? "bg-[#185045] text-white hover:bg-[#0f4439]" : "border border-[#185045] bg-white text-[#185045] hover:bg-[#f0f7f4]"

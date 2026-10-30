@@ -3360,6 +3360,7 @@ export const en = {
   "ops.pay.receiptIssue": "Issue receipt",
   "ops.pay.deleteConfirm": "Delete this payment? Its receipt link stops working and the deletion is logged.",
   "ops.pay.schedule": "Installment schedule",
+  "ops.pay.agreementUnset": "Payment agreement not set",
   "ops.pay.scheduleDefault": "Default: 50% deposit at confirmation, the rest 14 days before travel.",
   "ops.pay.scheduleEdit": "Edit schedule",
   "ops.pay.scheduleReset": "Back to default",

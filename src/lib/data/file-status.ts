@@ -9,6 +9,8 @@ import { getCurrentEmployeeId } from "./metrics";
 import { logAudit } from "./audit";
 import { setOfferStatus } from "./offer-status";
 import { confirmOffer } from "./operations";
+import { applyAgreement, checkAgreement, offerAgreementContext, type AgreementContext } from "./payment-agreement";
+import type { Agreement, AgreementError } from "@/lib/operations/agreement";
 import { clientWhatsappAllowed, offerMessage, sendOfferToClient, type ClientSendResult } from "./client-whatsapp";
 import { loadFileStatus } from "./file-status-core";
 import { getOfferCover } from "./offer-cover";
@@ -225,20 +227,37 @@ export async function sendOfferMessage(draftId: string, body: string, manual = f
 
 /**
  * «العميل أكّد» from Basic — the kanban's confirmation (confirmOffer), from the
- * file itself. A cancelled offer is not confirmed back to life.
+ * file itself. A cancelled offer is not confirmed back to life. With «كيف تم
+ * الاتفاق المالي؟» (payment-agreement.ts): checked first — a wrong date opens no
+ * case — then written into the case; if that write fails the case is open
+ * anyway and the answer says so (`agreementFailed`), for its payment step.
  */
-export async function confirmFromBasic(draftId: string, channel: "whatsapp" | "phone" | "office"): Promise<{ ok: true; operationId: string; canOpen: boolean } | Fail> {
+export async function confirmFromBasic(
+  draftId: string,
+  channel: "whatsapp" | "phone" | "office",
+  agreement?: Agreement,
+): Promise<{ ok: true; operationId: string; canOpen: boolean; agreementFailed?: AgreementError | "failed" } | Fail | { ok: false; error: `agree_${AgreementError}` }> {
   try {
     const file = await issuedFile(draftId, true);
     if (failed(file)) return file;
     if (file.offer.status === "cancelled") return { ok: false, error: "cancelled" };
+    const invalid = await checkAgreement(file.offer.id, agreement);
+    if (invalid === "failed") return { ok: false, error: "failed" };
+    if (invalid) return { ok: false, error: `agree_${invalid}` };
     const ch = channel === "phone" || channel === "office" ? channel : "whatsapp";
     const result = await confirmOffer({ offer_id: file.offer.id, channel: ch });
     if (!result.ok) return { ok: false, error: "failed" };
-    return { ok: true, operationId: result.id, canOpen: await currentCanOpen("/operations") };
+    const agreed = await applyAgreement(result.id, agreement);
+    return { ok: true, operationId: result.id, canOpen: await currentCanOpen("/operations"), ...(agreed.ok ? {} : { agreementFailed: agreed.error }) };
   } catch {
     return { ok: false, error: "failed" };
   }
+}
+
+/** What the agreement dialog starts from — the file's total, its way of paying, the travel day. */
+export async function basicAgreementContext(draftId: string): Promise<AgreementContext | null> {
+  const file = await issuedFile(draftId, false).catch(() => null);
+  return file && !failed(file) ? offerAgreementContext(file.offer.id) : null;
 }
 
 /** «إلغاء الملف» — its own employee (or operations / a manager), before operations hold it. */

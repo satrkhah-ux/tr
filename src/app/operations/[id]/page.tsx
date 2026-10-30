@@ -47,7 +47,7 @@ export default async function OperationCasePage({
 
   if (query.view !== "all") {
     const canSeeCost = await currentCan("pricing.internal");
-    return <CaseWizardShell data={data} canManage={canManage} canReadMrz={isOpenAIConfigured()} openUpload={query.upload === "1"} canSeeCost={canSeeCost} />;
+    return <CaseWizardShell data={data} canManage={canManage} canReadMrz={isOpenAIConfigured()} openUpload={query.upload === "1"} canSeeCost={canSeeCost} initialStep={typeof query.step === "string" ? query.step : undefined} />;
   }
 
   // null without pricing.internal — the card is then not drawn at all
