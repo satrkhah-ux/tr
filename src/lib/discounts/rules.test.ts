@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { couponCode, couponState, discountLabel, maskPhone, readScan } from "./rules";
+import { cleanName, couponCode, couponState, discountLabel, maskPhone, readScan } from "./rules";
 
 describe("discount rules", () => {
   it("labels", () => {
@@ -28,5 +28,19 @@ describe("discount rules", () => {
 
   it("masks the number", () => {
     expect(maskPhone("+966 55 123 4567")).toBe("05•••••567");
+  });
+});
+
+describe("cleanName", () => {
+  it("keeps a person's name, drops phrases, shops and marks", () => {
+    expect(cleanName("Hazim.")).toBe("Hazim");
+    expect(cleanName("Reham💕")).toBe("Reham");
+    expect(cleanName("عمر الجهني")).toBe("عمر الجهني");
+    expect(cleanName("استغفر الله")).toBeNull();
+    expect(cleanName("حساب تجاري")).toBeNull();
+    expect(cleanName("MARWA FAM SALES 🌷")).toBeNull();
+    expect(cleanName(".")).toBeNull();
+    expect(cleanName("خ")).toBeNull();
+    expect(cleanName(null)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { lastNine, type Audience, type DiscountKind } from "@/lib/discounts/rules";
+import { cleanName, lastNine, type Audience, type DiscountKind } from "@/lib/discounts/rules";
 
 /**
  * «قسم الخصومات» (the owner, 2026-10-31) — reads. The tables are closed to sessions; every caller
@@ -78,7 +78,7 @@ export async function recipients(audience: Audience, days: number | null): Promi
     if (key.length < 9 || !phone) return;
     const t = new Date(at).getTime();
     const was = people.get(key);
-    const clean = name?.trim() || null;
+    const clean = cleanName(name);
     if (!was) return void people.set(key, { phone: phone.trim(), name: clean, first: t, fileName });
     was.first = Math.min(was.first, t);
     if (clean && (fileName || !was.name) && !(was.fileName && !fileName)) Object.assign(was, { name: clean, fileName });
