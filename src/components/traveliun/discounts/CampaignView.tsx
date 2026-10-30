@@ -96,7 +96,7 @@ export function CampaignView({ campaign, coupons, names, preview }: { campaign: 
           </a>
         )}
         <p className="mt-3 text-[12px] font-semibold text-tv-text-faint">
-          الإرسال على واتساب عبر تيلي تيل بالقالب المعتمد «traveliun_coupon». كل كوبون يُرسل مرة واحدة، ورد العميل يصل لمحادثته كالمعتاد.
+          الإرسال على واتساب عبر تيلي تيل بالقالب المعتمد «traveliun_coupon_card»: صورة الكوبون بالعرض أعلى الرسالة ثم النص والرابط. كل كوبون يُرسل مرة واحدة، ورد العميل يصل لمحادثته كالمعتاد.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" disabled={running || left === 0} onClick={() => void send(false)}

@@ -75,6 +75,20 @@ async function documentHandle() {
   return up?.h ?? null;
 }
 
+/** A sample picture for an image header (the coupon card): --image=path/to/sample.png */
+async function imageHandle() {
+  const path = process.argv.find((a) => a.startsWith("--image="))?.slice(8);
+  if (!path) return null;
+  const png = readFileSync(path);
+  const debug = await fetch(`${GRAPH}/debug_token?input_token=${token}&access_token=${token}`).then((r) => r.json());
+  const appId = debug?.data?.app_id;
+  if (!appId) return null;
+  const session = await fetch(`${GRAPH}/${appId}/uploads?file_name=sample.png&file_length=${png.length}&file_type=image/png&access_token=${token}`, { method: "POST" }).then((r) => r.json());
+  if (!session?.id) return null;
+  const up = await fetch(`${GRAPH}/${session.id}`, { method: "POST", headers: { Authorization: `OAuth ${token}`, file_offset: "0" }, body: png }).then((r) => r.json());
+  return up?.h ?? null;
+}
+
 // --only=name1,name2: submit just these templates
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split(",").filter(Boolean);
 
@@ -94,6 +108,14 @@ for (const [key, def] of Object.entries(WA_TEMPLATES)) {
       continue;
     }
     components.unshift({ type: "HEADER", format: "DOCUMENT", example: { header_handle: [handle] } });
+  }
+  if (def.image) {
+    const handle = SUBMIT ? await imageHandle() : "<uploaded sample png>";
+    if (!handle) {
+      console.log(`! ${def.name}: pass --image=sample.png (the header picture's example)`);
+      continue;
+    }
+    components.unshift({ type: "HEADER", format: "IMAGE", example: { header_handle: [handle] } });
   }
   const payload = { name: def.name, language: "ar", category: def.category ?? "UTILITY", components };
   if (!SUBMIT) {

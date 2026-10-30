@@ -141,6 +141,8 @@ export type WaTemplateDef = {
   body: string;
   /** the programme carries its PDF as the template's document header. */
   document?: boolean;
+  /** a picture as the header — the coupon's landscape card (lib/discounts/card.tsx). */
+  image?: boolean;
   /** Meta's category; UTILITY unless said (a follow-up on an offer is MARKETING). */
   category?: "UTILITY" | "MARKETING";
 };
@@ -268,8 +270,10 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
   },
   // «قسم الخصومات» (the owner, 2026-10-31): a personal coupon — the link opens its page with the QR (lib/discounts)
   coupon: {
-    name: "traveliun_coupon",
+    // the first «traveliun_coupon» (text only) was replaced before approval by this one with the card on top
+    name: "traveliun_coupon_card",
     category: "MARKETING",
+    image: true,
     params: ["name", "discount", "date", "link"],
     body: [
       HELLO,

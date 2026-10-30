@@ -94,6 +94,8 @@ export type WaTemplateSend = {
   params: string[];
   /** the programme's PDF: its public URL (Meta fetches it) and the serial it is rendered from first. */
   document?: { url: string; name: string; serial: string; cover?: CoverStyle };
+  /** the header picture's public URL (Meta fetches it). */
+  image?: string;
 };
 
 
@@ -130,6 +132,8 @@ export async function messageClient(
           params: extra.template.params,
           preview: waPreview(def, extra.template.params),
           document: def.document ? extra.template.document : undefined,
+          image: def.image && extra.template.image ? { url: extra.template.image } : undefined,
+          category: def.category,
         };
         if (template.document) {
           // Meta fetches the document itself and will not wait the ~5 s Chromium takes:

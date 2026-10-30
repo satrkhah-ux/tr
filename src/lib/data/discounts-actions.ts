@@ -160,7 +160,7 @@ export async function sendBatch(campaignId: string, count: number): Promise<{ ok
     const result = await messageClient(
       { employee_id: me, partner_company_id: null, customer: { arabic_name: c.client_name, mobile: c.phone } },
       m.text,
-      { template: { key: "coupon", params: m.params }, labels: ["كوبون"] },
+      { template: { key: "coupon", params: m.params, image: `${site()}/coupon/${c.token}/card` }, labels: ["كوبون"] },
     );
     const ok = result === "sent" || result === "template";
     last = RESULT_LABEL[result] ?? result;

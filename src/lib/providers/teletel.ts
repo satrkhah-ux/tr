@@ -180,7 +180,7 @@ export async function whatsappTemplateStatus(): Promise<Map<string, string> | nu
  */
 export async function sendTeletelTemplate(
   conversationId: number,
-  template: { name: string; params: string[]; preview: string; document?: { url: string; name: string }; category?: "UTILITY" | "MARKETING" },
+  template: { name: string; params: string[]; preview: string; document?: { url: string; name: string }; image?: { url: string }; category?: "UTILITY" | "MARKETING" },
 ): Promise<number | null> {
   const config = getTeletelConfig();
   if (!config) return null;
@@ -196,6 +196,7 @@ export async function sendTeletelTemplate(
       processed_params: {
         body,
         ...(template.document ? { header: { media_url: template.document.url, media_type: "document", media_name: template.document.name } } : {}),
+        ...(template.image ? { header: { media_url: template.image.url, media_type: "image" } } : {}),
       },
     },
   });
