@@ -92,6 +92,8 @@ export function shownDetail(detail: Record<string, string> | null | undefined): 
   delete rest[HOTEL_ID_KEY];
   // the supplier price check's currency (supplier-booking.ts) — ours, never a paper's
   delete rest.prebook_currency;
+  // «مسترجع / غير مسترجع / يُلغى إن لم يُدفع» (refund-mode.ts) — ours; the pay_by hold is never the client's
+  delete rest.refund_mode;
   return rest;
 }
 

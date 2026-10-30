@@ -19,6 +19,7 @@ import type { StepProps } from "@/lib/operations/wizard/types";
 import { SuggestInput } from "../../SuggestInput";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
+import { RefundBadge } from "../RefundEdit";
 
 export const wzCard = "tv-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 export const wzField =
@@ -323,8 +324,12 @@ function FlightCard({
             {t("wz.flights.ourRef")}: <DirText>{booking.company_ref ?? "—"}</DirText>
           </p>
         </div>
-        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
-          {done ? t("wz.flights.ticketed") : t("wz.flights.waiting")}
+        <span className="flex flex-wrap items-center gap-1">
+          {/* a ticket, once issued, is not refunded (the owner, 2026-10-30) */}
+          <RefundBadge booking={booking} />
+          <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-tv-status-success-bg text-tv-status-success" : "bg-tv-status-warning-bg text-tv-status-warning"}`}>
+            {done ? t("wz.flights.ticketed") : t("wz.flights.waiting")}
+          </span>
         </span>
       </div>
 

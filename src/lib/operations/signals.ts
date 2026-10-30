@@ -13,6 +13,7 @@
  */
 
 import { hotelFinal } from "./client-booking-state";
+import { riyadhDay } from "./refund-mode";
 import { passportExpiringWithin } from "./traveler-dto";
 import { installmentStates, type Installment } from "./payments";
 import type { ClientStatus, ExecutionStatus } from "./state";
@@ -57,6 +58,10 @@ export type OperationSnapshot = {
     /** a hotel's number and ours — what tells the hotel's FINAL confirmation (hotelFinal). Optional: unknown = lenient. */
     confirmation_number?: string | null;
     company_ref?: string | null;
+    /** paid to the supplier — a paid pay_by hold has nothing left to lose. Optional: unknown = unpaid. */
+    is_paid?: boolean | null;
+    /** detail.refund_mode (refund-mode.ts). Optional: unknown = the confirmed-only rule. */
+    refund_mode?: string | null;
   }[];
   documents: { kind: string; booking_id: string | null; created_at?: string | null }[];
   travelers: { display_name: string; passport_expiry: string | null }[];
@@ -155,18 +160,21 @@ export function passportExpiring(op: OperationSnapshot, today: string): string[]
 }
 
 /**
- * A confirmed booking whose free-cancellation window closes within days.
+ * A confirmed booking whose free-cancellation window closes within days — or
+ * a hold the hotel cancels unless we pay by its day (pay_by, the owner
+ * 2026-10-30), whatever its status, until it is paid.
  *
  * This is the one signal that stops real money leaving: past the deadline a
- * cancellation costs a fee, so a case being quietly reconsidered has to surface
- * before then, not after.
+ * cancellation costs a fee (or the room is gone), so it has to surface before
+ * then, not after.
  */
 export function cancellationDeadlineNear(op: OperationSnapshot, today: string): string[] {
   const limit = addDays(today, DEADLINE_WARN_DAYS);
   if (!limit) return [];
   return op.bookings
-    .filter((b) => b.status === "confirmed" && b.cancellation_deadline != null)
-    .filter((b) => (b.cancellation_deadline as string).slice(0, 10) <= limit)
+    .filter((b) => b.cancellation_deadline != null && b.status !== "cancelled")
+    .filter((b) => (b.refund_mode === "pay_by" ? !b.is_paid : b.status === "confirmed"))
+    .filter((b) => (riyadhDay(b.cancellation_deadline) ?? "") <= limit)
     .map((b) => b.title);
 }
 

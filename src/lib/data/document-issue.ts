@@ -5,6 +5,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { notifyPartnerCase } from "@/lib/data/ops-notify";
+import { clientPolicy } from "@/lib/operations/refund-mode";
 import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, HOTEL_ID_KEY, hotelIdOf, shownDetail, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { ensureCatalogHotel, requestHotelData } from "@/lib/data/hotel-data-request";
 import { voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
@@ -77,7 +78,7 @@ function toVoucherBooking(b: BookingRow): VoucherBooking {
     confirmation_number: b.confirmation_number,
     supplier_name: b.supplier_name,
     detail: shownDetail(b.detail ?? {}),
-    cancellation_policy: b.cancellation_policy,
+    cancellation_policy: clientPolicy(b.cancellation_policy, b.detail),
     is_paid: b.is_paid,
   };
 }

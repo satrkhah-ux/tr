@@ -67,6 +67,7 @@ type SeedRow = {
   detail: Record<string, string>;
   supplier_name: string;
   cancellation_policy: string | null;
+  cancellation_deadline?: string | null;
   quoted_net: number | null;
   currency: string;
   /** the registered supplier a line is handed to when it is seeded (a repackage's package line). */
@@ -352,6 +353,7 @@ export async function pullBookingsFromOffer(operationId: string): Promise<SeedRe
       status: "pending",
       client_reference: `TRV-${randomUUID()}`,
       cancellation_policy: r.cancellation_policy,
+      cancellation_deadline: r.cancellation_deadline ?? null,
       quoted_net: r.quoted_net,
       currency: r.currency,
       created_by: employeeId,

@@ -41,6 +41,7 @@ import { BOARD_AR } from "@/components/offer-doc/labels";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { roomsJson, seededSpec, type BookingRoomSpec } from "./room-details";
 import { HOTEL_ID_KEY, hotelIdOf, ROOM_SPEC_KEY } from "./voucher-dto";
+import { draftRefund, endOfRiyadhDay, FLIGHT_POLICY, refundPolicyText, REFUND_MODE_KEY } from "./refund-mode";
 
 export type PlannedBooking = {
   origin_ref: string;
@@ -52,6 +53,8 @@ export type PlannedBooking = {
   detail: Record<string, string>;
   supplier_name: string;
   cancellation_policy: string | null;
+  /** the last free-cancellation / pay-by moment (refund-mode.ts) — null when none. */
+  cancellation_deadline?: string | null;
   quoted_net: number | null;
   currency: string;
 };
@@ -279,9 +282,10 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         city_name: "",
         start_date: ref === "flight:intl" ? data.trip.arrival_date : null,
         end_date: ref === "flight:intl" ? data.trip.departure_date : null,
-        detail: { الركاب: pax },
+        detail: { الركاب: pax, [REFUND_MODE_KEY]: "non_refundable" },
         supplier_name: "",
-        cancellation_policy: null,
+        cancellation_policy: FLIGHT_POLICY,
+        cancellation_deadline: null,
         quoted_net: null,
         currency: "SAR",
       });
@@ -301,9 +305,10 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         city_name: "",
         start_date: ref === "flight:intl" ? data.trip.arrival_date : (legs[0].departure_at?.slice(0, 10) ?? null),
         end_date: ref === "flight:intl" ? data.trip.departure_date : (legs.at(-1)?.departure_at?.slice(0, 10) ?? null),
-        detail: { الركاب: pax },
+        detail: { الركاب: pax, [REFUND_MODE_KEY]: "non_refundable" },
         supplier_name: supplier,
-        cancellation_policy: null,
+        cancellation_policy: FLIGHT_POLICY,
+        cancellation_deadline: null,
         quoted_net: price,
         currency,
       });
@@ -320,6 +325,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
     const cabin = [...new Set(legs.map((f) => f.cabin_class).filter(Boolean))].join("، ");
     if (cabin) detail["الدرجة"] = cabin;
     detail["الركاب"] = pax;
+    // a ticket, once issued, is not refunded (the owner, 2026-10-30)
+    detail[REFUND_MODE_KEY] = "non_refundable";
     // the route of the legs actually written; the ticket rewrites it (wizard-tickets ticketTitle)
     const realOut = real.filter((f) => f.leg_order === "outbound");
     const route =
@@ -336,7 +343,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       end_date: legs.at(-1)?.departure_at?.slice(0, 10) ?? null,
       detail,
       supplier_name: supplier || [...new Set(real.map((f) => f.airline).filter(Boolean))].join("، "),
-      cancellation_policy: null,
+      cancellation_policy: FLIGHT_POLICY,
+      cancellation_deadline: null,
       quoted_net: price,
       currency,
     });
@@ -375,6 +383,9 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       if (stay.nights) detail["عدد الليالي"] = String(stay.nights);
       detail["النزلاء"] = pax;
       if (Object.keys(specs).length > 0) detail[ROOM_SPEC_KEY] = roomsJson(specs);
+      // «مسترجع حتى / غير مسترجع / يُلغى إن لم ندفع حتى» — the supplier rate's own, else what the agent chose
+      const refund = line.sourcing ? { mode: line.sourcing.refundable ? ("refundable_until" as const) : ("non_refundable" as const), date: null } : draftRefund(line);
+      if (refund) detail[REFUND_MODE_KEY] = refund.mode;
       rows.push({
         origin_ref: n === 1 ? `stay:${line.id}` : `stay:${line.id}#${n}`,
         kind: "hotel",
@@ -385,7 +396,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         end_date: stay.check_out,
         detail,
         supplier_name: line.supplier ?? "",
-        cancellation_policy: line.sourcing?.cancellation_policy?.trim() || companyCancellation,
+        cancellation_policy: line.sourcing?.cancellation_policy?.trim() || (refund ? refundPolicyText(refund.mode, refund.date) : companyCancellation),
+        cancellation_deadline: refund?.date ? endOfRiyadhDay(refund.date) : null,
         quoted_net: line.sourcing?.net_base ?? stayTotal(line),
         currency: line.sourcing ? "SAR" : line.manual_currency || "SAR",
       });

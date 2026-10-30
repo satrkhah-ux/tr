@@ -871,6 +871,12 @@ export type DraftHotel = {
   /** refundable until this date (YYYY-MM-DD); only with refundable === true. */
   refundable_until?: string | null;
   /**
+   * «يُلغى إن لم ندفع حتى» (the owner, 2026-10-30): the hotel holds the room and
+   * cancels it unless we pay by this date (YYYY-MM-DD). Only when refundable is
+   * not set. INTERNAL — never printed for the client (stayCancellation).
+   */
+  pay_by?: string | null;
+  /**
    * Who the stay was booked through (company_suppliers) when the agent typed
    * the price. Internal: never on the client document.
    */
@@ -986,6 +992,7 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
     ...(h.refundable === true && typeof h.refundable_until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(h.refundable_until)
       ? { refundable_until: h.refundable_until }
       : {}),
+    ...(typeof h.refundable !== "boolean" && typeof h.pay_by === "string" && /^\d{4}-\d{2}-\d{2}$/.test(h.pay_by) ? { pay_by: h.pay_by } : {}),
     ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
     ...(typeof h.priced_nights === "number" && h.priced_nights > 0 ? { priced_nights: h.priced_nights } : {}),
     ...(h.room_change === true ? { room_change: true } : {}),
@@ -2264,7 +2271,7 @@ export function sourcingFits(stay: HotelStay, trip: { adults: number; children: 
   );
 }
 
-/** The cancellation line a stay prints: the supplier's own policy, else what the agent marked. */
+/** The cancellation line a stay prints: the supplier's own policy, else what the agent marked. A pay_by hold is ours: nothing prints. */
 export function stayCancellation(h: Pick<DraftHotel, "sourcing" | "refundable" | "refundable_until">): string | null {
   if (h.sourcing) return h.sourcing.cancellation_policy || null;
   if (h.refundable === true) return h.refundable_until ? `قابل للاسترداد حتى ${h.refundable_until}` : "قابل للاسترداد";

@@ -90,7 +90,7 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
 
     const ids = operations.map((o) => o.id);
     const [bookingsRes, docsRes, paysRes, travRes, instRes] = await Promise.all([
-      supabase.from("operation_bookings").select("id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref").in("operation_id", ids),
+      supabase.from("operation_bookings").select("id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref, is_paid, refund_mode:detail->>refund_mode").in("operation_id", ids),
       supabase.from("operation_documents").select("operation_id, kind, booking_id, created_at").is("revoked_at", null).in("operation_id", ids),
       supabase.from("operation_payments").select("operation_id, amount, kind").in("operation_id", ids),
       supabase.from("operation_travelers").select("operation_id, display_name, passport_expiry").in("operation_id", ids),
@@ -106,7 +106,7 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
       }
       return out;
     };
-    const bookings = group((bookingsRes.data ?? []) as unknown as { operation_id: string; id: string; kind: string; title: string; status: string; cancellation_deadline: string | null; confirmed_at: string | null; confirmation_number: string | null; company_ref: string | null }[]);
+    const bookings = group((bookingsRes.data ?? []) as unknown as { operation_id: string; id: string; kind: string; title: string; status: string; cancellation_deadline: string | null; confirmed_at: string | null; confirmation_number: string | null; company_ref: string | null; is_paid: boolean | null; refund_mode: string | null }[]);
     const documents = group((docsRes.data ?? []) as unknown as { operation_id: string; kind: string; booking_id: string | null; created_at: string }[]);
     const travelers = group((travRes.data ?? []) as unknown as { operation_id: string; display_name: string; passport_expiry: string | null }[]);
     const installments = group((instRes.data ?? []) as unknown as { operation_id: string; due_date: string | null; amount: number }[]);

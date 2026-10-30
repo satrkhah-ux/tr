@@ -21,6 +21,7 @@ import { AddBooking } from "../DocumentsPanel";
 import { PullNotice, wzCard, wzField, wzPrimary, wzSecondary } from "./FlightsStep";
 import { IssueGuardNotice } from "../../IssueGuardNotice";
 import { SupplierBooking } from "../SupplierBooking";
+import { RefundBadge, RefundEditor } from "../RefundEdit";
 
 /** «الوصول → المغادرة» — on a narrow phone it breaks at the arrow, never inside a date */
 function Stay({ b }: { b: Pick<OperationBooking, "start_date" | "end_date"> }) {
@@ -229,6 +230,7 @@ function HotelRow({
           <span className="break-words text-[#185045]">{booking.title}</span>
           {dot}
           <Stay b={booking} />
+          <RefundBadge booking={booking} />
           {done && !open ? (
             <>
               {dot}
@@ -296,6 +298,8 @@ function HotelRow({
           </p>
           {/* «ينفّذه» — who books this hotel, and the request to them (as on «عرض الكل») */}
           <AssignBooking booking={booking} operationId={booking.operation_id} assignees={assignees} partnerId={partnerId} onDone={() => undefined} />
+          {/* «مسترجع حتى / غير مسترجع / يُلغى إن لم يُدفع قبل» — the reminders read it (ops daily) */}
+          <RefundEditor booking={booking} />
           <div className="flex flex-wrap gap-2">
             {booking.source === "api" && !done ? (
               <button type="button" disabled={pending} onClick={pullFromSupplier} className={wzSecondary}>

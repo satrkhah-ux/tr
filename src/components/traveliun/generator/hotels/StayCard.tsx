@@ -222,16 +222,16 @@ export function StayCard({
           {/* The price is OURS only when typed: a supplier rate is a quote we
               were given. Typed prices are per room for the whole stay (above);
               here is what they are in, and who the stay was booked through. */}
-          {!line.sourcing ? (
-            <div className="mt-3">
-              <RefundControl
-                refundable={line.refundable}
-                until={line.refundable_until}
-                onChange={(v) => onSetHotel(v)}
-                labels={{ yes: t("pg.refundable"), no: t("pg.nonRefundable"), until: t("pg.refundUntil") }}
-              />
-            </div>
-          ) : null}
+          <div className="mt-3">
+            <RefundControl
+              refundable={line.sourcing ? line.sourcing.refundable : line.refundable}
+              until={line.sourcing ? null : line.refundable_until}
+              payBy={line.sourcing ? null : line.pay_by}
+              locked={!!line.sourcing}
+              onChange={(v) => onSetHotel(v)}
+              labels={{ yes: t("pg.refundable"), no: t("pg.nonRefundable"), until: t("pg.refundUntil"), payBy: t("pg.payBy") }}
+            />
+          </div>
           {!line.sourcing ? (
             <div className="mt-3 grid gap-3 sm:grid-cols-[130px_minmax(0,1fr)]">
               <label className={rowLabelClass}>

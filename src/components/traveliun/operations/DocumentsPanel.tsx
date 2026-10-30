@@ -671,7 +671,7 @@ const KIND_FIELDS: Partial<Record<OperationBooking["kind"], string[]>> = {
 function detailForm(booking: OperationBooking): Record<string, string> {
   const d = { ...(booking.detail ?? {}), ...carFields(booking.detail) };
   // the room details are «تفاصيل الغرفة»'s, not a field to type JSON into
-  const keys = [...new Set([...Object.keys(d), ...(KIND_FIELDS[booking.kind] ?? [])])].filter((k) => k !== DRV.cars && k !== ROOM_SPEC_KEY && k !== HOTEL_ID_KEY && k !== "prebook_currency");
+  const keys = [...new Set([...Object.keys(d), ...(KIND_FIELDS[booking.kind] ?? [])])].filter((k) => k !== DRV.cars && k !== ROOM_SPEC_KEY && k !== HOTEL_ID_KEY && k !== "prebook_currency" && k !== "refund_mode");
   const car = keys.indexOf(DRV.car);
   if (car >= 0) keys.splice(car + 1, 0, DRV.cars);
   return Object.fromEntries(keys.map((k) => [k, d[k] ?? ""]));

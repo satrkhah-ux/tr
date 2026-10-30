@@ -60,7 +60,7 @@ async function loadCase(service: SupabaseClient, operationId: string): Promise<C
   const [bookingsRes, paymentsRes] = await Promise.all([
     service
       .from("operation_bookings")
-      .select("id, kind, title, city_name, start_date, end_date, status, confirmation_number, company_ref, pnr, ticket_numbers, flight_legs, is_paid, detail, origin_ref")
+      .select("id, kind, title, city_name, start_date, end_date, status, confirmation_number, company_ref, pnr, ticket_numbers, flight_legs, is_paid, cancellation_deadline, detail, origin_ref")
       .eq("operation_id", operationId),
     service.from("operation_payments").select("amount, kind").eq("operation_id", operationId),
   ]);
@@ -104,7 +104,10 @@ async function prepared(service: SupabaseClient, operationId: string, c: CaseCli
     bookings: c.bookings,
     voucherStays: ((docsRes.data ?? []) as { stays: StayKey[] | null }[]).flatMap((d) => d.stays ?? []),
     sent: new Set(((sentRes.data ?? []) as { template: string }[]).map((d) => d.template)),
+    today: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
+    owed: (remainingBalance(c.offer.total != null ? Number(c.offer.total) : null, c.paid) ?? 0) > 0,
   });
+
 }
 
 export type PreparedList = {

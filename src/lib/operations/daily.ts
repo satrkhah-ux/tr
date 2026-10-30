@@ -15,6 +15,10 @@ import { translate } from "@/lib/i18n";
 import { readyLabel } from "./wizard/index";
 import { BNPL_METHODS, settlementReminder } from "@/lib/payments/methods";
 import { tellEmployee } from "./payment-links-poll";
+import { notifyEmployee } from "@/lib/notifications/notify";
+import { endOfRiyadhDay, reminderStep, reminderText, riyadhDay } from "./refund-mode";
+
+
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -154,7 +158,68 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
   // «قائمة متابعتك اليوم» — the waits whose day has come, once per case a day (wizard-case.ts)
   result.alerts += await notifyDueWaits(supabase, today);
   result.alerts += await settlementReminders(supabase, today);
+  result.alerts += await refundDeadlineReminders(supabase, ops, today);
   return result;
+}
+
+/**
+ * Who answers for paying a supplier (the owner, 2026-10-30: «الموظف المسؤول والحسابات»).
+ * ponytail: no «الحسابات» permission exists; commissions.approve («يعتمد ويصرف») is the
+ * one that pays money out — a dedicated key when the accounts team gets a role.
+ */
+export const ACCOUNTS_PERMISSION = "commissions.approve" as const;
+
+/**
+ * «ادفع قبل … وإلا يُلغى الحجز» / «آخر يوم للإلغاء المجاني …» (the owner, 2026-10-30):
+ * 3 days, 1 day and the day itself before an unpaid booking's pay_by or
+ * refundable_until day — each step once per booking and day (operation_alerts
+ * «refund_deadline», ref booking:day:step; a new day re-arms them). To operations
+ * (notifyOps), the booking's «ينفّذه» else the case's «مسؤول الحالة» else its seller,
+ * and accounts. With the first, a case note tagging that employee: the client's
+ * reminder waits in «رسائل جاهزة للإرسال» — prepared, never sent from here.
+ */
+async function refundDeadlineReminders(supabase: SupabaseClient, ops: Op[], today: string): Promise<number> {
+  const live = new Map(ops.map((op) => [op.id, op]));
+  if (live.size === 0) return 0;
+  const { data } = await supabase
+    .from("operation_bookings")
+    .select("id, operation_id, title, city_name, cancellation_deadline, assignee_employee_id, refund_mode:detail->>refund_mode, operations(assignee_id, offers(employee_id))")
+    .in("detail->>refund_mode", ["pay_by", "refundable_until"])
+    .eq("is_paid", false)
+    .neq("status", "cancelled")
+    .gte("cancellation_deadline", new Date(`${today}T00:00:00+03:00`).toISOString())
+    .lte("cancellation_deadline", endOfRiyadhDay(addDays(today, 3)) ?? today);
+  type Row = { id: string; operation_id: string; title: string; city_name: string; cancellation_deadline: string; assignee_employee_id: string | null; refund_mode: "pay_by" | "refundable_until"; operations: unknown };
+  const one = <T,>(v: T | T[] | null | undefined): T | undefined => (Array.isArray(v) ? v[0] : (v ?? undefined));
+  let sent = 0;
+  for (const b of (data ?? []) as Row[]) {
+    const op = live.get(b.operation_id);
+    const day = riyadhDay(b.cancellation_deadline);
+    const step = day ? reminderStep(day, today) : null;
+    if (!op || !day || step === null) continue;
+    const head = `${b.title}${b.city_name ? ` — ${b.city_name}` : ""}`;
+    const text = `${reminderText(b.refund_mode, head, day, today)} — ${serialOf(op)}`;
+    if (!(await alertOnce(supabase, op.id, "refund_deadline", `${b.id}:${day}:${step}`, text))) continue;
+    sent += 1;
+    const caseRow = one(b.operations as { assignee_id: string | null; offers: unknown } | null);
+    const owner = b.assignee_employee_id ?? caseRow?.assignee_id ?? one(caseRow?.offers as { employee_id: string | null } | null)?.employee_id ?? null;
+    const href = `/operations/${op.id}`;
+    if (owner) await tellEmployee(supabase, owner, text, href, `refund:${b.id}:${day}:${step}`);
+    await notifyEmployee({ permission: ACCOUNTS_PERMISSION, kind: "ops", title: text, href, source: "operations", dedupeKey: `refund:${b.id}:${day}:${step}` });
+    // the case note, once per booking and day — naming who sends the client's reminder
+    const { error } = await supabase.from("operation_alerts").insert({ operation_id: op.id, kind: "refund_note", ref: `${b.id}:${day}` });
+    if (error) continue;
+    const { data: who } = owner ? await supabase.from("employees").select("arabic_name").eq("id", owner).maybeSingle() : { data: null };
+    const name = (who as { arabic_name: string | null } | null)?.arabic_name?.trim();
+    await logAudit({
+      action: "operation.note",
+      entity: "operations",
+      entity_id: op.id,
+      meta: { note: `📌 ${name ? `@${name}: ` : ""}${text}. جاهز للإرسال: تذكير السداد للعميل في «رسائل جاهزة للإرسال» (إن بقي عليه مبلغ) — راجعه وأرسله.` },
+      actor: { id: null, label: "ops-daily" },
+    });
+  }
+  return sent;
 }
 
 /**

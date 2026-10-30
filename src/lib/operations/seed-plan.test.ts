@@ -537,7 +537,7 @@ describe("flights the package did not sell, or only planned (the evaluator, 2026
     const intl = rows.find((r) => r.origin_ref === "flight:intl")!;
     expect(intl.title).toBe(`طيران دولي — ${FLIGHT_NEEDED}`);
     expect([intl.start_date, intl.end_date]).toEqual(["2026-11-20", data.trip.departure_date]);
-    expect(Object.keys(intl.detail)).toEqual(["الركاب"]);
+    expect(Object.keys(intl.detail)).toEqual(["الركاب", "refund_mode"]);
     expect(rows.find((r) => r.origin_ref === "flight:dom")!.title).toBe(`طيران داخلي — ${FLIGHT_NEEDED}`);
     // no drive is timed from a planned flight
     expect(JSON.stringify(rows)).not.toMatch(/00:00|MED/);

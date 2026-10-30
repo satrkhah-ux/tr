@@ -1,5 +1,6 @@
 import { flightLegs, type Leg } from "./drivers";
 import { arabicDay } from "./client-messages";
+import { daysLeft, REFUND_MODE_KEY, riyadhDay } from "./refund-mode";
 
 /**
  * What the client's trip link shows for each service, and when (the owner,
@@ -36,6 +37,8 @@ export type ClientBookingRow = {
   ticket_numbers?: string[] | null;
   flight_legs?: FlightLegRow[] | null;
   is_paid?: boolean | null;
+  /** the refundable / pay-by day (refund-mode.ts). Optional: rows read without it prepare no reminder. */
+  cancellation_deadline?: string | null;
   detail: Record<string, string> | null;
 };
 
@@ -172,6 +175,9 @@ export function preparedMessages(input: {
   /** the stays on the case's live hotel vouchers. */
   voucherStays: readonly StayKey[];
   sent: ReadonlySet<string>;
+  /** Riyadh today and whether the client still owes us — together they prepare the payment reminder. */
+  today?: string;
+  owed?: boolean;
 }): PreparedMessage[] {
   if (!input.link) return [];
   const where = input.destination?.trim() ? ` إلى ${input.destination.trim()}` : "";
@@ -241,6 +247,32 @@ export function preparedMessages(input: {
         SIGN,
       ].join("\n\n"),
     });
+  }
+
+  // «نذكّركم بأن حجز فندق X يتطلب السداد قبل …» (the owner, 2026-10-30): a hotel whose free cancellation
+  // or hold ends within 3 days, unpaid, while the client still owes us. Never says the room is only held.
+  if (input.today && input.owed) {
+    for (const b of live.filter((x) => x.kind === "hotel" && x.id && !x.is_paid)) {
+      const mode = b.detail?.[REFUND_MODE_KEY];
+      const day = riyadhDay(b.cancellation_deadline);
+      if ((mode !== "pay_by" && mode !== "refundable_until") || !day) continue;
+      const left = daysLeft(day, input.today);
+      const key = `paydue:${b.id}:${day}`;
+      if (left < 0 || left > 3 || input.sent.has(key)) continue;
+      const h = clientHotel(b);
+      out.push({
+        key,
+        label: `تذكير السداد — فندق ${h.name}`,
+        template: "booking_update",
+        body: [
+          input.hello,
+          `نذكّركم بأن حجز فندق ${h.name}${h.city ? ` في ${h.city}` : ""} يتطلب إتمام السداد قبل ${arabicDay(day)}، حتى نثبّت الحجز لكم.`,
+          "تفاصيل رحلتك في الرابط:",
+          input.link,
+          SIGN,
+        ].join("\n\n"),
+      });
+    }
   }
   return out;
 }

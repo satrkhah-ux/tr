@@ -19,6 +19,7 @@ import { carCount, DRV } from "@/lib/operations/drivers";
 import { entriesToSave, type ConfirmEntry } from "@/lib/operations/confirm-all";
 import { findLookupCountry, type LookupRoomType } from "@/lib/offer/draft-types";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { endOfRiyadhDay, isRefundMode, refundPolicyText, REFUND_MODE_KEY, type RefundMode } from "@/lib/operations/refund-mode";
 import type { BoardType } from "@/lib/types";
 
 /**
@@ -457,10 +458,20 @@ export async function updateBooking(input: {
   supplier_name?: string;
   confirmation_number?: string | null;
   cancellation_policy?: string | null;
+  /**
+   * «مسترجع حتى / غير مسترجع / يُلغى إن لم يُدفع قبل» (the owner, 2026-10-30): the mode
+   * and its day (YYYY-MM-DD) — written as detail.refund_mode, cancellation_deadline
+   * (the day's end, Riyadh) and the policy line. mode null clears all three.
+   */
+  refund?: { mode: RefundMode | null; date: string | null };
   note?: string | null;
 }): Promise<{ ok: true } | Fail> {
   const denied = await gateRow("operation_bookings", input.id);
   if (denied) return { ok: false, error: denied };
+  const refund = input.refund;
+  if (refund && refund.mode !== null && !isRefundMode(refund.mode)) return { ok: false, error: "err.updateFailed" };
+  // a refundable window or a hold has a day, and a real one
+  if (refund && (refund.mode === "refundable_until" || refund.mode === "pay_by") && !(refund.date && endOfRiyadhDay(refund.date))) return { ok: false, error: "ops.err.refundDate" };
   if (input.title !== undefined && !input.title.trim()) return { ok: false, error: "ops.err.titleRequired" };
   const cars = input.detail?.[DRV.cars];
   if (cars !== undefined && carCount(cars) === null) return { ok: false, error: "ops.err.carCount" };
@@ -474,6 +485,11 @@ export async function updateBooking(input: {
     if (input.detail !== undefined) patch.detail = input.detail;
     if (input.supplier_name !== undefined) patch.supplier_name = input.supplier_name;
     if (input.cancellation_policy !== undefined) patch.cancellation_policy = input.cancellation_policy;
+    if (refund) {
+      const day = refund.mode && refund.mode !== "non_refundable" ? refund.date : null;
+      patch.cancellation_deadline = day ? endOfRiyadhDay(day) : null;
+      if (input.cancellation_policy === undefined) patch.cancellation_policy = refund.mode ? refundPolicyText(refund.mode, day) : null;
+    }
     if (input.note !== undefined) patch.note = input.note;
     // Clearing the reference drops the booking back to a provisional hold —
     // "confirmed" without a number is a claim nobody can check at the desk.
@@ -500,7 +516,7 @@ export async function updateBooking(input: {
       if (moved && patch.status === undefined) Object.assign(patch, { status: "pending", supplier_booking_code: null, prebook_net: null, prebook_at: null });
     }
     // a flight's legs time the receptions and drop-offs — keep the lines as they were before the edit
-    const before = input.detail
+    const before = input.detail || refund
       ? ((await supabase.from("operation_bookings").select("kind, title, operation_id, detail").eq("id", input.id).maybeSingle()).data as {
           kind: string;
           title: string;
@@ -508,9 +524,20 @@ export async function updateBooking(input: {
           detail: Record<string, string> | null;
         } | null)
       : null;
-    // the supplier price check's currency (supplier-booking.ts) is ours, never the form's: carried over
-    const checkCurrency = before?.detail?.prebook_currency;
-    if (input.detail && checkCurrency && !input.detail.prebook_currency) patch.detail = { ...input.detail, prebook_currency: checkCurrency };
+    // the supplier price check's currency (supplier-booking.ts) and the refund mode are ours, never the form's: carried over
+    if (refund && !input.detail && !before) return { ok: false, error: "err.loadFailed" };
+    if (input.detail || refund) {
+      const next: Record<string, string> = { ...(input.detail ?? before?.detail ?? {}) };
+      for (const key of ["prebook_currency", REFUND_MODE_KEY]) {
+        const was = before?.detail?.[key];
+        if (was && !next[key]) next[key] = was;
+      }
+      if (refund) {
+        if (refund.mode) next[REFUND_MODE_KEY] = refund.mode;
+        else delete next[REFUND_MODE_KEY];
+      }
+      patch.detail = next;
+    }
     const { error } = await supabase.from("operation_bookings").update(patch).eq("id", input.id);
     if (error) return { ok: false, error: "err.updateFailed" };
     if (before?.kind === "flight" && input.detail) {

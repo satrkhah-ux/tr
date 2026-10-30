@@ -905,19 +905,20 @@ export function HotelPanel({
             })}
             {/* refundable — part of the price, so under the price column (a supplier rate states its own) */}
             {/* «مسترد / غير مسترد» always shown (the owner, 2026-10-29), with the last refund date when refundable */}
-            {!line.sourcing ? (
-              <div className={`${rowGap} ${HOTEL_COLS}`}>
-                <span className="max-xl:hidden xl:col-span-3" />
-                <div className="col-span-2">
-                  <RefundControl
-                    refundable={line.refundable}
-                    until={line.refundable_until}
-                    onChange={(v) => follow(line, (l) => ({ ...l, ...v }))}
-                    labels={{ yes: tx("refundable"), no: tx("nonRefundable"), until: tx("refundUntil") }}
-                  />
-                </div>
+            {/* 2026-10-30: three choices, and on a supplier-priced line its rate's own terms, read-only */}
+            <div className={`${rowGap} ${HOTEL_COLS}`}>
+              <span className="max-xl:hidden xl:col-span-3" />
+              <div className="col-span-2">
+                <RefundControl
+                  refundable={line.sourcing ? line.sourcing.refundable : line.refundable}
+                  until={line.sourcing ? null : line.refundable_until}
+                  payBy={line.sourcing ? null : line.pay_by}
+                  locked={!!line.sourcing}
+                  onChange={(v) => follow(line, (l) => ({ ...l, ...v }))}
+                  labels={{ yes: tx("refundable"), no: tx("nonRefundable"), until: tx("refundUntil"), payBy: tx("payBy") }}
+                />
               </div>
-            ) : null}
+            </div>
             {tboOf(line.hotel_id) ? (
               <TboStayPrice
                 // a new hotel, other dates, rooms or party: the last answer is not this stay's
@@ -1259,7 +1260,7 @@ function TboStayPrice({
     const each = Math.round((rate.total_line / Math.max(line.rooms.length, 1)) * 100) / 100;
     onApply({
       ...withRooms(
-        { ...line, sourcing: null, supplier: "TBO Holidays", refundable: rate.refundable, refundable_until: null },
+        { ...line, sourcing: null, supplier: "TBO Holidays", refundable: rate.refundable, refundable_until: null, pay_by: null },
         // each room its own name, as TBO gives them in order
         line.rooms.map((r, j) => ({ ...r, price: each, board_type: rate.board, hotel_room_name: (rate.rooms[j] ?? rate.rooms[0] ?? rate.room).slice(0, HOTEL_ROOM_NAME_MAX) })),
       ),

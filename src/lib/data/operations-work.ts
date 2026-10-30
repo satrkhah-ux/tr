@@ -38,6 +38,8 @@ type BookingRow = {
   paid_at: string | null;
   request_sent_at: string | null;
   request_answered_at: string | null;
+  is_paid: boolean | null;
+  refund_mode: string | null;
 };
 
 type DocRow = { operation_id: string; kind: string; booking_id: string | null; created_at: string };
@@ -87,7 +89,7 @@ async function load(): Promise<Loaded> {
       supabase
         .from("operation_bookings")
         .select(
-          "id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref, created_at, paid_at, request_sent_at, request_answered_at",
+          "id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref, created_at, paid_at, request_sent_at, request_answered_at, is_paid, refund_mode:detail->>refund_mode",
         )
         .in("operation_id", ids),
       // Revoked documents do not count as issued — that is the whole point of
@@ -136,6 +138,8 @@ async function load(): Promise<Loaded> {
           confirmed_at: b.confirmed_at,
           confirmation_number: b.confirmation_number,
           company_ref: b.company_ref,
+          is_paid: b.is_paid,
+          refund_mode: b.refund_mode,
         })),
         documents: ds.map((d) => ({ kind: d.kind, booking_id: d.booking_id, created_at: d.created_at })),
         travelers: ts.map((t) => ({ display_name: t.display_name, passport_expiry: t.passport_expiry })),

@@ -1959,6 +1959,7 @@ export const en = {
   "pg.refundable": "Refundable",
   "pg.nonRefundable": "Non-refundable",
   "pg.refundUntil": "until",
+  "pg.payBy": "Cancelled unless paid by",
   "pg.addItem": "Add",
   "pg.itemPlaceholder": "Write an item and press Add…",
   // visas stage
@@ -3334,6 +3335,7 @@ export const en = {
   "ops.request.markSent": "Sent by other means",
   "ops.request.sentLog": "Requests sent",
   "ops.partners": "Partner companies",
+  "ops.err.refundDate": "Pick the date: the last refund or payment day.",
   "ops.err.pickAssignee": "Choose who is handling it.",
   "ops.err.emptyMessage": "The message is empty.",
   "ops.err.sendFailed": "The message could not be sent.",
