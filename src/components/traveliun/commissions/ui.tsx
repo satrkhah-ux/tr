@@ -63,9 +63,9 @@ export function MonthPicker({ month, action }: { month: string; action: string }
   );
 }
 
-export function Tabs({ active, manage }: { active: "mine" | "cycles" | "policy"; manage: boolean }) {
+export function Tabs({ active, manage }: { active: "mine" | "cycles" | "policy" | "targets"; manage: boolean }) {
   const tabs: [string, string, typeof active][] = [["/commissions", "عمولتي", "mine"]];
-  if (manage) tabs.push(["/commissions/cycles", "دورة العمولات", "cycles"], ["/commissions/policy", "سياسة العمولة", "policy"]);
+  if (manage) tabs.push(["/commissions/cycles", "دورة العمولات", "cycles"], ["/commissions/policy", "سياسة العمولة", "policy"], ["/commissions/targets", "أهداف المبيعات", "targets"]);
   if (tabs.length < 2) return null;
   return (
     <nav className="flex flex-wrap gap-1.5">

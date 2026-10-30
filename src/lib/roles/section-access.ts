@@ -107,6 +107,7 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   // «عمولتي» is each holder's own — listed before /commissions, the first match wins
   ["/commissions/cycles", ["commissions.manage", "commissions.approve"]],
   ["/commissions/policy", ["commissions.manage", "commissions.approve"]],
+  ["/commissions/targets", ["commissions.manage"]],
   ["/commissions", ["commissions.view", "commissions.manage", "commissions.approve"]],
   // «المطوّر»: service switches and external links' health
   ["/murad-settings", ["settings.manage", "developer.access"]],

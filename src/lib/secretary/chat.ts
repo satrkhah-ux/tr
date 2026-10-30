@@ -7,6 +7,8 @@ import { notifyEmployee } from "@/lib/notifications/notify";
 import { cleanErrorReport, errorDedupeKey, errorQuestion, explainKnownError, renderKnown } from "./error-core";
 import { helpReply } from "./help";
 import { isHowTo } from "./help-core";
+import { isTargetQuestion } from "@/lib/commissions/target";
+import { salesTargetBrief } from "@/lib/data/commissions";
 import { currentSecretaryEmployee, planText, renderBriefing, secretaryBriefing, secretaryDb, secretarySettings, type SecretaryEmployee } from "./core";
 
 /**
@@ -31,6 +33,7 @@ const SECRETARY_SYSTEM = [
   "- أنت تساعد الموظف ولا تراسل العملاء: لا تَعِد بإرسال شيء لعميل.",
   "- بالعربية البسيطة، قصيراً ومرتباً (نقاط عند الحاجة)، وبأسماء العملاء كما وردت.",
   "- رتّب الأولوية: من رد وينتظر، ثم الساخن، ثم المستحق اليوم.",
+  "- إن سأل عن هدفه أو مبيعاته أو عمولته: أجب من «أرقام الموظف هذا الشهر» فقط — كم بقي، وكم يلزمه يومياً، ثم أي العملاء في قائمته أقرب للتأكيد (من رد وينتظر، الساخن، متابعات العروض) ليبدأ بهم. لا تذكر رقم موظف آخر.",
 ].join("\n");
 
 const TABLE_MISSING = "42P01";
@@ -85,18 +88,22 @@ export async function askSecretary(text: string): Promise<SecretaryThread> {
   if (insertError) return { ok: false, error: "تعذّر الحفظ." };
 
   // «كيف أنشئ بكج؟» — the system guide, not the employee's day (help-core.ts)
-  const howTo = isHowTo(question);
-  const reply = howTo ? await helpReply(question) : await dayReply(employee, question);
+  // «كيف أصل إلى هدفي؟» is about the employee's own figures, not the guide
+  const target = isTargetQuestion(question);
+  const howTo = isHowTo(question) && !target;
+  const reply = howTo ? await helpReply(question) : await dayReply(employee, question, target);
   await db.from("secretary_messages").insert({ employee_id: employee.id, role: "secretary", content: reply });
   await logAudit({ action: "secretary.chat", entity: "secretary_messages", entity_id: employee.id, meta: { chars: question.length, help: howTo } });
   const messages = await thread(employee.id);
   return { ok: true, messages: messages ?? [] };
 }
 
-async function dayReply(employee: SecretaryEmployee, question: string): Promise<string> {
-  const [briefing, history] = await Promise.all([secretaryBriefing(employee), thread(employee.id, 12)]);
+async function dayReply(employee: SecretaryEmployee, question: string, target = false): Promise<string> {
+  // the month's figures cost a full commission calculation: only when the question is about them (commissions.view, own row only)
+  const [briefing, history, figures] = await Promise.all([secretaryBriefing(employee), thread(employee.id, 12), target ? salesTargetBrief() : null]);
   const context = [
     renderBriefing(employee, briefing),
+    ...(target ? ["", figures ?? "أرقام المبيعات والهدف غير ظاهرة لهذا الموظف (لا يملك صلاحية «عمولتي»)."] : []),
     "",
     "آخر الحوار بينك وبين الموظف:",
     ...(history ?? []).map((m) => `${m.role === "user" ? "الموظف" : "السكرتير"}: ${m.content.slice(0, 600)}`),

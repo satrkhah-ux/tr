@@ -47,6 +47,8 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
 import { ExecutiveOverview } from "./ExecutiveDashboardClient";
 import { OperationsSnapshot } from "./operations/OperationsSnapshot";
 import { MyDashboard } from "./MyDashboard";
+import { SalesTargetCard } from "./SalesTargetCard";
+import type { MySalesCard } from "@/lib/data/commissions";
 import { DepartmentHomes } from "./home/DepartmentHomes";
 import { homeKindsFor } from "@/lib/roles/homes";
 import type { VisaBoard } from "@/lib/visa-files/types";
@@ -56,7 +58,7 @@ import { LatestOfferPanel } from "./LatestOfferPanel";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { TranslationKey } from "@/lib/i18n";
 
-export function TraveliunDashboardClient({ opsSummary, mine, latest = null, visaBoard = null }: { opsSummary: OpsSummary; mine: MyDashboardData; latest?: ClientOffer | null; visaBoard?: VisaBoard | null }) {
+export function TraveliunDashboardClient({ opsSummary, mine, latest = null, visaBoard = null, salesCard = null }: { opsSummary: OpsSummary; mine: MyDashboardData; latest?: ClientOffer | null; visaBoard?: VisaBoard | null; salesCard?: MySalesCard | null }) {
   const { dashboardView } = useRole();
   const { t, dir } = useTraveliunUI();
 
@@ -65,9 +67,9 @@ export function TraveliunDashboardClient({ opsSummary, mine, latest = null, visa
     <TraveliunShell title="nav.dashboard">
       <div className="tv-fade-up" dir={dir}>
         {dashboardView === "admin" ? (
-          <AdminHome opsSummary={opsSummary} mine={mine} latest={latest} />
+          <AdminHome opsSummary={opsSummary} mine={mine} latest={latest} salesCard={salesCard} />
         ) : dashboardView === "employee" ? (
-          <EmployeeHome opsSummary={opsSummary} mine={mine} visaBoard={visaBoard} />
+          <EmployeeHome opsSummary={opsSummary} mine={mine} visaBoard={visaBoard} salesCard={salesCard} />
         ) : (
           <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
@@ -232,7 +234,7 @@ function PreviousSections() {
  * administration too. So «لوحتي» is the first tab and the tabs lead the page;
  * the executive and team tabs are unchanged behind it.
  */
-function AdminHome({ opsSummary, mine, latest }: { opsSummary: OpsSummary; mine: MyDashboardData; latest: ClientOffer | null }) {
+function AdminHome({ opsSummary, mine, latest, salesCard }: { opsSummary: OpsSummary; mine: MyDashboardData; latest: ClientOffer | null; salesCard: MySalesCard | null }) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const canExec = can("pricing.internal");
@@ -259,6 +261,7 @@ function AdminHome({ opsSummary, mine, latest }: { opsSummary: OpsSummary; mine:
         </button>
       </div>
 
+      {tab === "mine" && salesCard ? <SalesTargetCard data={salesCard} /> : null}
       {tab === "mine" ? <MyFollowups /> : null}
       {tab === "mine" ? <MyDashboard data={mine} /> : canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
 
@@ -274,12 +277,13 @@ function AdminHome({ opsSummary, mine, latest }: { opsSummary: OpsSummary; mine:
 }
 
 // ---------- EMPLOYEE home: «لوحتي» first, then operations + sections ----------
-function EmployeeHome({ opsSummary, mine, visaBoard }: { opsSummary: OpsSummary; mine: MyDashboardData; visaBoard: VisaBoard | null }) {
+function EmployeeHome({ opsSummary, mine, visaBoard, salesCard }: { opsSummary: OpsSummary; mine: MyDashboardData; visaBoard: VisaBoard | null; salesCard: MySalesCard | null }) {
   const { can } = useRole();
   // a colleague of a department opens on that department's home (the owner, 2026-10-29); anyone else keeps the general one
   if (homeKindsFor(can).length) {
     return (
       <div className="space-y-4">
+        {salesCard ? <SalesTargetCard data={salesCard} /> : null}
         <DepartmentHomes opsSummary={opsSummary} mine={mine} visaBoard={visaBoard} />
         <PreviousSections />
       </div>
@@ -287,6 +291,7 @@ function EmployeeHome({ opsSummary, mine, visaBoard }: { opsSummary: OpsSummary;
   }
   return (
     <div className="space-y-4">
+      {salesCard ? <SalesTargetCard data={salesCard} /> : null}
       <MyFollowups />
       <MyDashboard data={mine} />
       <OperationsSnapshot summary={opsSummary} />

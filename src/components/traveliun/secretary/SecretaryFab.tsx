@@ -11,7 +11,7 @@ import { SecretaryDayBoard } from "./SecretaryDayBoard";
 import { StatusButtons } from "@/components/traveliun/presence/StatusButtons";
 import type { ErrorReport } from "@/lib/secretary/error-core";
 import { ErrorWatch } from "./ErrorWatch";
-import { MURAD_ERROR_EVENT } from "./send-error";
+import { MURAD_ASK_EVENT, MURAD_ERROR_EVENT } from "./send-error";
 
 /** Permanent side handle with an accessible drawer. */
 export function SecretaryFab() {
@@ -20,6 +20,7 @@ export function SecretaryFab() {
   const [board, setBoard] = useState<SecretaryBoard | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingError, setPendingError] = useState<ErrorReport | null>(null);
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   function changeOpen(next: boolean) {
     setOpen(next);
     if (next && !loading) {
@@ -30,6 +31,7 @@ export function SecretaryFab() {
 
   const [statusOpen, setStatusOpen] = useState(false);
   const clearPending = useCallback(() => setPendingError(null), []);
+  const clearQuestion = useCallback(() => setPendingQuestion(null), []);
   // «أرسل الخطأ لمُراد» from anywhere on the page: open the chat with it
   useEffect(() => {
     const take = (e: Event) => {
@@ -38,8 +40,18 @@ export function SecretaryFab() {
       setTab("chat");
       setOpen(true);
     };
+    const ask = (e: Event) => {
+      e.preventDefault();
+      setPendingQuestion((e as CustomEvent<string>).detail);
+      setTab("chat");
+      setOpen(true);
+    };
     window.addEventListener(MURAD_ERROR_EVENT, take);
-    return () => window.removeEventListener(MURAD_ERROR_EVENT, take);
+    window.addEventListener(MURAD_ASK_EVENT, ask);
+    return () => {
+      window.removeEventListener(MURAD_ERROR_EVENT, take);
+      window.removeEventListener(MURAD_ASK_EVENT, ask);
+    };
   }, []);
 
   return <Sheet open={open} onOpenChange={changeOpen}>
@@ -76,7 +88,7 @@ export function SecretaryFab() {
             {!loading && board && <SecretaryDayBoard board={board} compact />}
             {!loading && !board && <p className="p-2 text-sm text-[#557d78]">تعذّر قراءة خطتك الآن — افتح الصفحة الكاملة.</p>}
           </div>
-        : <SecretaryChat pendingError={pendingError} onPendingTaken={clearPending} />}
+        : <SecretaryChat pendingError={pendingError} onPendingTaken={clearPending} pendingQuestion={pendingQuestion} onQuestionTaken={clearQuestion} />}
     </SheetContent>
   </Sheet>;
 }

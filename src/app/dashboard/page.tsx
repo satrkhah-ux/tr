@@ -1,6 +1,7 @@
 import { TraveliunDashboardClient } from "@/components/traveliun/TraveliunDashboardClient";
 import { getOperationsSummary } from "@/lib/data/operations-work";
 import { getMyDashboard } from "@/lib/data/my-dashboard";
+import { getMySalesCard } from "@/lib/data/commissions";
 import { getLatestOffer } from "@/lib/data/offers";
 import { getVisaBoard } from "@/lib/data/visa-files";
 import { currentCan } from "@/lib/roles/current";
@@ -13,7 +14,7 @@ export default async function DashboardPage() {
   // clock rather than the visitor's laptop. «لوحتي» likewise: the employee is
   // read from the session here, so the browser never names whose numbers to show.
   // the latest offer, its smart check and client link (the old «مركز التشغيل الذكي») — the administration's
-  const [opsSummary, mine, latest, visaBoard] = await Promise.all([
+  const [opsSummary, mine, latest, visaBoard, salesCard] = await Promise.all([
     getOperationsSummary(),
     getMyDashboard(),
     currentCan("dashboard.admin").then((on) => (on ? getLatestOffer() : null)),
@@ -23,6 +24,8 @@ export default async function DashboardPage() {
       const r = await getVisaBoard();
       return r.ok ? r.board : null;
     }),
+    // «مبيعاتك / هدفك / عمولتك» — the signed-in employee's own month (commissions.view), never a colleague's
+    getMySalesCard().catch(() => null),
   ]);
-  return <TraveliunDashboardClient opsSummary={opsSummary} mine={mine} latest={latest} visaBoard={visaBoard} />;
+  return <TraveliunDashboardClient opsSummary={opsSummary} mine={mine} latest={latest} visaBoard={visaBoard} salesCard={salesCard} />;
 }

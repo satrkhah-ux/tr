@@ -15,6 +15,7 @@ import {
   type CommissionCalculationSnapshot,
   type CommissionPolicyDocument,
 } from "@/lib/commissions/policy";
+import { daysLeftInMonth, parseTargets, progress, SALES_TARGETS_KEY, targetFor, type SalesTargets } from "@/lib/commissions/target";
 
 /**
  * «العمولات» (0092): the month's commission from the files themselves — no
@@ -237,5 +238,76 @@ export async function getPolicyView(): Promise<PolicyView | null> {
     me,
     employees: ((staff.data ?? []) as { id: string; arabic_name: string }[]).map((e) => ({ id: e.id, name: e.arabic_name })),
     can: { manage, approve },
+  };
+}
+
+// ------------------------------------------------ «أهداف المبيعات» ----
+
+export async function readSalesTargets(db: SupabaseClient): Promise<SalesTargets> {
+  const { data } = await db.from("app_settings").select("value").eq("key", SALES_TARGETS_KEY).maybeSingle();
+  return parseTargets((data as { value?: string } | null)?.value);
+}
+
+/** The home card (the owner, 2026-10-30): this month's own figures from «عمولتي», and the target. Null = no commissions.view. */
+export type MySalesCard = {
+  month: string;
+  sales: number;
+  clients: number;
+  commission: number;
+  frozen: boolean;
+  target: number | null;
+  progress: ReturnType<typeof progress>;
+  daysLeft: number;
+};
+
+export async function getMySalesCard(nowMs = Date.now()): Promise<MySalesCard | null> {
+  const mine = await getMyCommission();
+  const me = mine && (await getCurrentEmployeeId());
+  if (!mine || !me) return null;
+  const targets = await readSalesTargets(service());
+  const target = targetFor(targets, me, mine.month);
+  return {
+    month: mine.month,
+    sales: mine.sales,
+    clients: mine.files.length,
+    commission: mine.net,
+    frozen: mine.frozen,
+    target,
+    progress: progress(mine.sales, target),
+    daysLeft: daysLeftInMonth(nowMs),
+  };
+}
+
+/** مُراد's grounding for «كيف أصل إلى هدفي؟» — the same card, as plain lines; null when the employee may not see commissions. */
+export async function salesTargetBrief(): Promise<string | null> {
+  const c = await getMySalesCard().catch(() => null);
+  if (!c) return null;
+  const n = (x: number) => Math.round(x).toLocaleString("en-US");
+  return [
+    `أرقام الموظف هذا الشهر (${c.month}) — كما في «العمولات»: الملف يُحسب في الشهر الذي أكمل فيه العميل الدفع:`,
+    `- مبيعاته: ${n(c.sales)} ريال`,
+    `- عدد العملاء المؤكدين (أكملوا الدفع): ${c.clients}`,
+    `- عمولته التقديرية: ${n(c.commission)} ريال${c.frozen ? " (معتمدة)" : " (تقديرية، تتحدث مع كل سداد)"}`,
+    c.target && c.progress
+      ? `- هدفه الشهري: ${n(c.target)} ريال — حقق ${c.progress.pct}%، الباقي ${n(c.progress.left)} ريال، وبقي في الشهر ${c.daysLeft} يوماً (≈ ${n(c.progress.left / c.daysLeft)} ريال يومياً)`
+      : "- لم تحدد الإدارة له هدفاً شهرياً بعد.",
+  ].join("\n");
+}
+
+export type TargetsView = {
+  month: string;
+  employees: { id: string; name: string }[];
+  targets: SalesTargets;
+};
+
+/** «أهداف المبيعات» — commissions.manage only. */
+export async function getTargetsView(monthIn?: string): Promise<TargetsView | null> {
+  if (!(await currentCan("commissions.manage"))) return null;
+  const db = service();
+  const [targets, staff] = await Promise.all([readSalesTargets(db), db.from("employees").select("id, arabic_name").eq("status", "Active").order("arabic_name")]);
+  return {
+    month: isMonth(monthIn) ? monthIn : thisMonth(),
+    employees: ((staff.data ?? []) as { id: string; arabic_name: string }[]).map((e) => ({ id: e.id, name: e.arabic_name })),
+    targets,
   };
 }

@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { parseCommissionPolicy } from "@/lib/commissions/policy";
-import { activePolicy, calculate, isMonth, liveCycleOf, service, DEFAULT_MONTHLY_COST, type Adjustment, type CycleRow } from "@/lib/data/commissions";
+import { logAudit } from "@/lib/data/audit";
+import { SALES_TARGETS_KEY, withTarget } from "@/lib/commissions/target";
+import { activePolicy, calculate, readSalesTargets, isMonth, liveCycleOf, service, DEFAULT_MONTHLY_COST, type Adjustment, type CycleRow } from "@/lib/data/commissions";
 
 /**
  * The commission cycle's steps (0092). Each one asks for its permission again —
@@ -172,4 +174,29 @@ export async function discardPolicyDraft(policyId: string): Promise<ActionResult
   if (!(await gate("commissions.manage")) && !(await gate("commissions.approve"))) return fail("لا تملك الصلاحية");
   const { error } = await service().from("commission_policies").delete().eq("id", policyId).eq("status", "draft");
   return error ? fail("تعذّر الحذف") : done();
+}
+
+/**
+ * «أهداف المبيعات»: one employee's standing target (month null) or one month's override; amount null clears it.
+ * commissions.manage; audited with before and after.
+ */
+export async function setSalesTarget(employeeId: string, month: string | null, amount: number | null): Promise<ActionResult> {
+  if (!(await gate("commissions.manage"))) return fail("لا تملك صلاحية إدارة العمولات");
+  if (typeof employeeId !== "string" || !/^[0-9a-f-]{36}$/i.test(employeeId)) return fail("موظف غير موجود");
+  const db = service();
+  // ponytail: read-modify-write of one JSON value; two managers saving in the same second can lose one edit — a table if that ever happens
+  const { data: person } = await db.from("employees").select("id").eq("id", employeeId).maybeSingle();
+  if (!person) return fail("موظف غير موجود");
+  const before = await readSalesTargets(db);
+  const next = withTarget(before, employeeId, month, amount);
+  if (!next) return fail("المبلغ أو الشهر غير صحيح");
+  const { error } = await db.from("app_settings").upsert({ key: SALES_TARGETS_KEY, value: JSON.stringify(next), updated_at: new Date().toISOString() });
+  if (error) return fail("تعذّر الحفظ");
+  await logAudit({
+    action: "settings.updated",
+    entity: "app_settings",
+    entity_id: SALES_TARGETS_KEY,
+    meta: { employee_id: employeeId, month, before: month ? (before.months[month]?.[employeeId] ?? null) : (before.monthly[employeeId] ?? null), after: amount },
+  });
+  return done();
 }

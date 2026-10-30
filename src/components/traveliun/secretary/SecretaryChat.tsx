@@ -10,7 +10,7 @@ import { takePendingError } from "./send-error";
 const QUICK = ["ما حال محادثاتي؟", "ما مهامي اليوم؟", "من الساخن؟", "كيف أنشئ بكج جديد؟"];
 
 /** pendingError: an error sent with «أرسل الخطأ لمُراد» (SecretaryFab); /secretary reads the one left in sessionStorage */
-export function SecretaryChat({ tall = false, active = true, pendingError = null, onPendingTaken }: { tall?: boolean; active?: boolean; pendingError?: ErrorReport | null; onPendingTaken?: () => void }) {
+export function SecretaryChat({ tall = false, active = true, pendingError = null, onPendingTaken, pendingQuestion = null, onQuestionTaken }: { tall?: boolean; active?: boolean; pendingError?: ErrorReport | null; onPendingTaken?: () => void; pendingQuestion?: string | null; onQuestionTaken?: () => void }) {
   const [messages, setMessages] = useState<SecretaryMsg[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,6 +38,15 @@ export function SecretaryChat({ tall = false, active = true, pendingError = null
     void explain(pendingError);
     onPendingTaken?.();
   }, [pendingError, onPendingTaken]);
+
+  // a ready question from a button elsewhere (askMurad): asked once, the older thread must not overwrite its answer
+  useEffect(() => {
+    if (!pendingQuestion) return;
+    explaining.current = true;
+    void send(pendingQuestion);
+    onQuestionTaken?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- send reads the latest state itself; re-running on it would ask twice
+  }, [pendingQuestion, onQuestionTaken]);
 
   async function explain(report: ErrorReport) {
     setError("");

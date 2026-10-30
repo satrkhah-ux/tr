@@ -34,3 +34,11 @@ export function takePendingError(): ErrorReport | null {
     return null;
   }
 }
+
+/** a ready question for مُراد from a button elsewhere (the home sales card): the floating panel opens its chat and asks it */
+export const MURAD_ASK_EVENT = "murad:ask";
+
+export function askMurad(question: string): void {
+  const taken = !window.dispatchEvent(new CustomEvent(MURAD_ASK_EVENT, { detail: question, cancelable: true }));
+  if (!taken) window.location.assign("/secretary");
+}
