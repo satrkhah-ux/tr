@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { SignInShowcase, SignInTypedMobile } from "./SignInServices";
 import { TraveliunLogo } from "./TraveliunLogo";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -67,9 +68,10 @@ export function TraveliunSignIn() {
           <div className="mb-8 flex justify-center">
             <TraveliunLogo />
           </div>
+          <SignInTypedMobile />
           <form
             onSubmit={submit}
-            className="rounded-md bg-white px-[52px] py-[54px] shadow-[0_0_28px_rgba(0,0,0,0.06)]"
+            className="tv-rise rounded-md bg-white px-[52px] py-[54px] shadow-[0_0_28px_rgba(0,0,0,0.06)]"
           >
             <label className="mb-7 block">
               <span className="mb-2 block text-[13px] font-medium text-[#003c3a]">
@@ -133,7 +135,7 @@ export function TraveliunSignIn() {
           </p>
         </div>
       </section>
-      <section className="hidden min-h-screen bg-[url('/traveliun/auth-background.webp')] bg-cover bg-center lg:block" />
+      <SignInShowcase />
     </main>
   );
 }
