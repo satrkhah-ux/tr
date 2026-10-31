@@ -60,8 +60,8 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
     if (leadError || !lead) throw Error("visa_lead_missing");
     const receipt = lead.murad_receipt as MuradReceipt | null;
     if (!receipt) throw Error("visa_receipt_missing");
-    const { data: employees } = await service.from("employees").select("id,arabic_name,english_name").eq("status", "Active");
-    const assignment = currentAssignment({ assignee: agent?.name ?? null, team: team.name }, employees ?? []);
+    const { data: employees } = await service.from("employees").select("id,arabic_name,english_name,teletel_agent_id").eq("status", "Active");
+    const assignment = currentAssignment({ assignee: agent?.name ?? null, team: team.name, assigneeId: agent?.id ?? null }, employees ?? []);
     const updated: MuradReceipt = { ...receipt, assignedAt, team: team.name, agent: agent?.name ?? null, pending: false };
     const { error } = await service.from("client_leads").update({ ...assignment, murad_receipt: updated, assigned_at: assignedAt, assignee_reply_at: null, auto_route: team.name, auto_routed_at: assignedAt, auto_wait_sec: receipt.waitSec, updated_at: assignedAt }).eq("id", lead.id);
     if (error) throw Error("visa_receipt_save_failed");

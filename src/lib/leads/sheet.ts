@@ -35,9 +35,9 @@ export const INQUIRIES = [
   { label: "طلب غير واضح", color: "#a64d79", ink: "#ffffff" },
 ] as const;
 
-/** one spelling for comparing Arabic: no spaces, hamzas or tā' marbūṭa, no tatweel */
+/** one spelling for comparing Arabic: no spaces, hamzas or tā' marbūṭa, no tatweel, no hidden direction marks («‏اسوار») */
 export function fold(s: string): string {
-  return s.replace(/\s+/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "");
+  return s.replace(/[\s‎‏‪-‮⁦-⁩]+/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "");
 }
 
 const INQUIRY_ALIASES: Record<string, string> = {
@@ -122,7 +122,15 @@ export function matchEmployee(name: string, employees: { id: string; arabic_name
   if (exact.length === 1) return exact[0].id;
   const words = name.trim().split(/\s+/).length;
   const starts = employees.filter((e) => fold(e.arabic_name.trim().split(/\s+/).slice(0, words).join(" ")) === n);
-  return starts.length === 1 ? starts[0].id : null;
+  if (starts.length === 1) return starts[0].id;
+  // the name as Teletel shows it: first and last only («خالد الجبري» is «خالد محمد علي الجبري»)
+  const parts = name.trim().split(/\s+/);
+  if (parts.length !== 2) return null;
+  const ends = employees.filter((e) => {
+    const w = e.arabic_name.trim().split(/\s+/);
+    return w.length > 2 && fold(w[0]) === fold(parts[0]) && fold(w[w.length - 1]) === fold(parts[1]);
+  });
+  return ends.length === 1 ? ends[0].id : null;
 }
 
 /** the calendar day in Riyadh (YYYY-MM-DD) — the company's day, whatever the server's clock */

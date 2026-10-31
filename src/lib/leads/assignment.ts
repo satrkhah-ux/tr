@@ -1,6 +1,9 @@
 import { matchEmployee } from "./sheet";
-type Person = { id: string; arabic_name: string; english_name: string | null };
-export function employeeFor(name: string | null, people: Person[]): string | null {
+type Person = { id: string; arabic_name: string; english_name: string | null; teletel_agent_id?: number | null };
+/** the employee behind a Teletel agent: by the agent's id when known (employees.teletel_agent_id), else by name */
+export function employeeFor(name: string | null, people: Person[], agentId?: number | null): string | null {
+  const byId = agentId ? people.filter((p) => p.teletel_agent_id === agentId) : [];
+  if (byId.length === 1) return byId[0].id;
   if (!name) return null;
   return matchEmployee(name, people) ?? matchEmployee(name, people.filter(p=>p.english_name).map(p=>({id:p.id,arabic_name:p.english_name!})));
 }
@@ -9,11 +12,11 @@ export const teamLabel = (team: string): string => (/^قسم\s/.test(team) ? tea
 
 /** The provider's current owner is authoritative. Keep its display name even
  * when that agent has no matching local employee; a team is also an assignment. */
-export function currentAssignment(conversation: { assignee: string | null; team: string | null }, people: Person[]) {
+export function currentAssignment(conversation: { assignee: string | null; team: string | null; assigneeId?: number | null }, people: Person[]) {
   const name = conversation.assignee?.trim() || null;
   const team = conversation.team?.trim() || null;
   return {
-    assigned_to: name ? employeeFor(name, people) : null,
+    assigned_to: name ? employeeFor(name, people, conversation.assigneeId) : null,
     assigned_to_name: name ?? (team ? teamLabel(team) : null),
   };
 }

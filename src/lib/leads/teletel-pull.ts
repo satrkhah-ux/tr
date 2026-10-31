@@ -46,7 +46,7 @@ const TIMELINE_PAGES = 10;
 
 const iso = (sec: number) => new Date(sec * 1000).toISOString();
 
-type Person = { id: string; arabic_name: string; english_name: string | null };
+type Person = { id: string; arabic_name: string; english_name: string | null; teletel_agent_id: number | null };
 type Known = {
   id: string;
   phone: string;
@@ -133,7 +133,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   const nowSec = Math.floor(Date.now() / 1000);
 
   const [{ data: people }, places, { data: known }] = await Promise.all([
-    supabase.from("employees").select("id, arabic_name, english_name").eq("status", "Active"),
+    supabase.from("employees").select("id, arabic_name, english_name, teletel_agent_id").eq("status", "Active"),
     loadPlaces(supabase),
     // ponytail: every Teletel row and every unmatched sheet row, a page at a time (PostgREST stops at a thousand); a date window when it grows past tens of thousands
     allRows((a, b) =>
@@ -160,7 +160,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   const reopened: OpenConversation[] = [];
   for (const c of open) {
     const phone = normalizePhone(c.phone);
-    const holder = employeeFor(c.assignee, team);
+    const holder = employeeFor(c.assignee, team, c.assigneeId);
     // where it stands for «الشاشات» and /m (lifecycle.ts): the client waiting on us, or we spoke last
     const live = { ...currentAssignment(c, team), delay: delayText(c, nowSec) || null, status: "open" as const, conversation_state: c.waitingSince > 0 ? "waiting" : "open" };
     const had = byConversation.get(c.id) ?? sheetByPhone.get(phone);
@@ -318,7 +318,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     await Promise.all(gone.slice(i, i + 5).map(async (lead) => {
       // A handover may have happened just before closure, between two pulls.
       const current = await teletelGet<{ inbox_id?: number; status?: string; meta?: { assignee?: { id?: number; name?: string }; team?: { name?: string } } }>(`/conversations/${lead.teletel_conversation_id}`);
-      const assignment = current?.meta ? currentAssignment({ assignee: current.meta.assignee?.name ?? null, team: current.meta.team?.name ?? null }, team) : {};
+      const assignment = current?.meta ? currentAssignment({ assignee: current.meta.assignee?.name ?? null, team: current.meta.team?.name ?? null, assigneeId: current.meta.assignee?.id ?? null }, team) : {};
       await supabase.from("client_leads").update({ ...assignment, status: "closed", delay: null, updated_at: new Date().toISOString() }).eq("id", lead.id);
       // who closed it, kept (lifecycle.ts): when the client writes again it goes back to them, or to intake — resolved
       // only (a snoozed one leaves the open list too)
