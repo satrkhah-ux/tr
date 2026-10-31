@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, RotateCcw, Search } from "lucide-react";
 import type { Lead } from "@/lib/data/leads";
-import { getReportSupervision, incompleteReasons } from "@/lib/data/daily-report";
+import { getReportSupervision, getStaffReport, incompleteReasons } from "@/lib/data/daily-report";
 import { toCsv } from "@/lib/data/table-csv";
 import type { Place } from "@/lib/leads/auto";
 import { NOTHING, resolvePlace } from "@/lib/leads/places";
@@ -32,6 +32,7 @@ import {
   type ReportRequest,
   type SupervisionFigures,
 } from "@/lib/leads/daily-report";
+import { StaffCompare } from "./StaffCompare";
 
 /**
  * «التقرير» (the owner, 2026-10-29): the follow-up staff's daily requests report, written by the system from the
@@ -47,6 +48,7 @@ const VIEWS = [
   ["departments", "حسب القسم"],
   ["all", "كل الطلبات"],
   ["review", "مراجعة وتصحيح"],
+  ["compare", "مطابقة تقريري"],
 ] as const;
 type View = (typeof VIEWS)[number][0];
 const PERIODS: [PeriodKind, string][] = [
@@ -79,6 +81,11 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
   // Teletel could not answer, tried again after all the others
   const [tried, setTried] = useState<string[]>([]);
   const [failedIds, setFailedIds] = useState<string[]>([]);
+  // «مطابقة تقريري» only for who may compare (reports.staff_compare, or a manager)
+  const [canCompare, setCanCompare] = useState(false);
+  useEffect(() => {
+    void getStaffReport(today).then((r) => setCanCompare(r !== null)).catch(() => undefined);
+  }, [today]);
   const latest = useRef(0);
   const resets = useRef(0);
   // moves between periods: a read that ends on another period says nothing about the one now shown
@@ -313,7 +320,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        {VIEWS.map(([k, label]) => (
+        {VIEWS.filter(([k]) => k !== "compare" || canCompare).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setView(k)} className={`h-8 rounded-full px-3 text-[12px] font-extrabold max-sm:min-h-10 ${view === k ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045] hover:bg-[#f0f7f4]"}`}>
             {label}
           </button>
@@ -328,7 +335,9 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
 
       {note ? <p className="rounded-[9px] bg-[#fff8eb] px-3 py-2 text-[12px] font-bold text-[#8a5a00]">{note}</p> : null}
 
-      {view !== "review" ? (
+      {view === "compare" ? (
+        <StaffCompare report={report} places={places} />
+      ) : view !== "review" ? (
         <div className="tv-card space-y-2 rounded-[12px] border p-3">
           <textarea
             value={text}

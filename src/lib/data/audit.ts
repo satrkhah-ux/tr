@@ -62,6 +62,7 @@ export type AuditAction =
   | "discounts.campaign_created"
   | "discounts.sent"
   | "discounts.redeemed"
+  | "reports.staff_saved"
   | "expense.deleted"
   | "payment.agreed_total_set"
   | "payment.agreement_set"

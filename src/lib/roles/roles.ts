@@ -100,6 +100,8 @@ export const ALL_PERMISSIONS = [
   "clients.view",
   "followups.work",
   "followups.manage",
+  /** «مطابقة تقريري»: paste the daily report written by hand and see it beside the system's, with the reasons of each difference (the owner, 2026-10-31). */
+  "reports.staff_compare",
   /** «التأشيرات»: work the visa files (create, collect documents, submit, follow up) — the visa department. */
   "visas.work",
   /** «التأشيرات»: the department's whole board, reassigning files, payments and the numbers. */
@@ -216,7 +218,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   },
   {
     key: "perm.group.clients",
-    items: [{ key: "clients.view", kind: "view" }, { key: "followups.work", kind: "do" }, { key: "followups.manage", kind: "do", sensitive: true }],
+    items: [{ key: "clients.view", kind: "view" }, { key: "followups.work", kind: "do" }, { key: "followups.manage", kind: "do", sensitive: true }, { key: "reports.staff_compare", kind: "do" }],
   },
   {
     key: "perm.group.visas",

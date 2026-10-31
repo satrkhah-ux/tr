@@ -2259,6 +2259,8 @@ export const en = {
   "perm.followups.work": "Follow-up agent",
   "perm.followups.work.hint": "Claim transferred clients and work on your assigned cases.",
   "perm.followups.manage": "Follow-up supervisor",
+  "perm.reports.staff_compare": "Daily report matching",
+  "perm.reports.staff_compare.hint": "Paste the hand-written daily report and compare it with the system's, with the reason of each difference.",
   "perm.group.visas": "Visas",
   "perm.visas.work": "Visa agent",
   "perm.visas.work.hint": "Open visa files, collect documents, submit and follow up.",

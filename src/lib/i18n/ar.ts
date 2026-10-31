@@ -2257,6 +2257,8 @@ export const ar: Dictionary = {
   "perm.followups.work": "موظف المتابعة",
   "perm.followups.work.hint": "استلام العملاء المحولين للمتابعة والعمل على الملفات المسندة إليك.",
   "perm.followups.manage": "الإشراف على المتابعة",
+  "perm.reports.staff_compare": "مطابقة التقرير اليومي",
+  "perm.reports.staff_compare.hint": "لصق التقرير اليومي المكتوب باليد ومقارنته بتقرير النظام مع سبب كل فرق.",
   "perm.group.visas": "التأشيرات",
   "perm.visas.work": "موظف التأشيرات",
   "perm.visas.work.hint": "فتح ملفات التأشيرات وجمع المستندات والتقديم والمتابعة.",

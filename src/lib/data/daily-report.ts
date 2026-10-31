@@ -8,6 +8,8 @@ import { reasonFromMessages } from "@/lib/leads/incomplete-reason";
 import type { SupervisionFigures } from "@/lib/leads/daily-report";
 import { getSupervisionReport } from "@/lib/followups/supervision/actions";
 import { exemptNow } from "@/lib/manager-screen/exempt";
+import { getCurrentEmployeeId } from "@/lib/data/metrics";
+import { logAudit } from "@/lib/data/audit";
 
 /**
  * «التقرير» — why each unclear request is unclear («ارسل مرفقات فقط», «تحية فقط»), read from what the client wrote in
@@ -71,4 +73,44 @@ export async function getReportSupervision(days: number): Promise<SupervisionFig
       .filter((row) => row.key !== "—" && !exempt.employeeIds.has(row.key))
       .map((row) => ({ name: report.names[row.key] ?? "موظف", due: row.due, done: row.done, overdue: row.overdue, compliance: row.compliance })),
   };
+}
+
+/**
+ * «مطابقة تقريري» (the owner, 2026-10-31): the daily report a follow-up employee writes by hand, kept per day and per
+ * employee (app_settings `staff_report:<day>:<employee>`) beside the comparison she saw — read back by her, and by the
+ * coordinator who studies the differences until one way of counting is agreed. reports.staff_compare, or a manager.
+ */
+export type StaffReportSaved = { text: string; name: string | null; at: string; rows: unknown };
+
+async function staffReportKey(day: string): Promise<{ key: string; employeeId: string } | null> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const allowed = (await Promise.all([currentCan("reports.staff_compare"), currentCan("dashboard.admin")])).some(Boolean);
+  const employeeId = allowed ? await getCurrentEmployeeId() : null;
+  return employeeId ? { key: `staff_report:${day}:${employeeId}`, employeeId } : null;
+}
+
+/** null when the caller may not compare; else what she saved for that day (or null) */
+export async function getStaffReport(day: string): Promise<{ saved: StaffReportSaved | null } | null> {
+  const k = await staffReportKey(day);
+  if (!k) return null;
+  const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("app_settings").select("value").eq("key", k.key).maybeSingle();
+  try {
+    return { saved: data?.value ? (JSON.parse(data.value) as StaffReportSaved) : null };
+  } catch {
+    return { saved: null };
+  }
+}
+
+export async function saveStaffReport(day: string, text: string, rows: unknown): Promise<{ ok: boolean; error?: string }> {
+  const k = await staffReportKey(day);
+  if (!k) return { ok: false, error: "لا صلاحية لحفظ التقرير" };
+  const body = String(text ?? "").slice(0, 20_000);
+  if (!body.trim()) return { ok: false, error: "التقرير فارغ" };
+  const db = createSupabaseServiceClient() as unknown as SupabaseClient;
+  const { data: me } = await db.from("employees").select("arabic_name").eq("id", k.employeeId).maybeSingle();
+  const value: StaffReportSaved = { text: body, name: (me?.arabic_name as string | undefined)?.replace(/[\u200e\u200f]/g, "").trim() ?? null, at: new Date().toISOString(), rows: JSON.parse(JSON.stringify(rows ?? null)) };
+  const { error } = await db.from("app_settings").upsert({ key: k.key, value: JSON.stringify(value), updated_at: value.at });
+  if (error) return { ok: false, error: "تعذّر الحفظ" };
+  await logAudit({ action: "reports.staff_saved", entity: "employees", entity_id: k.employeeId, meta: { day, key: k.key } });
+  return { ok: true };
 }
