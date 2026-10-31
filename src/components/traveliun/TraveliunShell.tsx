@@ -57,6 +57,7 @@ import {
   Timer,
   Wallet,
   TicketPercent,
+  KeyRound,
   Wrench,
   X,
   Zap,
@@ -246,6 +247,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.discountCampaigns", href: "/discounts" },
     ],
   },
+  // «حسابات الدخول» — every employee adds the logins they hold; the administration sees all (lib/logins/actions.ts)
+  { labelKey: "nav.logins", href: "/logins", icon: KeyRound },
 
   // ---------- «قسم البيانات» — the reference tables the generator reads ----------
   // Fifty links of «البيانات» and «الإدارة» down to eighteen (the owner, 2026-10-19):
@@ -852,7 +855,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
 /** Visual sections only: access filtering and link order stay in useNavGroups. */
 function menuSection(key: TranslationKey): TranslationKey {
   if (["nav.dataSection", "nav.adminSection", "nav.sla", "nav.managementDecisions", "nav.muradSettings", "nav.developer"].includes(key)) return "nav.section.management";
-  if (["nav.visaFiles", "nav.partnerCompanies", "nav.almatar", "nav.operations", "nav.commissions", "nav.accounts", "nav.discounts"].includes(key)) return "nav.section.services";
+  if (["nav.visaFiles", "nav.partnerCompanies", "nav.almatar", "nav.operations", "nav.commissions", "nav.accounts", "nav.discounts", "nav.logins"].includes(key)) return "nav.section.services";
   return "nav.section.daily";
 }
 

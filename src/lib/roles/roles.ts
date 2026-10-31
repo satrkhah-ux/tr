@@ -94,6 +94,8 @@ export const ALL_PERMISSIONS = [
   "discounts.manage",
   /** «قارئ الكوبونات»: scan a client's coupon and use it — once. */
   "discounts.redeem",
+  /** «حسابات الدخول»: see and manage every login the staff added (the owner, 2026-10-31) — each employee sees their own without it. */
+  "logins.manage",
   /** «مطوّر»: the developer page — external links' health, and turning system services on and off. */
   "developer.access",
   /** «العملاء» (/clients): every client conversation (0107 — every role got it; take it per role or colleague). */
@@ -260,6 +262,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "discounts.manage", kind: "do", sensitive: true },
       { key: "discounts.redeem", kind: "do" },
     ],
+  },
+  {
+    key: "perm.group.logins",
+    items: [{ key: "logins.manage", kind: "do", sensitive: true }],
   },
   {
     key: "perm.group.team",

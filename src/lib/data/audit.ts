@@ -62,6 +62,10 @@ export type AuditAction =
   | "discounts.campaign_created"
   | "discounts.sent"
   | "discounts.redeemed"
+  // «حسابات الدخول»: saved / shown / removed (meta: the account's name — never the password)
+  | "login.saved"
+  | "login.revealed"
+  | "login.deleted"
   | "reports.staff_saved"
   | "expense.deleted"
   | "payment.agreed_total_set"
