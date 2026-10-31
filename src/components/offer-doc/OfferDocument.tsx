@@ -1282,10 +1282,10 @@ const listCardMm = (items: string[]) =>
 const paymentNoteMm = (finance: FinanceSection | undefined) => {
   if (!hasFinance(finance)) return 19;
   const lines = (list: string[]) => list.reduce((sum, l) => sum + 6.2 * Math.max(1, Math.ceil(l.length / 95)), 0);
-  return 17 + [finance.banks, finance.payments, finance.instalment].reduce((sum, list) => sum + (list.length ? 7 + lines(list) : 0), 0);
+  return 17 + [finance.banks, finance.payments, finance.refunds ?? [], finance.instalment].reduce((sum, list) => sum + (list.length ? 7 + lines(list) : 0), 0);
 };
 
-/** «الشروط المالية»: the bank accounts, the payment milestones, the instalment plan — each only when written. */
+/** «الشروط المالية»: the bank accounts, the payment milestones, the hotels' refund terms, the instalment plan — each only when written. */
 function FinanceTerms({ finance }: { finance: FinanceSection }) {
   const part = (title: string, list: string[]) =>
     list.length ? (
@@ -1303,6 +1303,7 @@ function FinanceTerms({ finance }: { finance: FinanceSection }) {
       <h3>{AR.financeTerms}</h3>
       {part(AR.financeBanks, finance.banks)}
       {part(AR.financePayments, finance.payments)}
+      {part(AR.financeRefunds, finance.refunds ?? [])}
       {part(AR.financeInstalment, finance.instalment)}
     </div>
   );

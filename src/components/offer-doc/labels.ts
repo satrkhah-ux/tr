@@ -131,6 +131,7 @@ export const AR = {
   financeTerms: "الشروط المالية",
   financeBanks: "الحسابات البنكية",
   financePayments: "شروط الدفع",
+  financeRefunds: "سياسة الاسترجاع",
   financeInstalment: "تقسيط المبلغ",
   termsContract: "عقد إتفاقية بيع (الشروط والأحكام)",
   climate: "الطقس والملابس المناسبة",

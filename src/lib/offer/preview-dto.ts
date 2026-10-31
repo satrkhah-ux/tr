@@ -32,7 +32,7 @@ import {
   FLIGHTS_LATER_LINE,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
-import { financeSection, type FinanceTerm } from "./finance-terms";
+import { financeSection, withFileTerms, type FinanceTerm } from "./finance-terms";
 import { clientStayLine, draftTransportNote } from "./itinerary";
 import { AIRPORT_TRANSFER_LINE, advancedDayNote, advancedLines, meetsElsewhere } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
@@ -98,6 +98,27 @@ export function draftToPreviewOffer(
   const nights = data.trip.nights || cities.reduce((sum, c) => sum + c.nights, 0);
   const days = data.trip.days || (nights > 0 ? nights + 1 : 0);
   const route = advancedLines(data.advanced);
+  // what the issue prints: the hotels this file sells (soldHotels)
+  const hotels = deriveHotelStays(cities, soldHotels(data)).map(({ line: h, nights: stayNights, check_in, check_out }) => {
+    return {
+      city_name: h.city_name || null,
+      hotel_name: h.hotel_name || null,
+      stars: h.sourcing?.star_rating ?? null,
+      room_type: roomTypesText(h.rooms, (b) => BOARD_AR[b]) || h.room_type_name || h.sourcing?.room_name || null,
+      board_type: h.board_type,
+      rooms_count: h.rooms_count,
+      nights: stayNights,
+      check_in,
+      check_out,
+      sell_price: null,
+      sell_currency: null,
+      cancellation_policy: stayCancellation(h),
+      excluded_surcharges: h.sourcing?.excluded_surcharges ?? [],
+      valid_until: h.sourcing?.valid_until ?? null,
+      image_url: h.sourcing?.image_url ?? null,
+      facilities: h.sourcing?.facilities ?? [],
+    };
+  });
 
   return {
     ...emptyBase(),
@@ -115,27 +136,7 @@ export function draftToPreviewOffer(
     total: draftSellTotal(data, sarPer),
     currency: data.pricing.display_currency,
     pricing: emptyPricing(data.pricing.display_currency),
-    // what the issue prints: the hotels this file sells (soldHotels)
-    hotels: deriveHotelStays(cities, soldHotels(data)).map(({ line: h, nights: stayNights, check_in, check_out }) => {
-      return {
-        city_name: h.city_name || null,
-        hotel_name: h.hotel_name || null,
-        stars: h.sourcing?.star_rating ?? null,
-        room_type: roomTypesText(h.rooms, (b) => BOARD_AR[b]) || h.room_type_name || h.sourcing?.room_name || null,
-        board_type: h.board_type,
-        rooms_count: h.rooms_count,
-        nights: stayNights,
-        check_in,
-        check_out,
-        sell_price: null,
-        sell_currency: null,
-        cancellation_policy: stayCancellation(h),
-        excluded_surcharges: h.sourcing?.excluded_surcharges ?? [],
-        valid_until: h.sourcing?.valid_until ?? null,
-        image_url: h.sourcing?.image_url ?? null,
-        facilities: h.sourcing?.facilities ?? [],
-      };
-    }),
+    hotels,
     // as the issue prints them: a part «أضف لاحقاً» is said, not shown (drafts.ts produce)
     flights: data.flights.filter((f) => !(f.leg_order === "internal" ? data.flight_booking.later_dom : data.flight_booking.later_intl)).map((f) => ({
       airline: f.airline || null,
@@ -167,13 +168,18 @@ export function draftToPreviewOffer(
     ],
     excludes: [...route.excludes, ...data.services.excludes],
     terms: data.services.terms,
-    finance: financeSection(finance.items, {
-      countryId: finance.countryId,
-      total: draftSellTotal(data, sarPer),
-      currency: data.pricing.display_currency,
-      travelDate: start,
-      issueDate: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
-    }),
+    finance: withFileTerms(
+      financeSection(finance.items, {
+        countryId: finance.countryId,
+        total: draftSellTotal(data, sarPer),
+        currency: data.pricing.display_currency,
+        travelDate: start,
+        issueDate: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
+      }),
+      data.pricing.plan,
+      data.pricing.display_currency,
+      hotels,
+    ),
     days: data.days
       // index on the FULL list: the transport line depends on a day's neighbours
       .map((d, index) => ({ d, move: data.scope.transport ? advancedDayNote(draftTransportNote(data, data.days, index), data.advanced) : null }))

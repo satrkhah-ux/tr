@@ -155,6 +155,8 @@ import { OfferVersions } from "../OfferVersions";
 import { ReissueOffer } from "../ReissueOffer";
 import { PriceUpdate } from "./PriceUpdate";
 import { PayMethodPick } from "./PayMethodPick";
+import { PaymentPlanBox } from "./PaymentPlanBox";
+import { dueDates } from "@/lib/offer/payment-plan";
 import { OverlandHopNotice } from "../OverlandHopNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -2009,6 +2011,23 @@ export function BasicEditor({
                       const { payment_method: _was, ...rest } = data.pricing;
                       void _was;
                       patch({ pricing: m ? { ...rest, payment_method: m } : rest });
+                    }}
+                  />
+                ) : null}
+                {canPricing && !partnerSession && clientPays > 0 ? (
+                  <PaymentPlanBox
+                    plan={data.pricing.plan}
+                    total={clientPays}
+                    profit={summary.profit}
+                    currency={display}
+                    dates={dueDates(
+                      data.hotels.flatMap((h) => [h.refundable_until, h.pay_by]),
+                      new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
+                    )}
+                    onChange={(plan) => {
+                      const { plan: _was, ...rest } = data.pricing;
+                      void _was;
+                      patch({ pricing: plan ? { ...rest, plan } : rest });
                     }}
                   />
                 ) : null}

@@ -7,6 +7,8 @@
  * Pure: no database, no clock (the issue date comes in).
  */
 
+import { planLines, refundLines, type PaymentPlan } from "./payment-plan";
+
 export type DueWhen = "confirm" | "after_confirm" | "before_travel";
 
 export type FinanceTerm = {
@@ -23,11 +25,21 @@ export type FinanceTerm = {
   due_amount?: number | null;
 };
 
-export type FinanceSection = { banks: string[]; payments: string[]; instalment: string[] };
+/** `refunds`: «سياسة الاسترجاع» — each hotel's refund terms (the owner, 2026-10-31); absent on snapshots issued before it */
+export type FinanceSection = { banks: string[]; payments: string[]; instalment: string[]; refunds?: string[] };
 
 export const emptyFinance = (): FinanceSection => ({ banks: [], payments: [], instalment: [] });
 export const hasFinance = (f: FinanceSection | undefined): f is FinanceSection =>
-  Boolean(f && (f.banks.length || f.payments.length || f.instalment.length));
+  Boolean(f && (f.banks.length || f.payments.length || f.instalment.length || f.refunds?.length));
+
+/**
+ * The file's own terms on top of the data team's (the owner, 2026-10-31): a payment plan agreed with this client
+ * replaces the standing milestones under «شروط الدفع»; the hotels' refund terms go under «سياسة الاسترجاع».
+ */
+export function withFileTerms(section: FinanceSection, plan: PaymentPlan | undefined, currency: string | null, hotels: Parameters<typeof refundLines>[0]): FinanceSection {
+  const lines = planLines(plan, currency);
+  return { ...section, payments: lines.length ? lines : section.payments, refunds: refundLines(hotels) };
+}
 
 const days = (n: number) => (n === 1 ? "يوم واحد" : n === 2 ? "يومين" : n <= 10 ? `${n} أيام` : `${n} يوماً`);
 const money = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });

@@ -8,6 +8,7 @@
  */
 
 import type { FinanceTerm } from "./finance-terms";
+import { cleanPlan, type PaymentPlan } from "./payment-plan";
 import type { BoardType, FlightLegOrder, PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { normalizeAdvanced, withAdvancedTransport, type DraftAdvanced } from "./advanced";
@@ -1634,12 +1635,19 @@ export type DraftPricing = {
    * None = the cash price, as before. Our own riyal files only.
    */
   payment_method?: PayMethod;
+  /** «خطة الدفع» (the owner, 2026-10-31): the first payment and the dues on their dates — payment-plan.ts */
+  plan?: PaymentPlan;
 };
 
 export type PackageProfit = { mode: "pct" | "amount"; value: number | null };
 
 /** A stored method kept only when it is one of E's; a «اعتمد هذه» pin only when every figure is a number — anything else prices on its own. */
 function withAdopted(pricing: DraftPricing): DraftPricing {
+  if (pricing.plan !== undefined) {
+    const { plan, ...rest } = pricing;
+    const clean = cleanPlan(plan);
+    pricing = clean ? { ...rest, plan: clean } : rest;
+  }
   if (pricing.payment_method !== undefined && !isPayMethod(pricing.payment_method)) {
     const { payment_method: _unknown, ...rest } = pricing;
     void _unknown;

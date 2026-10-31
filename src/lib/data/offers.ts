@@ -2,7 +2,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findLookupCountry } from "@/lib/offer/draft-types";
-import { financeSection, type FinanceSection } from "@/lib/offer/finance-terms";
+import { financeSection, withFileTerms, type FinanceSection } from "@/lib/offer/finance-terms";
+import { cleanPlan, type PaymentPlan } from "@/lib/offer/payment-plan";
 import { loadFinanceTerms } from "./finance-terms";
 import { getPaymentFees } from "./app-settings";
 import { methodsForFees, sessionEFee, withMethodFees } from "@/lib/offer/payment-methods";
@@ -574,6 +575,18 @@ async function offerFinance(
   return { ...section, instalment: withMethodFees(section.instalment, base ?? offer.total, methodsForFees(), sessionEFee(fees)) };
 }
 
+/** «خطة الدفع» of the Basic file that issued this serial (payment-plan.ts) — none when it has no plan. */
+async function filePlan(supabase: SupabaseClient, serial: string): Promise<PaymentPlan | undefined> {
+  const { data } = await supabase
+    .from("offer_drafts")
+    .select("plan:data->pricing->plan")
+    .eq("data->>produced_serial", serial)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return cleanPlan((data as { plan?: unknown } | null)?.plan);
+}
+
 /** The internal offer, unchecked — not exported: its callers state their own gate. */
 async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | null> {
   try {
@@ -812,7 +825,9 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       includes,
       excludes: serviceRows.filter((s) => s.kind === "exclude").map((s) => s.label),
       terms: termRows.map((t) => t.text),
-      finance: await offerFinance(supabase, offer, { travel: arrival_date, issue: issue_date }, ourPrice).catch(() => undefined),
+      finance: await offerFinance(supabase, offer, { travel: arrival_date, issue: issue_date }, ourPrice)
+        .then(async (section) => withFileTerms(section, await filePlan(supabase, offer.serial), offer.currency, hotels))
+        .catch(() => undefined),
       climate,
       // numerics come back from pg as strings — coerce so the document formats
       // them as numbers instead of printing "30.0" verbatim.
