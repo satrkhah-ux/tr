@@ -129,8 +129,8 @@ export function LoginsPanel({ rows, manager, vault }: { rows: LoginRow[]; manage
 
       <section className={card}>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث بالاسم أو الإيميل أو الرقم" className={`${field} max-w-xs`} />
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className={`${field} w-auto`}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث بالاسم أو الإيميل أو الرقم" className={`${field} sm:max-w-xs`} />
+          <select value={kind} onChange={(e) => setKind(e.target.value)} className={field.replace("w-full", "w-auto")}>
             <option value="all">كل الأنواع</option>
             {LOGIN_KINDS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
           </select>
